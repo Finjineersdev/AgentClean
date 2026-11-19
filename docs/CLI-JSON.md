@@ -87,4 +87,8 @@ the selection, `freed`, and `runs` (after purging when `--execute`).
 **`pin [FOLDER]`**, **`unpin FOLDER`**: `{"command":"pin","pinned":[…]}`, the
 list after the change.
 
+**`config [--idle-days N] [--dormant-days N] [--exclude DIR]… [--include DIR]…`**:
+`command`, `path` (the config file), `idle_days`, `dormant_days`, `pinned`,
+`exclude`, after any change. Like `pin`, it changes only AgentClean's config.
+
 **`rules-check DIR`**: `command`, `rule_files`, `artifacts`.

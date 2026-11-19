@@ -1,0 +1,15 @@
+[
+  {
+    "command": "config",
+    "dormant_days": 90,
+    "exclude": [
+      "$TMP/work"
+    ],
+    "idle_days": 7,
+    "path": "CONFIG",
+    "pinned": [
+      "$TMP/work/site"
+    ],
+    "schema_version": 1
+  }
+]

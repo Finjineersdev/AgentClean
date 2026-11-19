@@ -352,6 +352,10 @@ fn normalized(e: &Env, out: &str) -> serde_json::Value {
                     match k.as_str() {
                         "bytes" | "freed" | "created_unix" if v.is_u64() => *v = 0.into(),
                         "run_id" => *v = "RUN".into(),
+                        // The config file's place differs between macOS and Linux.
+                        "path" if v.as_str().is_some_and(|p| p.ends_with("config.toml")) => {
+                            *v = "CONFIG".into()
+                        }
                         _ => mask(v, base),
                     }
                 }
@@ -417,6 +421,10 @@ fn json_output_matches_the_snapshots() {
     snapshot("purge-dry-run", &json(&["purge", &id, "--store", store]));
     snapshot("restore", &json(&["restore", &id, "--store", store]));
     snapshot("pin", &json(&["pin", project]));
+    snapshot(
+        "config",
+        &json(&["config", "--idle-days", "7", "--exclude", work]),
+    );
 
     let out = e.run(&["--json", "restore", "nope", "--store", store]);
     assert!(!out.status.success());
@@ -456,4 +464,37 @@ fn only_narrows_the_selection() {
         assert!(exists(&e.project, ".next/cache/build.bin"));
         assert!(!e.store.exists());
     }
+}
+
+#[test]
+fn config_changes_only_the_settings() {
+    let e = env();
+    let work = e.project.parent().unwrap().to_str().unwrap().to_owned();
+    let out = e.ok(&[
+        "config",
+        "--idle-days",
+        "3",
+        "--dormant-days",
+        "30",
+        "--exclude",
+        &work,
+    ]);
+    assert!(out.contains("idle after  3 days"), "{out}");
+    let saved = fs::read_to_string(config_file(&e)).unwrap();
+    assert!(
+        saved.contains("idle_days = 3") && saved.contains(&work),
+        "{saved}"
+    );
+    let base = e.home.parent().unwrap().to_str().unwrap().to_owned();
+    let scan = e.ok(&["scan", &base]);
+    assert!(scan.contains("excluded"), "{scan}");
+
+    // Idle may not exceed dormant; nothing is saved.
+    let bad = e.run(&["config", "--idle-days", "40"]);
+    assert!(!bad.status.success());
+    assert_eq!(fs::read_to_string(config_file(&e)).unwrap(), saved);
+
+    e.ok(&["config", "--include", &work]);
+    assert!(!fs::read_to_string(config_file(&e)).unwrap().contains(&work));
+    assert!(exists(&e.project, ".next/cache/build.bin"));
 }

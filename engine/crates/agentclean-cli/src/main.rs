@@ -102,6 +102,21 @@ enum Cmd {
     Pin { folder: Option<PathBuf> },
     /// Remove a pin
     Unpin { folder: PathBuf },
+    /// Show the settings, or change them. Changes only AgentClean's config.
+    Config {
+        /// Projects changed within this many days are Active
+        #[arg(long, value_name = "DAYS")]
+        idle_days: Option<u64>,
+        /// Projects unchanged for this many days are Dormant
+        #[arg(long, value_name = "DAYS")]
+        dormant_days: Option<u64>,
+        /// Folder for scan to skip (repeatable)
+        #[arg(long, value_name = "FOLDER")]
+        exclude: Vec<PathBuf>,
+        /// Stop skipping a folder (repeatable)
+        #[arg(long, value_name = "FOLDER")]
+        include: Vec<PathBuf>,
+    },
     /// List clean runs, newest first
     History {
         #[command(flatten)]
@@ -204,6 +219,12 @@ fn main() -> ExitCode {
         ),
         Cmd::Pin { folder } => pin(folder.as_deref()),
         Cmd::Unpin { folder } => unpin(&folder),
+        Cmd::Config {
+            idle_days,
+            dormant_days,
+            exclude,
+            include,
+        } => config(idle_days, dormant_days, &exclude, &include),
         Cmd::History { store } => history(&store),
         Cmd::Restore { run, item, store } => restore(&run, item, &store),
         Cmd::Purge {
@@ -308,6 +329,64 @@ fn unpin(folder: &Path) -> CliResult {
     print_pins(&cfg);
     if !json_mode() {
         say!("Unpinned {}.", folder.display());
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn config(
+    idle: Option<u64>,
+    dormant: Option<u64>,
+    exclude: &[PathBuf],
+    include: &[PathBuf],
+) -> CliResult {
+    let path = config_path()?;
+    let mut cfg = Config::load(&path)?;
+    let before = cfg.clone();
+    cfg.idle_days = idle.unwrap_or(cfg.idle_days);
+    cfg.dormant_days = dormant.unwrap_or(cfg.dormant_days);
+    if cfg.idle_days > cfg.dormant_days {
+        return Err(format!(
+            "idle days ({}) cannot be more than dormant days ({})",
+            cfg.idle_days, cfg.dormant_days
+        ));
+    }
+    for folder in exclude {
+        let folder =
+            std::fs::canonicalize(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
+        if !cfg.exclude.contains(&folder) {
+            cfg.exclude.push(folder);
+        }
+    }
+    for folder in include {
+        let canon = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.clone());
+        cfg.exclude.retain(|p| p != folder && p != &canon);
+    }
+    if cfg != before {
+        cfg.save(&path)?;
+    }
+    let list = |v: &[PathBuf]| v.iter().map(|p| lossy(p)).collect::<Vec<_>>();
+    if json_mode() {
+        put(
+            "command",
+            "config",
+            json!({
+                "path": lossy(&path),
+                "idle_days": cfg.idle_days,
+                "dormant_days": cfg.dormant_days,
+                "pinned": list(&cfg.pinned),
+                "exclude": list(&cfg.exclude),
+            }),
+        );
+    } else {
+        say!("config      {}", path.display());
+        say!("idle after  {} days", cfg.idle_days);
+        say!("dormant     {} days", cfg.dormant_days);
+        cfg.pinned
+            .iter()
+            .for_each(|p| say!("pinned      {}", p.display()));
+        cfg.exclude
+            .iter()
+            .for_each(|p| say!("excluded    {}", p.display()));
     }
     Ok(ExitCode::SUCCESS)
 }
