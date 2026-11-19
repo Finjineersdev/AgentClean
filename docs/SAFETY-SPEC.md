@@ -41,7 +41,12 @@ through a linted rule and the guard. There is no free-form delete.
 The repository being inspected is untrusted input. A repository's own
 configuration can name programs for git to run, so the guard calls git with
 `core.fsmonitor=false` and `core.hooksPath=/dev/null`, clears `GIT_DIR` and
-`GIT_WORK_TREE`, and never passes a path through a shell.
+`GIT_WORK_TREE`, and never passes a path through a shell. A partial clone
+would fetch missing objects from a remote the repository names, over a
+transport it chooses (`ext::` runs a command), so git also runs with
+`GIT_NO_LAZY_FETCH=1` (git 2.45 and later) and an empty `GIT_ALLOW_PROTOCOL`,
+which allows no transport and overrides the repository's own
+`protocol.<name>.allow`.
 `git_check_does_not_run_repository_programs` proves the fsmonitor case.
 
 ### Known limits
@@ -95,7 +100,7 @@ nothing is approved without an activity assessment.
 | --- | --- | --- | --- |
 | I15 | A pinned project, or one inside a pinned folder, is refused with no override. An Active project (a process other than AgentClean's own process family and pipeline runs inside it, or a file or commit is newer than `idle_days`) is refused unless the guard is built with `allow_active` (`--include-active`) | `Guard::check`, `activity::assess` | `active_and_pinned_projects_are_refused`, `pinned_projects_are_never_cleaned`, `projects_in_use_need_an_explicit_flag`, `a_tool_running_inside_makes_it_active` |
 | I15a | Dormant needs every signal checked in full: git answered, the edit walk finished within its limits, and processes were listed. Otherwise the verdict is at most Idle | `activity::decide` | `an_incomplete_check_is_never_dormant`, `too_many_files_is_never_dormant`, `a_broken_repository_is_never_dormant` |
-| I15b | Reading the last commit runs git with the I11 settings plus `log.showSignature=false`, so a repository cannot make it run `gpg.program` | `guard::hardened_git` | `reading_commits_does_not_run_repository_programs` |
+| I15b | Reading the last commit runs git with the I11 settings plus `log.showSignature=false`, so a repository cannot make it run `gpg.program` or fetch from its own remote | `guard::hardened_git` | `reading_commits_does_not_run_repository_programs`, `reading_commits_does_not_fetch_from_the_repositorys_remote` |
 | I15c | A config file that exists but cannot be read, has an unknown key, a relative pin, or `idle_days` above `dormant_days` stops `plan` and `clean`: pins are never silently dropped | `Config::load` | `config_is_read_strictly`, `a_broken_config_stops_cleaning` |
 
 Known limit: activity is assessed once, before approval. A tool started in

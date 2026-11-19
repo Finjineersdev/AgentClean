@@ -307,6 +307,12 @@ pub(crate) fn hardened_git(root: &Path) -> Command {
     .arg(root)
     .env("GIT_OPTIONAL_LOCKS", "0")
     .env("GIT_TERMINAL_PROMPT", "0")
+    // A partial clone fetches missing objects from a remote the repository
+    // names, over a transport it chooses (`ext::` runs a command). No lazy
+    // fetches, and no transport at all: an empty GIT_ALLOW_PROTOCOL overrides
+    // even a repository's own `protocol.<name>.allow`.
+    .env("GIT_NO_LAZY_FETCH", "1")
+    .env("GIT_ALLOW_PROTOCOL", "")
     .env_remove("GIT_DIR")
     .env_remove("GIT_WORK_TREE")
     .stdin(Stdio::null())

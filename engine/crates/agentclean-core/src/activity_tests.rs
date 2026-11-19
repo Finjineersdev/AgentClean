@@ -283,6 +283,69 @@ fn reading_commits_does_not_run_repository_programs() {
 
 #[cfg(unix)]
 #[test]
+fn reading_commits_does_not_fetch_from_the_repositorys_remote() {
+    let tmp = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(tmp.path()).unwrap();
+    let repo = base.join("repo");
+    touch(&repo.join("package.json"), 200);
+    git(&repo, &["init", "-q"], 0);
+    // HEAD's tree is missing, as in a partial clone, and the promisor remote
+    // is an ext:: transport that runs a command.
+    let commit = "tree 1111111111111111111111111111111111111111\n\
+        author t <t@example.invalid> 1600000000 +0000\n\
+        committer t <t@example.invalid> 1600000000 +0000\n\nx\n";
+    fs::write(base.join("commit"), commit).unwrap();
+    let id = Command::new("git")
+        .args([
+            "hash-object",
+            "-t",
+            "commit",
+            "-w",
+            "--literally",
+            "../commit",
+        ])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    let id = String::from_utf8(id.stdout).unwrap();
+    git(&repo, &["update-ref", "HEAD", id.trim()], 0);
+    let marker = base.join("ran");
+    let url = format!("ext::sh -c touch% {}", marker.display());
+    for (key, value) in [
+        ("core.repositoryformatversion", "1"),
+        ("extensions.partialClone", "origin"),
+        ("remote.origin.url", url.as_str()),
+        ("remote.origin.promisor", "true"),
+        ("protocol.ext.allow", "always"),
+        ("protocol.allow", "always"),
+    ] {
+        git(&repo, &["config", key, value], 0);
+    }
+
+    // The trap is armed: plain git log runs the remote's command.
+    Command::new("git")
+        .args(["log", "-1", "--", "."])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    assert!(marker.exists(), "test setup: the lazy fetch did not run");
+    fs::remove_file(&marker).unwrap();
+
+    let a = run(&repo, Some(&quiet()));
+    assert!(
+        !marker.exists(),
+        "assess fetched from the repository's remote"
+    );
+    assert!(
+        a.reason().contains("git could not be read"),
+        "{}",
+        a.reason()
+    );
+    assert_ne!(a.verdict(), Verdict::Dormant);
+}
+
+#[cfg(unix)]
+#[test]
 fn a_tool_running_inside_makes_it_active() {
     let (_tmp, root) = project();
     age_all(&root, 200);
