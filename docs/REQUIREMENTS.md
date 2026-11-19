@@ -64,7 +64,6 @@ permanent deletion as a default.
 
 ## Open items
 
-- GitHub owner for the repository and Homebrew tap (`AGENTCLEAN_OWNER`).
 - Bundle identifier: currently `app.agentclean.AgentClean`; change it to a
   domain the owner controls.
 - New app icon and character art; the inherited icon stays until then.

@@ -18,7 +18,7 @@ jobs:
       #   MACOS_CERT_PASSWORD   its password
       #   MACOS_SIGN_IDENTITY   e.g. "Developer ID Application: Your Name (TEAMID)"
       #   APPLE_ID, APPLE_APP_PASSWORD, APPLE_TEAM_ID   for notarytool
-      # Optional: TAP_GITHUB_TOKEN (fine-grained PAT with contents:write on AGENTCLEAN_OWNER/homebrew-tap) to bump the cask.
+      # Optional: TAP_GITHUB_TOKEN (fine-grained PAT with contents:write on Finjineersdev/homebrew-tap) to bump the cask.
       HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' }}
       HAS_TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN != '' }}
     steps:
@@ -87,7 +87,7 @@ jobs:
           body: |
             ## Install
             ```bash
-            brew install --cask AGENTCLEAN_OWNER/tap/agentclean
+            brew install --cask Finjineersdev/tap/agentclean
             ```
             or download the `.dmg` below, drag **AgentClean** to Applications, and on first launch **right-click → Open** (unless this build is notarized). Then grant **Full Disk Access** when the app asks.
 
@@ -100,7 +100,7 @@ jobs:
         run: |
           V="${VERSION#v}"
           SHA=$(awk '{print $1}' "dist/AgentClean-$V.dmg.sha256")
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/AGENTCLEAN_OWNER/homebrew-tap.git" tap
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Finjineersdev/homebrew-tap.git" tap
           cd tap
           sed -i '' -E "s/^  version \".*\"/  version \"$V\"/; s/^  sha256 \".*\"/  sha256 \"$SHA\"/" Casks/agentclean.rb
           git config user.name "agentclean-release-bot"

@@ -13,7 +13,7 @@ Thanks for looking under the hood. This is a tool that deletes files, so the bar
 ## Setup
 
 ```bash
-git clone https://github.com/AGENTCLEAN_OWNER/AgentClean.git
+git clone https://github.com/Finjineersdev/AgentClean.git
 cd AgentClean
 cd CleanCore && swift test          # engine tests, no Xcode project needed
 cd .. && open AgentClean.xcodeproj  # Xcode 26+, macOS 26 SDK

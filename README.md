@@ -68,6 +68,3 @@ New work is under the Apache License 2.0 ([LICENSE](LICENSE)). Code inherited
 from the upstream project stays under its MIT licence, and code it adapted
 from other projects keeps theirs; see [NOTICE](NOTICE) and
 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
-
-Before publishing, replace the `AGENTCLEAN_OWNER` placeholder with the GitHub
-account or organisation that will host the project.

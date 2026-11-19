@@ -39,13 +39,11 @@ in this repository. Keep it that way.
 ## 3. Repository state
 
 - Location on the owner's Mac: `/Users/muhammad/prod-project`.
-- Branch `agentclean-m0`, on top of 22 upstream commits.
-- **Nothing is committed.** M0 changes are staged; M1 changes and this handoff
-  are unstaged. Suggested first action: commit them as two or three commits
-  (see section 7).
-- Not yet on GitHub. The placeholder `AGENTCLEAN_OWNER` appears in the README,
-  Cargo manifests, release workflow and docs; replace it once the owner picks
-  the account (`grep -rn AGENTCLEAN_OWNER .`).
+- Private repository <https://github.com/Finjineersdev/AgentClean>, branch
+  `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
+  commits. The upstream fork is the `upstream` remote. Make it public after
+  the name check and the `SECURITY.md` rewrite.
+- M0, M1 and M2.1 are committed.
 - Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
   owner names a domain they control.
 

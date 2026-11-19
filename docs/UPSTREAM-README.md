@@ -11,12 +11,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AGENTCLEAN_OWNER/AgentClean/releases/latest"><img src="https://img.shields.io/github/v/release/AGENTCLEAN_OWNER/AgentClean?style=flat-square&color=2DD4BF" alt="Release" /></a>
+  <a href="https://github.com/Finjineersdev/AgentClean/releases/latest"><img src="https://img.shields.io/github/v/release/Finjineersdev/AgentClean?style=flat-square&color=2DD4BF" alt="Release" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey?style=flat-square" alt="macOS 26+" />
   <img src="https://img.shields.io/badge/swift-6-orange?style=flat-square" alt="Swift 6" />
   <img src="https://img.shields.io/badge/telemetry-none-2DD4BF?style=flat-square" alt="No telemetry" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT" />
-  <a href="https://github.com/AGENTCLEAN_OWNER/homebrew-tap"><img src="https://img.shields.io/badge/brew-AGENTCLEAN_OWNER%2Ftap%2Fagentclean-fbb040?style=flat-square" alt="Homebrew" /></a>
+  <a href="https://github.com/Finjineersdev/homebrew-tap"><img src="https://img.shields.io/badge/brew-Finjineersdev%2Ftap%2Fagentclean-fbb040?style=flat-square" alt="Homebrew" /></a>
 </p>
 
 <p align="center">
@@ -64,10 +64,10 @@ Everything else a cleaner should do is here too, but with the same honesty: Dock
 **Homebrew** (recommended, no Gatekeeper dance):
 
 ```bash
-brew install --cask AGENTCLEAN_OWNER/tap/agentclean
+brew install --cask Finjineersdev/tap/agentclean
 ```
 
-**Or the DMG**: download the latest `.dmg` from [Releases](https://github.com/AGENTCLEAN_OWNER/AgentClean/releases/latest), open it, drag **AgentClean** to Applications. The build is signed but not notarized yet, so the first launch needs **right-click → Open**, or:
+**Or the DMG**: download the latest `.dmg` from [Releases](https://github.com/Finjineersdev/AgentClean/releases/latest), open it, drag **AgentClean** to Applications. The build is signed but not notarized yet, so the first launch needs **right-click → Open**, or:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/AgentClean.app
@@ -80,7 +80,7 @@ Requires macOS 26 (Tahoe) or later. Apple Silicon and Intel.
 ### Build from source
 
 ```bash
-git clone https://github.com/AGENTCLEAN_OWNER/AgentClean.git
+git clone https://github.com/Finjineersdev/AgentClean.git
 cd AgentClean/CleanCore && swift test      # engine tests
 cd .. && open AgentClean.xcodeproj         # Xcode 26+
 ```

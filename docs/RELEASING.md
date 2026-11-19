@@ -7,13 +7,13 @@
    git push origin main v1.1.0
    ```
 3. The **Release** workflow builds the app on a macOS 26 runner, packages `AgentClean-<version>.dmg`, writes a sha256, and publishes a GitHub Release with generated notes.
-4. With `TAP_GITHUB_TOKEN` set, it also bumps `Casks/agentclean.rb` in `AGENTCLEAN_OWNER/homebrew-tap`, so `brew upgrade --cask agentclean` picks the new version up within the hour.
+4. With `TAP_GITHUB_TOKEN` set, it also bumps `Casks/agentclean.rb` in `Finjineersdev/homebrew-tap`, so `brew upgrade --cask agentclean` picks the new version up within the hour.
 
 ## Repository secrets
 
 | Secret | Purpose | Required |
 |---|---|---|
-| `TAP_GITHUB_TOKEN` | Fine-grained PAT, repository `AGENTCLEAN_OWNER/homebrew-tap`, permission **Contents: read and write**. Lets the workflow bump the cask. | For the cask auto-bump |
+| `TAP_GITHUB_TOKEN` | Fine-grained PAT, repository `Finjineersdev/homebrew-tap`, permission **Contents: read and write**. Lets the workflow bump the cask. | For the cask auto-bump |
 | `MACOS_CERT_P12` | `base64 -i DeveloperID.p12` of your **Developer ID Application** certificate (exported from Keychain Access with its private key) | For notarized builds |
 | `MACOS_CERT_PASSWORD` | Password used when exporting the `.p12` | " |
 | `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` | " |
@@ -25,10 +25,10 @@ Without the certificate secrets the workflow ships an ad-hoc signed build; users
 
 ## Homebrew
 
-Tap: https://github.com/AGENTCLEAN_OWNER/homebrew-tap
+Tap: https://github.com/Finjineersdev/homebrew-tap
 
 ```bash
-brew install --cask AGENTCLEAN_OWNER/tap/agentclean
+brew install --cask Finjineersdev/tap/agentclean
 brew upgrade --cask agentclean
 brew uninstall --zap --cask agentclean   # also removes settings, logs, quarantine
 ```
