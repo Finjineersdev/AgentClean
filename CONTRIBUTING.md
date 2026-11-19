@@ -82,7 +82,8 @@ cargo mutants -p agentclean-core --test-workspace=true \
   -f crates/agentclean-core/src/guard.rs \
   -f crates/agentclean-core/src/deny.rs \
   -f crates/agentclean-core/src/quarantine.rs \
-  -f crates/agentclean-core/src/rules.rs
+  -f crates/agentclean-core/src/rules.rs \
+  -f crates/agentclean-core/src/discover.rs
 ```
 
 Fuzzing needs the nightly toolchain (`rustup toolchain install nightly`). The

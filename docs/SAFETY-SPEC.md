@@ -5,7 +5,7 @@ something that cannot be rebuilt. This document states the invariants that
 prevent it. Each invariant names the code that enforces it and the test that
 proves it. A change that weakens an invariant needs an ADR.
 
-Status: **I1–I14d are implemented and tested** in `engine/crates/agentclean-core`.
+Status: **I1–I14d and I18 are implemented and tested** in `engine/crates/agentclean-core`.
 I15–I17 are specified and not implemented yet.
 
 ## Model
@@ -68,6 +68,14 @@ configuration can name programs for git to run, so the guard calls git with
 | I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
 | I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution` | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag` |
 
+## Discovery (M2)
+
+Discovery only reads; what it finds still passes I1–I12 before anything moves.
+
+| # | Invariant | Enforced by | Test |
+| --- | --- | --- | --- |
+| I18 | The project walk never follows a link, never enters another volume, the quarantine store, a bundle, a hidden folder, an artifact folder of a project it found, or a folder that belongs to its parent's project (Flutter's `android/`). A candidate is reported once, by the outermost project that claims it | `discover::discover` | `links_are_never_followed`, `other_volumes_are_not_entered`, `the_quarantine_store_is_not_entered`, `bundles_and_hidden_folders_are_not_entered`, `finds_every_project_in_a_layout_like_the_owners` |
+
 Space is freed only when a run is purged, because a rename on the same volume
 moves no data. The CLI says so after every clean.
 
@@ -98,7 +106,7 @@ but are not otherwise coordinated.
   satisfies I2, I2a and I8; `manifest_load` asserts that any accepted manifest
   satisfies I14b and I14d and survives a write and re-read unchanged. Both run
   nightly for 10 minutes each (`engine-nightly` workflow).
-- `cargo mutants` on `guard.rs`, `deny.rs`, `quarantine.rs` and `rules.rs` must report no
+- `cargo mutants` on `guard.rs`, `deny.rs`, `quarantine.rs`, `rules.rs` and `discover.rs` must report no
   surviving mutants; it runs nightly and the command is in `CONTRIBUTING.md`.
   Code that only one platform compiles is kept inside a shared function, so
   the tests that run cover the code that ships.

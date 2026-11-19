@@ -52,15 +52,15 @@ pub enum Refusal {
 
 /// Identity of a directory at approval time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FileId {
-    dev: u64,
-    ino: u64,
+pub(crate) struct FileId {
+    pub(crate) dev: u64,
+    pub(crate) ino: u64,
     /// Creation time where the file system records it. Inode numbers are
     /// reused, so a directory deleted and recreated can keep its number.
     born: Option<std::time::SystemTime>,
 }
 
-fn file_id(meta: &fs::Metadata) -> FileId {
+pub(crate) fn file_id(meta: &fs::Metadata) -> FileId {
     // One function with the platform split inside, so the tests that run
     // exercise the code that ships. Windows support lands with the Windows
     // port; until then identity there is the creation time plus the canonical

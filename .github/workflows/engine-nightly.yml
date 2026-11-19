@@ -57,6 +57,7 @@ jobs:
           -f crates/agentclean-core/src/deny.rs
           -f crates/agentclean-core/src/quarantine.rs
           -f crates/agentclean-core/src/rules.rs
+          -f crates/agentclean-core/src/discover.rs
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

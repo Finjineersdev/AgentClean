@@ -152,16 +152,27 @@ impl RuleFile {
     /// True if `project_root` holds one of this rule's markers and is not
     /// excluded. Markers are never followed through symbolic links.
     pub fn detects(&self, project_root: &Path) -> bool {
+        self.marked(project_root) && !self.excluded(project_root)
+    }
+
+    /// True if `dir` holds a marker but `exclude_if` makes it part of the
+    /// parent's project (Flutter's `android/`). Discovery does not enter it.
+    pub fn defers_to_parent(&self, dir: &Path) -> bool {
+        self.marked(dir) && self.excluded(dir)
+    }
+
+    fn marked(&self, dir: &Path) -> bool {
         let d = &self.detect;
-        let marked = d.any_files.iter().any(|m| is_file(&project_root.join(m)))
-            || d.any_dirs.iter().any(|m| is_dir(&project_root.join(m)))
-            || glob_matches(project_root, &d.any_glob);
-        let excluded = d.exclude_if.as_ref().is_some_and(|x| {
-            project_root
-                .parent()
+        d.any_files.iter().any(|m| is_file(&dir.join(m)))
+            || d.any_dirs.iter().any(|m| is_dir(&dir.join(m)))
+            || glob_matches(dir, &d.any_glob)
+    }
+
+    fn excluded(&self, dir: &Path) -> bool {
+        self.detect.exclude_if.as_ref().is_some_and(|x| {
+            dir.parent()
                 .is_some_and(|parent| x.parent_any_files.iter().any(|m| is_file(&parent.join(m))))
-        });
-        marked && !excluded
+        })
     }
 
     /// Candidates for `project_root`: artifacts that exist and whose evidence
