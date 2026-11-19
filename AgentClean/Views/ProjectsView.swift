@@ -43,7 +43,9 @@ struct ProjectsView: View {
             Divider().opacity(0.3)
 
             if let p = model.project(model.selectedProject) {
-                ProjectDetail(project: p).id(p)
+                // Keyed by path, not value: a refresh after a clean must not tear down
+                // the open Review sheet (and its Undo).
+                ProjectDetail(project: p).id(p.root)
             } else {
                 Text("Choose a project").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -122,6 +124,11 @@ struct ProjectDetail: View {
             .padding(24)
         }
         .onAppear { picked = Selection.defaults(for: project) }
+        .onChange(of: project) { _, fresh in
+            // Drop ticks on folders that are gone or can no longer be cleaned (pinned).
+            let still = Set(fresh.items.filter(Selection.selectable).map { Selection.path($0, in: fresh) })
+            picked.formIntersection(still)
+        }
         .sheet(item: $review) { out in
             ReviewSheet(project: project, picked: picked, dryRun: out)
         }
