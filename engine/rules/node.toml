@@ -22,3 +22,41 @@ path = ".turbo"
 class = "safe"
 reason = "Turborepo local task cache."
 restore = "Recreated on the next turbo run"
+
+[[artifact]]
+path = ".nuxt"
+class = "safe"
+reason = "Nuxt build and dev output. Recreated by the next build or dev run."
+restore = "nuxt build"
+
+[[artifact]]
+path = ".parcel-cache"
+class = "safe"
+reason = "Parcel build cache."
+restore = "Recreated on the next parcel build"
+
+[[artifact]]
+path = ".svelte-kit"
+class = "safe"
+reason = "SvelteKit generated files and build output."
+restore = "Recreated by vite dev or vite build"
+
+[[artifact]]
+path = ".angular/cache"
+class = "safe"
+reason = "Angular CLI build cache."
+restore = "Recreated on the next ng build"
+
+[[artifact]]
+path = "dist"
+class = "safe"
+reason = "Build output from Vite or webpack, whose default output folder is dist."
+restore = "npm run build"
+requires = { any_glob = ["vite.config.*", "webpack.config.*"] }
+
+[[artifact]]
+path = "build"
+class = "safe"
+reason = "Create React App build output."
+restore = "npm run build"
+requires = { json = { file = "package.json", key = "dependencies.react-scripts" } }

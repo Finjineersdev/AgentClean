@@ -10,6 +10,7 @@ path = ".venv"
 class = "caution"
 reason = "Virtual environment. Recreate it and reinstall dependencies."
 restore = "python -m venv .venv, then install dependencies"
+requires = { inside = ["pyvenv.cfg"] }
 
 [[artifact]]
 path = ".pytest_cache"
@@ -22,3 +23,28 @@ path = ".ruff_cache"
 class = "safe"
 reason = "Ruff lint cache. Recreated on the next lint run."
 restore = "Recreated automatically"
+
+[[artifact]]
+path = "venv"
+class = "caution"
+reason = "Virtual environment. Recreate it and reinstall dependencies."
+restore = "python -m venv venv, then install dependencies"
+requires = { inside = ["pyvenv.cfg"] }
+
+[[artifact]]
+path = "__pycache__"
+class = "safe"
+reason = "Compiled bytecode. Python rewrites it on the next import."
+restore = "Recreated automatically"
+
+[[artifact]]
+path = ".mypy_cache"
+class = "safe"
+reason = "mypy type-check cache. Recreated on the next check."
+restore = "Recreated automatically"
+
+[[artifact]]
+path = ".tox"
+class = "safe"
+reason = "tox test environments. Recreated on the next tox run."
+restore = "tox"

@@ -967,6 +967,19 @@ mod tests {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules");
         let rules = load_dir(&dir);
         assert!(rules.is_ok(), "{rules:?}");
-        assert!(rules.is_ok_and(|r| r.len() >= 3));
+        assert!(rules.is_ok_and(|r| r.len() >= 11));
+    }
+
+    #[test]
+    fn flutter_platform_folders_are_not_projects_of_their_own() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules");
+        let rules = ok(load_dir(&dir));
+        let app = dir.join("fixtures/flutter/match/app");
+        for sub in ["android", "ios"] {
+            for rule in &rules {
+                let got = rule.candidates(&app.join(sub));
+                assert!(got.is_empty(), "{} on {sub}: {got:?}", rule.id);
+            }
+        }
     }
 }

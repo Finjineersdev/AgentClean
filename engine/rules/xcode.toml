@@ -1,0 +1,15 @@
+schema = 2
+id = "xcode"
+name = "Xcode (CocoaPods)"
+
+[detect]
+any_glob = ["*.xcodeproj", "*.xcworkspace"]
+# A Flutter app's ios/ folder belongs to the Flutter rule.
+exclude_if = { parent_any_files = ["pubspec.yaml"] }
+
+[[artifact]]
+path = "Pods"
+class = "caution"
+reason = "CocoaPods dependencies. Reinstall them from the Podfile."
+restore = "pod install"
+requires = { any_files = ["Podfile"] }

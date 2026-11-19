@@ -1,0 +1,22 @@
+schema = 2
+id = "android"
+name = "Android"
+
+# The project's own build and .gradle folders come from the java rule (Gradle).
+[detect]
+any_files = ["settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"]
+exclude_if = { parent_any_files = ["pubspec.yaml"] }
+
+[[artifact]]
+path = "app/build"
+class = "safe"
+reason = "Build output of the app module. Recreated by the next Gradle build."
+restore = "./gradlew assembleDebug"
+requires = { any_files = ["app/src/main/AndroidManifest.xml"] }
+
+[[artifact]]
+path = "app/.cxx"
+class = "safe"
+reason = "Native (CMake or ndk-build) intermediates of the app module."
+restore = "Recreated by the next Gradle build"
+requires = { any_files = ["app/src/main/AndroidManifest.xml"] }

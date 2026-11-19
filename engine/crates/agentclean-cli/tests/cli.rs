@@ -102,6 +102,18 @@ fn clean_is_a_dry_run_by_default() {
 }
 
 #[test]
+fn a_folder_two_rules_claim_is_offered_once() {
+    let e = env();
+    let p = &e.project;
+    fs::write(p.join("Cargo.toml"), "[package]").unwrap();
+    fs::write(p.join("pom.xml"), "<project/>").unwrap();
+    fs::create_dir_all(p.join("target/debug")).unwrap();
+    let out = e.clean(&[]);
+    assert_eq!(out.matches("target").count(), 1, "{out}");
+    assert!(out.contains("2 folders"), "{out}");
+}
+
+#[test]
 fn caution_folders_need_an_explicit_flag() {
     let e = env();
     let out = e.clean(&["--execute"]);

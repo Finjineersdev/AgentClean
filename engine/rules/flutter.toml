@@ -1,0 +1,27 @@
+schema = 2
+id = "flutter"
+name = "Flutter and Dart"
+
+[detect]
+any_files = ["pubspec.yaml"]
+
+[[artifact]]
+path = ".dart_tool"
+class = "safe"
+reason = "Dart tool output and package config. Recreated by dart pub get."
+restore = "dart pub get (or flutter pub get)"
+
+[[artifact]]
+path = "build"
+class = "safe"
+reason = "Flutter build output. Recreated by the next flutter build or run."
+restore = "flutter build"
+# .metadata is written by flutter create, so plain Dart packages are left alone.
+requires = { any_files = [".metadata"] }
+
+[[artifact]]
+path = "ios/Pods"
+class = "caution"
+reason = "CocoaPods dependencies of the iOS app. Reinstall them from the Podfile."
+restore = "flutter build ios (runs pod install)"
+requires = { any_files = ["ios/Podfile"] }

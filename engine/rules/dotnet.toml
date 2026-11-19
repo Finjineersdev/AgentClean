@@ -1,0 +1,18 @@
+schema = 2
+id = "dotnet"
+name = ".NET"
+
+[detect]
+any_glob = ["*.csproj", "*.fsproj"]
+
+[[artifact]]
+path = "bin"
+class = "safe"
+reason = ".NET build output. Recreated by the next build."
+restore = "dotnet build"
+
+[[artifact]]
+path = "obj"
+class = "safe"
+reason = ".NET intermediate build files. Recreated by restore and build."
+restore = "dotnet build"

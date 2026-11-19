@@ -57,7 +57,8 @@ Evidence files must be regular files whose real location is the path written
 in the rule, inside the project: a linked file, or a linked folder on the way,
 does not count. Anything unreadable counts as "no evidence".
 
-A candidate is also only offered when its path exists.
+A candidate is also only offered when its path exists, and only once when
+two rules name the same folder.
 
 ## Classes
 

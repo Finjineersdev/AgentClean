@@ -1,0 +1,29 @@
+schema = 2
+id = "java"
+name = "Java and Kotlin (Maven, Gradle)"
+
+[detect]
+any_files = ["pom.xml", "settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"]
+# Flutter's android/ folder: Flutter writes its build output at the top.
+exclude_if = { parent_any_files = ["pubspec.yaml"] }
+
+[[artifact]]
+path = "target"
+class = "safe"
+reason = "Maven build output. Recreated by the next build."
+restore = "mvn package"
+requires = { any_files = ["pom.xml"] }
+
+[[artifact]]
+path = "build"
+class = "safe"
+reason = "Gradle build output. Recreated by the next build."
+restore = "./gradlew build"
+requires = { any_files = ["settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"] }
+
+[[artifact]]
+path = ".gradle"
+class = "caution"
+reason = "Gradle's per-project cache. The next build is slower while it refills."
+restore = "Recreated by the next Gradle build"
+requires = { any_files = ["settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"] }

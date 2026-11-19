@@ -158,8 +158,13 @@ fn assess(
     caution: bool,
 ) -> Vec<(String, Verdict)> {
     let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     for rule in rules {
         for candidate in rule.candidates(project) {
+            // Two rules can claim one folder (Cargo and Maven both use target).
+            if !seen.insert(candidate.rel().to_path_buf()) {
+                continue;
+            }
             let label = format!("{}  [{}]", candidate.rel().display(), candidate.rule_id());
             let verdict = match guard.check(project, &candidate) {
                 Err(why) => Verdict::Refused(why.to_string()),

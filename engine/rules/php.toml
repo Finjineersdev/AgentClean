@@ -1,0 +1,14 @@
+schema = 2
+id = "php"
+name = "PHP (Composer)"
+
+[detect]
+any_files = ["composer.json"]
+
+# Laravel's storage/ holds user data and is never a target.
+[[artifact]]
+path = "vendor"
+class = "caution"
+reason = "Composer dependencies. Reinstall them from composer.lock."
+restore = "composer install"
+requires = { inside = ["autoload.php"] }

@@ -1,0 +1,14 @@
+schema = 2
+id = "go"
+name = "Go"
+
+[detect]
+any_files = ["go.mod"]
+
+# The module and build caches are global; they belong to M4.
+[[artifact]]
+path = "vendor"
+class = "caution"
+reason = "Vendored module copies made by go mod vendor."
+restore = "go mod vendor"
+requires = { inside = ["modules.txt"] }

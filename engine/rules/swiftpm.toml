@@ -1,0 +1,12 @@
+schema = 2
+id = "swiftpm"
+name = "Swift Package Manager"
+
+[detect]
+any_files = ["Package.swift"]
+
+[[artifact]]
+path = ".build"
+class = "safe"
+reason = "SwiftPM build output and checked-out dependencies."
+restore = "swift build"
