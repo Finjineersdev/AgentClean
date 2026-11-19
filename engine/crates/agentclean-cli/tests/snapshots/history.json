@@ -1,0 +1,33 @@
+[
+  {
+    "command": "history",
+    "runs": [
+      {
+        "created_unix": 0,
+        "entries": [
+          {
+            "bytes": 0,
+            "class": "caution",
+            "original": "$TMP/work/site/node_modules",
+            "project_root": "$TMP/work/site",
+            "rule_id": "node",
+            "state": "moved",
+            "stored": "0000"
+          },
+          {
+            "bytes": 0,
+            "class": "safe",
+            "original": "$TMP/work/site/.next",
+            "project_root": "$TMP/work/site",
+            "rule_id": "node",
+            "state": "moved",
+            "stored": "0001"
+          }
+        ],
+        "format": 1,
+        "run_id": "RUN"
+      }
+    ],
+    "schema_version": 1
+  }
+]

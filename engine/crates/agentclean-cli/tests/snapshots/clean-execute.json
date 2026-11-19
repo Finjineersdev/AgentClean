@@ -1,0 +1,61 @@
+[
+  {
+    "bytes": 0,
+    "command": "clean",
+    "execute": true,
+    "folders": 2,
+    "held_caution": 0,
+    "projects": [
+      {
+        "items": [
+          {
+            "action": "move",
+            "bytes": 0,
+            "class": "caution",
+            "path": "node_modules",
+            "reason": null,
+            "rule": "node"
+          },
+          {
+            "action": "move",
+            "bytes": 0,
+            "class": "safe",
+            "path": ".next",
+            "reason": null,
+            "rule": "node"
+          }
+        ],
+        "pinned": false,
+        "reason": "edited 200 days ago",
+        "root": "$TMP/work/site",
+        "verdict": "dormant"
+      }
+    ],
+    "run": {
+      "created_unix": 0,
+      "entries": [
+        {
+          "bytes": 0,
+          "class": "caution",
+          "original": "$TMP/work/site/node_modules",
+          "project_root": "$TMP/work/site",
+          "rule_id": "node",
+          "state": "moved",
+          "stored": "0000"
+        },
+        {
+          "bytes": 0,
+          "class": "safe",
+          "original": "$TMP/work/site/.next",
+          "project_root": "$TMP/work/site",
+          "rule_id": "node",
+          "state": "moved",
+          "stored": "0001"
+        }
+      ],
+      "format": 1,
+      "run_id": "RUN"
+    },
+    "schema_version": 1
+  }
+]

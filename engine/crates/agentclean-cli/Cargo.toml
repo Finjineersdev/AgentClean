@@ -17,6 +17,8 @@ workspace = true
 [dependencies]
 agentclean-core = { path = "../agentclean-core" }
 clap.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 tempfile.workspace = true

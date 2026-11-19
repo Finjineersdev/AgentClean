@@ -1,0 +1,28 @@
+[
+  {
+    "command": "plan",
+    "project": {
+      "items": [
+        {
+          "bytes": 0,
+          "class": "caution",
+          "path": "node_modules",
+          "refused": null,
+          "rule": "node"
+        },
+        {
+          "bytes": 0,
+          "class": "safe",
+          "path": ".next",
+          "refused": null,
+          "rule": "node"
+        }
+      ],
+      "pinned": false,
+      "reason": "edited 200 days ago",
+      "root": "$TMP/work/site",
+      "verdict": "dormant"
+    },
+    "schema_version": 1
+  }
+]

@@ -31,7 +31,7 @@ with notarization and a Homebrew cask.
 | F6 | Rule catalogue for Node.js, Rust, Python, Xcode, Android, Flutter, PHP, Go, .NET, Java, Swift packages | M2 | Each rule has must-match and must-not-match fixtures |
 | F7 | Idle or active verdict with reasons: last commit, last source edit, processes with a working directory in the project | M2 | Reasons shown for every project; pinned projects never offered |
 | F8 | Accurate sizes: shared blocks counted once, estimates labelled | M2 | Hard-link and clone fixtures report expected totals |
-| F9 | JSON output for every command | M2 | Schema documented; snapshot tests |
+| F9 | JSON output for every command | M2 | Schema documented (`docs/CLI-JSON.md`); snapshot tests |
 | F10 | Mac app drives the Rust engine for scan, plan, clean, restore | M3 | No Swift code path moves or deletes; enforced by a CI check |
 | F11 | Remove out-of-scope inherited modules: malware list, uninstaller, fan and sensor control, speed test, system junk | M3 | Modules and their UI are gone; app builds |
 | F12 | Run on macOS 14 or later | M3 | App launches and passes UI tests on macOS 14 |

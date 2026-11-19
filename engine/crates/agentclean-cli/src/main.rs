@@ -4,33 +4,25 @@
 //! given. Cleaning moves folders into a quarantine; nothing is deleted until a
 //! run is purged. The exception is `pin` and `unpin`, which change only
 //! AgentClean's own config file, never a project.
+//!
+//! With `--json`, every command prints one JSON document (`scan` prints JSON
+//! Lines) in the shapes documented in `docs/CLI-JSON.md`.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use agentclean_core::activity::{self, Activity, Config, Processes, Verdict as Busy};
 use agentclean_core::discover::{self, Event, Options, Skip};
-use agentclean_core::guard::{Approved, Guard};
+use agentclean_core::guard::Guard;
 use agentclean_core::quarantine::{self, Manifest, State, Store};
 use agentclean_core::rules::{self, Candidate, Class, RuleFile};
 use clap::{Args, Parser, Subcommand};
+use serde_json::{json, Value};
 
-/// Prints one line to stdout. If the reader has gone (`agentclean scan |
-/// head`), exits quietly instead of panicking like `println!`.
-macro_rules! say {
-    ($($arg:tt)*) => { emit(format_args!($($arg)*)) };
-}
-
-fn emit(line: std::fmt::Arguments) {
-    use std::io::Write;
-    if let Err(e) = writeln!(std::io::stdout().lock(), "{line}") {
-        if e.kind() == std::io::ErrorKind::BrokenPipe {
-            std::process::exit(0);
-        }
-        eprintln!("error: cannot write output: {e}");
-        std::process::exit(1);
-    }
-}
+/// Version of every JSON shape this binary prints.
+const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Parser)]
 #[command(
@@ -39,6 +31,9 @@ fn emit(line: std::fmt::Arguments) {
     about = "Reclaim disk space from developer projects, safely"
 )]
 struct Cli {
+    /// Print JSON instead of text (scan prints JSON Lines)
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     command: Cmd,
 }
@@ -56,6 +51,19 @@ enum Cmd {
     RulesCheck {
         /// Directory containing *.toml rule files
         dir: PathBuf,
+    },
+    /// Find projects and what each could free (read-only)
+    Scan {
+        /// Folders to scan [default: the home folder]
+        roots: Vec<PathBuf>,
+        /// Directory of *.toml rule files [default: the built-in catalogue]
+        #[arg(long, value_name = "DIR")]
+        rules: Option<PathBuf>,
+        /// Also list projects with nothing to clean (always on with --json)
+        #[arg(long)]
+        all: bool,
+        #[command(flatten)]
+        store: StoreArg,
     },
     /// Show what the rules and the safety guard would allow in one project (read-only)
     Plan {
@@ -77,6 +85,10 @@ enum Cmd {
         /// tool running inside). Pinned projects are never cleaned.
         #[arg(long)]
         include_active: bool,
+        /// Only these folders (absolute paths, repeatable). Each must be one
+        /// the rules offer in the given projects; it still passes every check.
+        #[arg(long, value_name = "PATH")]
+        only: Vec<PathBuf>,
         /// Actually move the folders
         #[arg(long)]
         execute: bool,
@@ -85,19 +97,6 @@ enum Cmd {
         /// Project roots
         #[arg(required = true)]
         projects: Vec<PathBuf>,
-    },
-    /// Find projects and what each could free (read-only)
-    Scan {
-        /// Folders to scan [default: the home folder]
-        roots: Vec<PathBuf>,
-        #[arg(long, value_name = "DIR")]
-        /// Directory of *.toml rule files [default: the built-in catalogue]
-        rules: Option<PathBuf>,
-        /// Also list projects with nothing to clean
-        #[arg(long)]
-        all: bool,
-        #[command(flatten)]
-        store: StoreArg,
     },
     /// Never clean this folder or anything inside it; with no folder, list pins
     Pin { folder: Option<PathBuf> },
@@ -139,20 +138,56 @@ enum Cmd {
 
 type CliResult = Result<ExitCode, String>;
 
+static JSON: AtomicBool = AtomicBool::new(false);
+
+fn json_mode() -> bool {
+    JSON.load(Ordering::Relaxed)
+}
+
+/// Prints one line to stdout. If the reader has gone (`agentclean scan |
+/// head`), exits quietly instead of panicking like `println!`.
+macro_rules! say {
+    ($($arg:tt)*) => { emit(format_args!($($arg)*)) };
+}
+
+fn emit(line: std::fmt::Arguments) {
+    use std::io::Write;
+    if let Err(e) = writeln!(std::io::stdout().lock(), "{line}") {
+        if e.kind() == std::io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        eprintln!("error: cannot write output: {e}");
+        std::process::exit(1);
+    }
+}
+
+/// Prints `fields` as one JSON object tagged with the schema version and
+/// `key` (`"command"` for documents, `"type"` for scan lines).
+fn put(key: &str, name: &str, fields: Value) {
+    let mut doc = json!({ "schema_version": SCHEMA_VERSION, key: name });
+    if let (Value::Object(doc), Value::Object(fields)) = (&mut doc, fields) {
+        doc.extend(fields);
+    }
+    say!("{doc}");
+}
+
 fn main() -> ExitCode {
-    let result = match Cli::parse().command {
+    let cli = Cli::parse();
+    JSON.store(cli.json, Ordering::Relaxed);
+    let result = match cli.command {
         Cmd::RulesCheck { dir } => rules_check(&dir),
-        Cmd::Plan { rules, project } => plan(rules.as_deref(), &project),
         Cmd::Scan {
             roots,
             rules,
             all,
             store,
         } => scan(roots, rules.as_deref(), all, &store),
+        Cmd::Plan { rules, project } => plan(rules.as_deref(), &project),
         Cmd::Clean {
             rules,
             include_caution,
             include_active,
+            only,
             execute,
             store,
             projects,
@@ -164,6 +199,7 @@ fn main() -> ExitCode {
                 active: include_active,
                 execute,
             },
+            &only,
             &store,
         ),
         Cmd::Pin { folder } => pin(folder.as_deref()),
@@ -178,7 +214,14 @@ fn main() -> ExitCode {
         } => purge(run.as_deref(), older_than_days, execute, &store),
     };
     result.unwrap_or_else(|e| {
-        eprintln!("error: {e}");
+        if json_mode() {
+            say!(
+                "{}",
+                json!({ "schema_version": SCHEMA_VERSION, "error": e })
+            );
+        } else {
+            eprintln!("error: {e}");
+        }
         ExitCode::FAILURE
     })
 }
@@ -213,14 +256,28 @@ fn load_config() -> Result<Config, String> {
     }
 }
 
+fn lossy(p: &Path) -> String {
+    p.to_string_lossy().into_owned()
+}
+
+fn print_pins(cfg: &Config) {
+    if json_mode() {
+        let pins: Vec<String> = cfg.pinned.iter().map(|p| lossy(p)).collect();
+        put("command", "pin", json!({ "pinned": pins }));
+    }
+}
+
 fn pin(folder: Option<&Path>) -> CliResult {
     let path = config_path()?;
     let mut cfg = Config::load(&path)?;
     let Some(folder) = folder else {
-        if cfg.pinned.is_empty() {
-            say!("Nothing is pinned.");
+        print_pins(&cfg);
+        if !json_mode() {
+            if cfg.pinned.is_empty() {
+                say!("Nothing is pinned.");
+            }
+            cfg.pinned.iter().for_each(|p| say!("{}", p.display()));
         }
-        cfg.pinned.iter().for_each(|p| say!("{}", p.display()));
         return Ok(ExitCode::SUCCESS);
     };
     let folder = std::fs::canonicalize(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
@@ -231,7 +288,10 @@ fn pin(folder: Option<&Path>) -> CliResult {
         cfg.pinned.push(folder.clone());
         cfg.save(&path)?;
     }
-    say!("Pinned {}: it will never be cleaned.", folder.display());
+    print_pins(&cfg);
+    if !json_mode() {
+        say!("Pinned {}: it will never be cleaned.", folder.display());
+    }
     Ok(ExitCode::SUCCESS)
 }
 
@@ -245,25 +305,29 @@ fn unpin(folder: &Path) -> CliResult {
         return Err(format!("{} is not pinned", folder.display()));
     }
     cfg.save(&path)?;
-    say!("Unpinned {}.", folder.display());
+    print_pins(&cfg);
+    if !json_mode() {
+        say!("Unpinned {}.", folder.display());
+    }
     Ok(ExitCode::SUCCESS)
 }
 
 fn rules_check(dir: &Path) -> CliResult {
     let loaded = load_rules(Some(dir))?;
     let artifacts: usize = loaded.iter().map(|r| r.artifacts.len()).sum();
-    say!("{} rule files, {} artifacts: ok", loaded.len(), artifacts);
+    if json_mode() {
+        put(
+            "command",
+            "rules-check",
+            json!({ "rule_files": loaded.len(), "artifacts": artifacts }),
+        );
+    } else {
+        say!("{} rule files, {} artifacts: ok", loaded.len(), artifacts);
+    }
     Ok(ExitCode::SUCCESS)
 }
 
-/// One candidate's outcome in one project.
-enum Verdict {
-    Allowed(Approved),
-    Refused(String),
-    CautionHeld,
-}
-
-/// What `plan` and `clean` need to judge projects.
+/// What `scan`, `plan` and `clean` need to judge projects.
 struct Context {
     rules: Vec<RuleFile>,
     config: Config,
@@ -319,24 +383,12 @@ impl Context {
             items,
         }
     }
-
-    /// Prints the project's activity line and judges its candidates.
-    fn assess(&self, guard: &Guard, project: &Path, caution: bool) -> Vec<(String, Verdict)> {
-        let activity = self.activity(project);
-        say!(
-            "{}: {:?}, {}",
-            project.display(),
-            activity.verdict(),
-            activity.reason()
-        );
-        assess(&self.rules, guard, &activity, caution)
-    }
 }
 
 /// Every rule's candidates in one project, once each: two rules can claim
 /// one folder (Cargo and Maven both use target).
 fn candidates(rules: &[RuleFile], project: &Path) -> Vec<Candidate> {
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     rules
         .iter()
         .flat_map(|r| r.candidates(project))
@@ -344,28 +396,31 @@ fn candidates(rules: &[RuleFile], project: &Path) -> Vec<Candidate> {
         .collect()
 }
 
-fn assess(
-    rules: &[RuleFile],
-    guard: &Guard,
-    activity: &Activity,
-    caution: bool,
-) -> Vec<(String, Verdict)> {
-    let mut out = Vec::new();
-    {
-        for candidate in candidates(rules, activity.root()) {
-            let label = format!("{}  [{}]", candidate.rel().display(), candidate.rule_id());
-            let verdict = match guard.check(activity, &candidate) {
-                Err(why) => Verdict::Refused(why.to_string()),
-                Ok(_) if candidate.class() == Class::Caution && !caution => Verdict::CautionHeld,
-                Ok(ok) => Verdict::Allowed(ok),
-            };
-            out.push((label, verdict));
-        }
+fn verdict_name(v: Busy) -> &'static str {
+    match v {
+        Busy::Active => "active",
+        Busy::Idle => "idle",
+        Busy::Dormant => "dormant",
     }
-    out
 }
 
-/// One project as `scan` reports it.
+fn class_name(c: Class) -> &'static str {
+    match c {
+        Class::Safe => "safe",
+        Class::Caution => "caution",
+    }
+}
+
+/// The text label for a project: its verdict, or Pinned.
+fn label(verdict: Busy, pinned: bool) -> String {
+    if pinned {
+        "Pinned".to_owned()
+    } else {
+        format!("{verdict:?}")
+    }
+}
+
+/// One project as `scan` and `plan` report it.
 struct ProjectReport {
     root: PathBuf,
     verdict: Busy,
@@ -381,6 +436,31 @@ struct ItemReport {
     class: Class,
     bytes: Option<u64>,
     refused: Option<String>,
+}
+
+impl ProjectReport {
+    fn json(&self) -> Value {
+        let items: Vec<Value> = self
+            .items
+            .iter()
+            .map(|i| {
+                json!({
+                    "path": lossy(&i.path),
+                    "rule": i.rule,
+                    "class": class_name(i.class),
+                    "bytes": i.bytes,
+                    "refused": i.refused,
+                })
+            })
+            .collect();
+        json!({
+            "root": lossy(&self.root),
+            "verdict": verdict_name(self.verdict),
+            "pinned": self.pinned,
+            "reason": self.reason,
+            "items": items,
+        })
+    }
 }
 
 /// What `scan` found, by what `clean` would need to take it.
@@ -429,14 +509,39 @@ fn scan(roots: Vec<PathBuf>, rules: Option<&Path>, all: bool, store: &StoreArg) 
         } => {
             let report = ctx.report(&root, candidates);
             totals.add(&report);
-            if all || !report.items.is_empty() {
+            if json_mode() {
+                put("type", "project", report.json());
+            } else if all || !report.items.is_empty() {
                 print_project(&report);
             }
         }
         Event::Skipped { path, reason } => {
-            say!("skipped  {}  {}", path.display(), describe(&reason));
+            if json_mode() {
+                let (kind, detail) = skip_names(&reason);
+                put(
+                    "type",
+                    "skipped",
+                    json!({ "path": lossy(&path), "reason": kind, "detail": detail }),
+                );
+            } else {
+                say!("skipped  {}  {}", path.display(), describe(&reason));
+            }
         }
     });
+    if json_mode() {
+        let pair = |(n, b): (usize, u64)| json!({ "folders": n, "bytes": b });
+        put(
+            "type",
+            "summary",
+            json!({
+                "projects": totals.projects,
+                "ready": pair(totals.ready),
+                "caution": pair(totals.caution),
+                "active": pair(totals.active),
+            }),
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
     let size = |(n, b): (usize, u64)| format!("{} in {}", human(b), count(n, "folder"));
     say!(
         "{}. Ready to clean: {} (Safe, in projects not in use).",
@@ -453,35 +558,43 @@ fn scan(roots: Vec<PathBuf>, rules: Option<&Path>, all: bool, store: &StoreArg) 
 
 fn print_project(p: &ProjectReport) {
     let total: u64 = p.items.iter().filter_map(|i| i.bytes).sum();
-    let verdict = if p.pinned {
-        "Pinned".to_owned()
-    } else {
-        format!("{:?}", p.verdict)
-    };
     say!(
-        "{verdict:<8} {:>9}  {}  ({})",
+        "{:<8} {:>9}  {}  ({})",
+        label(p.verdict, p.pinned),
         human(total),
         p.root.display(),
         p.reason
     );
     for item in &p.items {
-        match (&item.bytes, &item.refused) {
-            (Some(b), _) => say!(
+        match item.bytes {
+            Some(b) => say!(
                 "         {:>9}    {}  [{}]  {:?}",
-                human(*b),
+                human(b),
                 item.path.display(),
                 item.rule,
                 item.class
             ),
-            (None, why) => say!(
+            None => say!(
                 "         {:>9}    {}  [{}]  kept: {}",
                 "",
                 item.path.display(),
                 item.rule,
-                why.as_deref().unwrap_or("")
+                item.refused.as_deref().unwrap_or("")
             ),
         }
     }
+}
+
+/// A skip reason as a stable JSON name and a detail string.
+fn skip_names(skip: &Skip) -> (&'static str, String) {
+    let name = match skip {
+        Skip::Unreadable(_) => "unreadable",
+        Skip::OtherVolume => "other_volume",
+        Skip::DepthLimit => "depth_limit",
+        Skip::EntryLimit => "entry_limit",
+        Skip::Excluded => "excluded",
+    };
+    (name, describe(skip))
 }
 
 fn describe(skip: &Skip) -> String {
@@ -498,19 +611,39 @@ fn describe(skip: &Skip) -> String {
 
 fn plan(rules: Option<&Path>, project: &Path) -> CliResult {
     let ctx = Context::load(rules)?;
-    let found = ctx.assess(&Guard::from_env(), project, true);
-    if found.is_empty() {
+    let report = ctx.report(project, candidates(&ctx.rules, project));
+    if json_mode() {
+        put("command", "plan", json!({ "project": report.json() }));
+        return Ok(ExitCode::SUCCESS);
+    }
+    say!(
+        "{}: {}, {}",
+        project.display(),
+        label(report.verdict, report.pinned),
+        report.reason
+    );
+    if report.items.is_empty() {
         say!("nothing matched: no rule detects this folder, or it is already clean");
     }
-    for (label, verdict) in found {
-        match verdict {
-            Verdict::Allowed(ok) => {
-                let bytes = agentclean_core::size::usage(ok.path()).bytes;
-                say!("allow   {label}  {:?}  {}", ok.class(), human(bytes));
-            }
-            Verdict::Refused(why) => say!("refuse  {label}  {why}"),
-            Verdict::CautionHeld => {}
+    for item in &report.items {
+        match (item.bytes, &item.refused) {
+            (Some(b), _) => say!(
+                "allow   {}  [{}]  {:?}  {}",
+                item.path.display(),
+                item.rule,
+                item.class,
+                human(b)
+            ),
+            (None, why) => say!(
+                "refuse  {}  [{}]  {}",
+                item.path.display(),
+                item.rule,
+                why.as_deref().unwrap_or("")
+            ),
         }
+    }
+    if report.verdict == Busy::Active && !report.pinned {
+        say!("The project is in use: clean needs --include-active.");
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -521,7 +654,21 @@ struct Flags {
     execute: bool,
 }
 
-fn clean(rules: Option<&Path>, projects: &[PathBuf], flags: Flags, store: &StoreArg) -> CliResult {
+/// One candidate's outcome in `clean`.
+struct CleanItem {
+    candidate: Candidate,
+    bytes: Option<u64>,
+    /// Why it stays, if it does.
+    kept: Option<String>,
+}
+
+fn clean(
+    rules: Option<&Path>,
+    projects: &[PathBuf],
+    flags: Flags,
+    only: &[PathBuf],
+    store: &StoreArg,
+) -> CliResult {
     let Flags {
         caution,
         active,
@@ -533,49 +680,146 @@ fn clean(rules: Option<&Path>, projects: &[PathBuf], flags: Flags, store: &Store
     } else {
         Guard::from_env()
     };
+    // --only narrows the selection; it never adds a folder the rules and the
+    // guard would not offer anyway.
+    let picks: HashSet<PathBuf> = only
+        .iter()
+        .map(|p| std::fs::canonicalize(p).map_err(|e| format!("{}: {e}", p.display())))
+        .collect::<Result<_, _>>()?;
+    let mut picked = HashSet::new();
     let mut approved = Vec::new();
     let mut held = 0usize;
+    let mut reports = Vec::new();
     for project in projects {
-        for (label, verdict) in ctx.assess(&guard, project, caution) {
-            match verdict {
-                Verdict::Allowed(ok) => {
-                    let bytes = agentclean_core::size::usage(ok.path()).bytes;
-                    say!("  move    {label}  {}", human(bytes));
-                    approved.push((ok, bytes));
+        let activity = ctx.activity(project);
+        let canon = std::fs::canonicalize(project).unwrap_or_else(|_| project.clone());
+        let mut items = Vec::new();
+        for c in candidates(&ctx.rules, project) {
+            if !picks.is_empty() {
+                let abs = canon.join(c.rel());
+                if !picks.contains(&abs) {
+                    continue;
                 }
-                Verdict::Refused(why) => say!("  keep    {label}  {why}"),
-                Verdict::CautionHeld => {
+                picked.insert(abs);
+            }
+            let (bytes, kept) = match guard.check(&activity, &c) {
+                Err(why) => (None, Some(why.to_string())),
+                Ok(_) if c.class() == Class::Caution && !caution => {
                     held += 1;
-                    say!("  keep    {label}  Caution: pass --include-caution to move it");
+                    let why = "Caution: pass --include-caution to move it";
+                    (None, Some(why.to_owned()))
+                }
+                Ok(ok) => {
+                    let bytes = agentclean_core::size::usage(ok.path()).bytes;
+                    approved.push(ok);
+                    (Some(bytes), None)
+                }
+            };
+            items.push(CleanItem {
+                candidate: c,
+                bytes,
+                kept,
+            });
+        }
+        reports.push((project, activity, items));
+    }
+    let mut missing: Vec<String> = picks.difference(&picked).map(|p| lossy(p)).collect();
+    if !missing.is_empty() {
+        missing.sort();
+        return Err(format!(
+            "not a folder the rules offer in the given projects: {}",
+            missing.join(", ")
+        ));
+    }
+    let moving = reports
+        .iter()
+        .flat_map(|(_, _, items)| items.iter().filter_map(|i| i.bytes));
+    let (folders, total) = moving.fold((0usize, 0u64), |(n, t), b| (n + 1, t + b));
+
+    if !json_mode() {
+        for (project, activity, items) in &reports {
+            say!(
+                "{}: {}, {}",
+                project.display(),
+                label(activity.verdict(), activity.pinned()),
+                activity.reason()
+            );
+            for i in items {
+                let c = &i.candidate;
+                let name = format!("{}  [{}]", c.rel().display(), c.rule_id());
+                match i.bytes {
+                    Some(b) => say!("  move    {name}  {}", human(b)),
+                    None => say!("  keep    {name}  {}", i.kept.as_deref().unwrap_or("")),
                 }
             }
         }
     }
-    let total: u64 = approved.iter().map(|(_, b)| b).sum();
-    if approved.is_empty() {
+    let run = if execute && !approved.is_empty() {
+        let store = open_store(store)?;
+        Some(store.clean(approved).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    let failed = run
+        .as_ref()
+        .is_some_and(|r| r.entries.iter().any(|e| e.state == State::Failed));
+
+    if json_mode() {
+        let projects: Vec<Value> = reports
+            .iter()
+            .map(|(project, activity, items)| {
+                let items: Vec<Value> = items
+                    .iter()
+                    .map(|i| {
+                        let c = &i.candidate;
+                        json!({
+                            "path": lossy(c.rel()),
+                            "rule": c.rule_id(),
+                            "class": class_name(c.class()),
+                            "action": if i.bytes.is_some() { "move" } else { "keep" },
+                            "bytes": i.bytes,
+                            "reason": i.kept,
+                        })
+                    })
+                    .collect();
+                json!({
+                    "root": lossy(project),
+                    "verdict": verdict_name(activity.verdict()),
+                    "pinned": activity.pinned(),
+                    "reason": activity.reason(),
+                    "items": items,
+                })
+            })
+            .collect();
+        put(
+            "command",
+            "clean",
+            json!({
+                "execute": execute,
+                "projects": projects,
+                "folders": folders,
+                "bytes": total,
+                "held_caution": held,
+                "run": run,
+            }),
+        );
+    } else if folders == 0 {
         say!("Nothing to clean.");
-        return Ok(ExitCode::SUCCESS);
-    }
-    if !execute {
+    } else if let Some(run) = &run {
+        print_run(run);
+        say!("run: {}", run.run_id);
+        say!("Undo:        agentclean restore {}", run.run_id);
+        say!("Free space:  agentclean purge {} --execute", run.run_id);
+    } else {
         say!(
             "Dry run: {}, {} would move to quarantine. Nothing was changed. Add --execute to move them.",
-            count(approved.len(), "folder"),
+            count(folders, "folder"),
             human(total)
         );
         if held > 0 {
             say!("{} left out (Caution).", count(held, "folder"));
         }
-        return Ok(ExitCode::SUCCESS);
     }
-    let store = open_store(store)?;
-    let run = store
-        .clean(approved.into_iter().map(|(a, _)| a).collect())
-        .map_err(|e| e.to_string())?;
-    print_run(&run);
-    say!("run: {}", run.run_id);
-    say!("Undo:        agentclean restore {}", run.run_id);
-    say!("Free space:  agentclean purge {} --execute", run.run_id);
-    let failed = run.entries.iter().any(|e| e.state == State::Failed);
     Ok(if failed {
         ExitCode::from(3)
     } else {
@@ -586,6 +830,10 @@ fn clean(rules: Option<&Path>, projects: &[PathBuf], flags: Flags, store: &Store
 fn history(store: &StoreArg) -> CliResult {
     let store = open_store(store)?;
     let runs = store.runs().map_err(|e| e.to_string())?;
+    if json_mode() {
+        put("command", "history", json!({ "runs": runs }));
+        return Ok(ExitCode::SUCCESS);
+    }
     if runs.is_empty() {
         say!("No clean runs yet.");
     }
@@ -604,7 +852,11 @@ fn history(store: &StoreArg) -> CliResult {
 fn restore(run: &str, item: Option<usize>, store: &StoreArg) -> CliResult {
     let store = open_store(store)?;
     let manifest = store.restore(run, item).map_err(|e| e.to_string())?;
-    print_run(&manifest);
+    if json_mode() {
+        put("command", "restore", json!({ "run": manifest }));
+    } else {
+        print_run(&manifest);
+    }
     let stuck = match item {
         Some(i) => manifest
             .entries
@@ -633,11 +885,31 @@ fn purge(run: Option<&str>, days: Option<u64>, execute: bool, store: &StoreArg) 
         (None, None) => return Err("give a run id or --older-than-days".to_owned()),
     };
     let total: u64 = targets.iter().map(Manifest::bytes_held).sum();
-    if total == 0 {
-        say!("Nothing held in quarantine for that selection.");
+    let mut after = Vec::new();
+    let mut freed = 0u64;
+    if execute && total > 0 {
+        for r in &targets {
+            let done = store.purge(&r.run_id).map_err(|e| e.to_string())?;
+            freed += r.bytes_held().saturating_sub(done.bytes_held());
+            after.push(done);
+        }
+    }
+    if json_mode() {
+        let runs = if execute && total > 0 {
+            &after
+        } else {
+            &targets
+        };
+        put(
+            "command",
+            "purge",
+            json!({ "execute": execute, "bytes": total, "freed": freed, "runs": runs }),
+        );
         return Ok(ExitCode::SUCCESS);
     }
-    if !execute {
+    if total == 0 {
+        say!("Nothing held in quarantine for that selection.");
+    } else if !execute {
         for r in &targets {
             say!("{}  {}", r.run_id, human(r.bytes_held()));
         }
@@ -645,15 +917,10 @@ fn purge(run: Option<&str>, days: Option<u64>, execute: bool, store: &StoreArg) 
             "Dry run: {} would be permanently deleted from quarantine. This cannot be undone. Add --execute to delete.",
             human(total)
         );
-        return Ok(ExitCode::SUCCESS);
+    } else {
+        after.iter().for_each(print_run);
+        say!("Freed {}.", human(freed));
     }
-    let mut freed = 0u64;
-    for r in &targets {
-        let after = store.purge(&r.run_id).map_err(|e| e.to_string())?;
-        freed += r.bytes_held().saturating_sub(after.bytes_held());
-        print_run(&after);
-    }
-    say!("Freed {}.", human(freed));
     Ok(ExitCode::SUCCESS)
 }
 

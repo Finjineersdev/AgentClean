@@ -1,0 +1,37 @@
+[
+  {
+    "bytes": 0,
+    "command": "clean",
+    "execute": false,
+    "folders": 1,
+    "held_caution": 1,
+    "projects": [
+      {
+        "items": [
+          {
+            "action": "keep",
+            "bytes": null,
+            "class": "caution",
+            "path": "node_modules",
+            "reason": "Caution: pass --include-caution to move it",
+            "rule": "node"
+          },
+          {
+            "action": "move",
+            "bytes": 0,
+            "class": "safe",
+            "path": ".next",
+            "reason": null,
+            "rule": "node"
+          }
+        ],
+        "pinned": false,
+        "reason": "edited 200 days ago",
+        "root": "$TMP/work/site",
+        "verdict": "dormant"
+      }
+    ],
+    "run": null,
+    "schema_version": 1
+  }
+]

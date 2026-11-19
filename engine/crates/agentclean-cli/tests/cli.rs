@@ -338,3 +338,122 @@ fn a_closed_pipe_ends_quietly() {
     assert!(out.status.success(), "{stderr}");
     assert!(!stderr.contains("panicked"), "{stderr}");
 }
+
+/// Each JSON line of `out`, with the temporary folder replaced by `$TMP` and
+/// the values that vary between runs and file systems masked.
+fn normalized(e: &Env, out: &str) -> serde_json::Value {
+    fn mask(v: &mut serde_json::Value, base: &str) {
+        use serde_json::Value;
+        match v {
+            Value::String(s) => *s = s.replace(base, "$TMP"),
+            Value::Array(a) => a.iter_mut().for_each(|v| mask(v, base)),
+            Value::Object(m) => {
+                for (k, v) in m.iter_mut() {
+                    match k.as_str() {
+                        "bytes" | "freed" | "created_unix" if v.is_u64() => *v = 0.into(),
+                        "run_id" => *v = "RUN".into(),
+                        _ => mask(v, base),
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let base = e.home.parent().unwrap().to_str().unwrap().to_owned();
+    let mut lines: serde_json::Value = out
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap_or_else(|_| panic!("not JSON: {l}")))
+        .collect::<Vec<serde_json::Value>>()
+        .into();
+    mask(&mut lines, &base);
+    lines
+}
+
+/// Compares with `tests/snapshots/<name>.json`; UPDATE_SNAPSHOTS=1 rewrites it.
+fn snapshot(name: &str, got: &serde_json::Value) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/snapshots/{name}.json"));
+    let text = serde_json::to_string_pretty(got).unwrap() + "\n";
+    if std::env::var_os("UPDATE_SNAPSHOTS").is_some() {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, &text).unwrap();
+    }
+    let want = fs::read_to_string(&path).unwrap_or_default();
+    assert_eq!(text, want, "{name}: run with UPDATE_SNAPSHOTS=1 to accept");
+}
+
+#[test]
+fn json_output_matches_the_snapshots() {
+    let e = env();
+    let project = e.project.to_str().unwrap();
+    let work = e.project.parent().unwrap().to_str().unwrap();
+    let store = e.store.to_str().unwrap();
+    let json = |args: &[&str]| {
+        let mut all = vec!["--json"];
+        all.extend_from_slice(args);
+        normalized(&e, &e.ok(&all))
+    };
+    snapshot("rules-check", &json(&["rules-check", RULES]));
+    snapshot("scan", &json(&["scan", work]));
+    snapshot("plan", &json(&["plan", project]));
+    snapshot(
+        "clean-dry-run",
+        &json(&["clean", "--store", store, project]),
+    );
+    snapshot(
+        "clean-execute",
+        &json(&[
+            "clean",
+            "--store",
+            store,
+            "--execute",
+            "--include-caution",
+            project,
+        ]),
+    );
+    let run = e.ok(&["--json", "history", "--store", store]);
+    snapshot("history", &normalized(&e, &run));
+    let id: serde_json::Value = serde_json::from_str(&run).unwrap();
+    let id = id["runs"][0]["run_id"].as_str().unwrap().to_owned();
+    snapshot("purge-dry-run", &json(&["purge", &id, "--store", store]));
+    snapshot("restore", &json(&["restore", &id, "--store", store]));
+    snapshot("pin", &json(&["pin", project]));
+
+    let out = e.run(&["--json", "restore", "nope", "--store", store]);
+    assert!(!out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    snapshot("error", &normalized(&e, &text));
+}
+
+#[test]
+fn only_narrows_the_selection() {
+    let e = env();
+    let project = e.project.to_str().unwrap();
+    let next = e.project.join(".next");
+    let out = e.clean(&["--include-caution", "--only", next.to_str().unwrap()]);
+    assert!(out.contains("Dry run: 1 folder"), "{out}");
+    assert!(!out.contains("node_modules"), "{out}");
+
+    // Not something the rules offer: refused before anything moves.
+    for bad in [
+        e.project.join("src"),
+        e.project.join("missing"),
+        e.home.clone(),
+    ] {
+        let store = e.store.to_str().unwrap();
+        let out = e.run(&[
+            "clean",
+            "--store",
+            store,
+            "--execute",
+            "--include-caution",
+            "--only",
+            next.to_str().unwrap(),
+            "--only",
+            bad.to_str().unwrap(),
+            project,
+        ]);
+        assert!(!out.status.success(), "{bad:?}");
+        assert!(exists(&e.project, ".next/cache/build.bin"));
+        assert!(!e.store.exists());
+    }
+}

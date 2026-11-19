@@ -53,7 +53,8 @@ on macOS (`~/.local/share/agentclean/quarantine` on Linux). Because it is a
 move on the same disk, **space is freed only when you purge**. Projects on
 another volume are skipped in this version.
 
-The rule catalogue is built in; `--rules DIR` uses a folder of rule files
+Add `--json` to any command for machine-readable output
+([`docs/CLI-JSON.md`](docs/CLI-JSON.md)). The rule catalogue is built in; `--rules DIR` uses a folder of rule files
 instead. Each project gets a verdict first. **Active** projects (edited or committed in
 the last 14 days, or with a tool running inside) are left alone unless you
 pass `--include-active`; **pinned** projects are never cleaned.

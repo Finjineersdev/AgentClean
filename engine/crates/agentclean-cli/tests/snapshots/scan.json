@@ -1,0 +1,43 @@
+[
+  {
+    "items": [
+      {
+        "bytes": 0,
+        "class": "caution",
+        "path": "node_modules",
+        "refused": null,
+        "rule": "node"
+      },
+      {
+        "bytes": 0,
+        "class": "safe",
+        "path": ".next",
+        "refused": null,
+        "rule": "node"
+      }
+    ],
+    "pinned": false,
+    "reason": "edited 200 days ago",
+    "root": "$TMP/work/site",
+    "schema_version": 1,
+    "type": "project",
+    "verdict": "dormant"
+  },
+  {
+    "active": {
+      "bytes": 0,
+      "folders": 0
+    },
+    "caution": {
+      "bytes": 0,
+      "folders": 1
+    },
+    "projects": 1,
+    "ready": {
+      "bytes": 0,
+      "folders": 1
+    },
+    "schema_version": 1,
+    "type": "summary"
+  }
+]

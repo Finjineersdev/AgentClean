@@ -1,0 +1,8 @@
+[
+  {
+    "artifacts": 31,
+    "command": "rules-check",
+    "rule_files": 11,
+    "schema_version": 1
+  }
+]

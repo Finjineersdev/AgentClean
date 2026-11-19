@@ -1,0 +1,9 @@
+[
+  {
+    "command": "pin",
+    "pinned": [
+      "$TMP/work/site"
+    ],
+    "schema_version": 1
+  }
+]
