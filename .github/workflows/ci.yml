@@ -15,8 +15,10 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.app || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
       - name: Swift version
         run: swift --version
+      - name: Build the engine for the end-to-end tests
+        run: cargo build --manifest-path engine/Cargo.toml --locked -p agentclean-cli
       - name: Test
-        run: cd CleanCore && swift test --filter 'ProjectKindTests|GitProbeTests|ProjectClassifierTests|SafetyGuardTests|SettingsTests|QuarantineTests'
+        run: cd CleanCore && swift test --filter 'EngineContractTests|EngineEndToEndTests|ProjectKindTests|GitProbeTests|ProjectClassifierTests|SafetyGuardTests|SettingsTests|QuarantineTests'
 
   app-build:
     name: App build

@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "CleanCore", targets: ["CleanCore"]),
+        .library(name: "AgentEngine", targets: ["AgentEngine"]),
     ],
     targets: [
         .target(
@@ -22,6 +23,17 @@ let package = Package(
             path: "Sources/CleanCore",
             swiftSettings: [.swiftLanguageMode(.v6)],
             linkerSettings: [.linkedFramework("IOKit")]
+        ),
+        .target(
+            name: "AgentEngine",
+            path: "Sources/AgentEngine",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "AgentEngineTests",
+            dependencies: ["AgentEngine"],
+            path: "Tests/AgentEngineTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "CleanCoreTests",
