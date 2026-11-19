@@ -253,6 +253,55 @@ fn tampered_manifests_are_refused() {
 }
 
 #[test]
+fn manifests_cannot_send_items_outside_their_project() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    let path = f.store.root().join("runs").join(&run.run_id).join(MANIFEST);
+    let outside = f.base.join("elsewhere");
+    let cases: [(PathBuf, PathBuf); 4] = [
+        (outside.clone(), f.root.clone()),
+        (f.root.join("../../elsewhere"), f.root.clone()),
+        (f.root.clone(), f.root.clone()),
+        (f.root.join("target"), PathBuf::from("work/proj")),
+    ];
+    for (original, project_root) in cases {
+        let mut evil = run.clone();
+        evil.entries[0].original = original.clone();
+        evil.entries[0].project_root = project_root;
+        fs::write(&path, serde_json::to_vec(&evil).unwrap()).unwrap();
+        assert!(
+            matches!(
+                f.store.restore(&run.run_id, None),
+                Err(Error::BadManifest(..))
+            ),
+            "{original:?}"
+        );
+    }
+    assert!(!outside.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn restore_does_not_follow_a_replaced_parent() {
+    let f = fixture();
+    fs::create_dir_all(f.root.join("android/app/build")).unwrap();
+    let run = f.store.clean(vec![f.approve("android/app/build")]).unwrap();
+    assert_eq!(run.entries[0].state, State::Moved);
+
+    // Swap `android/app` for a link to a folder outside the project.
+    let outside = f.base.join("outside");
+    fs::create_dir_all(&outside).unwrap();
+    fs::remove_dir_all(f.root.join("android/app")).unwrap();
+    std::os::unix::fs::symlink(&outside, f.root.join("android/app")).unwrap();
+
+    let after = f.store.restore(&run.run_id, None).unwrap();
+    assert_eq!(after.entries[0].state, State::Moved);
+    assert!(after.entries[0].note.is_some());
+    assert!(!outside.join("build").exists());
+    assert!(f.items(&run).join("0000").is_dir());
+}
+
+#[test]
 fn run_ids_cannot_escape_the_store() {
     let f = fixture();
     for id in ["../store", "..", "", "runs/../../x", "a/b"] {

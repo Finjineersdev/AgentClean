@@ -16,7 +16,7 @@
 
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -245,21 +245,9 @@ impl Store {
 
     pub fn load(&self, run_id: &str) -> Result<Manifest, Error> {
         let dir = self.run_dir(run_id)?;
-        let bad = |m: String| Error::BadManifest(run_id.to_owned(), m);
-        let text = fs::read_to_string(dir.join(MANIFEST)).map_err(|e| bad(e.to_string()))?;
-        let manifest: Manifest = serde_json::from_str(&text).map_err(|e| bad(e.to_string()))?;
-        if manifest.format != FORMAT {
-            return Err(bad(format!("format {} is not supported", manifest.format)));
-        }
-        if manifest.run_id != run_id {
-            return Err(bad("run id does not match its folder".to_owned()));
-        }
-        for e in &manifest.entries {
-            if !valid_stored(&e.stored) || !e.original.is_absolute() {
-                return Err(bad(format!("entry {:?} is malformed", e.stored)));
-            }
-        }
-        Ok(manifest)
+        let text = fs::read_to_string(dir.join(MANIFEST))
+            .map_err(|e| Error::BadManifest(run_id.to_owned(), e.to_string()))?;
+        parse_manifest(run_id, &text)
     }
 
     /// Moves items of a run back where they came from: all of them, or the one
@@ -282,6 +270,13 @@ impl Store {
                 Err("something already exists at the original location".to_owned())
             } else if !dest.parent().is_some_and(Path::is_dir) {
                 Err("the folder it came from no longer exists".to_owned())
+            } else if !dest
+                .parent()
+                .is_some_and(|p| fs::canonicalize(p).is_ok_and(|c| c == p))
+            {
+                // `original` was canonical at clean time; a different real path
+                // now means a folder on the way was replaced, e.g. by a link.
+                Err("the folder it came from is now a link or has moved".to_owned())
             } else {
                 fs::rename(&src, &dest).map_err(|e| e.to_string())
             };
@@ -363,6 +358,41 @@ impl Store {
             "could not allocate a run folder".to_owned(),
         ))
     }
+}
+
+/// Parses and validates the manifest text of run `run_id`. Public so the fuzz
+/// targets can reach it; every accepted entry names a plain item under
+/// `items/` and an absolute original.
+pub fn parse_manifest(run_id: &str, text: &str) -> Result<Manifest, Error> {
+    let bad = |m: String| Error::BadManifest(run_id.to_owned(), m);
+    let manifest: Manifest = serde_json::from_str(text).map_err(|e| bad(e.to_string()))?;
+    if manifest.format != FORMAT {
+        return Err(bad(format!("format {} is not supported", manifest.format)));
+    }
+    if manifest.run_id != run_id {
+        return Err(bad("run id does not match its folder".to_owned()));
+    }
+    for e in &manifest.entries {
+        let inside = absolute_plain(&e.project_root)
+            && absolute_plain(&e.original)
+            && e.original.starts_with(&e.project_root)
+            && e.original != e.project_root;
+        if !valid_stored(&e.stored) || !inside {
+            return Err(bad(format!("entry {:?} is malformed", e.stored)));
+        }
+    }
+    Ok(manifest)
+}
+
+/// Absolute, with no `.` or `..` components.
+fn absolute_plain(path: &Path) -> bool {
+    path.is_absolute()
+        && path.components().all(|c| {
+            matches!(
+                c,
+                Component::RootDir | Component::Prefix(_) | Component::Normal(_)
+            )
+        })
 }
 
 /// True if the entry's item is in quarantine. A `pending` entry whose item is
