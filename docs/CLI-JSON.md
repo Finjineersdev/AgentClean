@@ -49,7 +49,8 @@ projects' items are refused.
 **Run** (`clean`, `history`, `restore`, `purge`) is the quarantine manifest:
 `run_id`, `format`, `created_unix`, and `entries`, each with `original`,
 `project_root`, `stored`, `rule_id`, `class`, `bytes`, `state` (`pending`,
-`moved`, `skipped`, `failed`, `restored`, `purged`) and an optional `note`.
+`moved`, `skipped`, `failed`, `restored`, `purged`), an optional `note`, and an
+optional `volume`: the quarantine on another drive that holds the item.
 
 ## Commands
 

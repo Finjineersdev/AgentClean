@@ -43,7 +43,7 @@ in this repository. Keep it that way.
   `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
   the name check and the `SECURITY.md` rewrite.
-- M0, M1 and M2.1 to M2.6 are committed.
+- M0, M1 and M2 (M2.1 to M2.7) are committed.
 - Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
   owner names a domain they control.
 
@@ -99,7 +99,7 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 | Gap | Where it gets fixed |
 | --- | --- |
 | Fuzzing and mutation testing owed | M2 (first tasks) |
-| Projects on a different volume from the quarantine are skipped, not cleaned | M2 decision, see `docs/milestones/M2.md` |
+| Projects on network drives, and on drives without Unix permissions (exFAT, FAT), are skipped | ADR 0004 |
 | Mac app unbuilt since the rename; macOS 26 floor; Swift deletion path still present | M3 |
 | `SECURITY.md` inaccurate | M3 |
 | GitHub Actions not pinned to commit SHAs | Before first release |

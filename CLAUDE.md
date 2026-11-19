@@ -73,6 +73,7 @@ xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
 | `engine/crates/agentclean-core/src/discover.rs` | Project discovery walk |
 | `engine/crates/agentclean-core/src/activity.rs` | Active, Idle, Dormant verdicts; config and pins |
 | `engine/crates/agentclean-core/src/size.rs` | Allocated-size measurement |
+| `engine/crates/agentclean-core/src/volumes.rs` | Mount table, drive roots, network drives |
 | `engine/crates/agentclean-cli/` | `agentclean` binary and end-to-end tests |
 | `engine/rules/*.toml` | Rule catalogue, one file per ecosystem |
 | `AgentClean/`, `CleanCore/` | Inherited SwiftUI app and Swift engine (to be reduced in M3) |

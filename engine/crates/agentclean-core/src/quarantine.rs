@@ -13,7 +13,14 @@
 //! an entry as moved. Items are moved by rename on the same volume
 //! (invariant I13), so a clean never copies data and never unlinks it.
 //! Space comes back only when a run is purged.
+//!
+//! A folder on another local drive goes to a quarantine on that drive,
+//! `<drive>/.agentclean-quarantine/runs/<run id>/items/` (ADR 0004). The
+//! manifest stays in the main store and records that folder as the entry's
+//! `volume`; every folder on the way must be a real folder that only its
+//! owner, the owner of the main store, can change (invariant I19).
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -24,9 +31,12 @@ use serde::{Deserialize, Serialize};
 use crate::guard::Approved;
 use crate::rules::Class;
 use crate::size;
+use crate::volumes::{self, Mount};
 
 pub const MANIFEST: &str = "manifest.json";
 pub const FORMAT: u32 = 1;
+/// Name of the quarantine folder at the top of another drive.
+pub const VOLUME_STORE: &str = ".agentclean-quarantine";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -56,6 +66,9 @@ pub struct Entry {
     /// Allocated bytes at clean time.
     pub bytes: u64,
     pub state: State,
+    /// The drive quarantine holding the item, when it is not the main store.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume: Option<PathBuf>,
     /// Why the last action on this entry did not succeed, if it did not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
@@ -167,9 +180,10 @@ impl Store {
         Ok(dir)
     }
 
-    /// Moves every approved directory into a new run. Items that changed since
-    /// approval, or sit on another volume, are recorded as skipped and left
-    /// where they are. Returns the final manifest.
+    /// Moves every approved directory into a new run. Items on another local
+    /// drive go to that drive's quarantine. Items that changed since approval,
+    /// or whose drive cannot hold a quarantine, are recorded as skipped and
+    /// left where they are. Returns the final manifest.
     pub fn clean(&self, plan: Vec<Approved>) -> Result<Manifest, Error> {
         if plan.is_empty() {
             return Err(Error::EmptyPlan);
@@ -196,23 +210,46 @@ impl Store {
                     class: a.class(),
                     bytes: size::usage(a.path()).bytes,
                     state: State::Pending,
+                    volume: None,
                     note: None,
                 })
                 .collect(),
         };
         write_manifest(&run_dir, &manifest).map_err(io)?;
 
+        let owner = owner_of(&self.root).map_err(|e| Error::Store(self.root.clone(), e))?;
+        let mut mounts: Option<Option<Vec<Mount>>> = None;
+        // Per device: the drive quarantine and this run's items folder there.
+        let mut drives: HashMap<u64, Result<(PathBuf, PathBuf), String>> = HashMap::new();
         for (i, approved) in plan.iter().enumerate() {
-            let outcome = if approved.device() != store_dev {
-                Err((
-                    State::Skipped,
-                    "on a different volume from the quarantine".to_owned(),
-                ))
-            } else if let Err(why) = approved.reverify() {
-                Err((State::Skipped, why.to_string()))
+            let target = if approved.device() == store_dev {
+                Ok(items.clone())
             } else {
-                let dest = items.join(&manifest.entries[i].stored);
-                fs::rename(approved.path(), &dest).map_err(|e| (State::Failed, e.to_string()))
+                let drive = drives.entry(approved.device()).or_insert_with(|| {
+                    let mounts = mounts.get_or_insert_with(volumes::mounts).as_deref();
+                    drive_run(approved.path(), &run_id, owner, mounts)
+                });
+                match drive {
+                    Ok((store, items)) if volumes::device(store) == Some(approved.device()) => {
+                        // Recorded before the move, so a crash cannot lose it.
+                        manifest.entries[i].volume = Some(store.clone());
+                        write_manifest(&run_dir, &manifest).map_err(io)?;
+                        Ok(items.clone())
+                    }
+                    Ok(_) => Err("its drive's quarantine is on another drive".to_owned()),
+                    Err(why) => Err(why.clone()),
+                }
+            };
+            let outcome = match target {
+                Err(why) => Err((State::Skipped, why)),
+                Ok(items) => match approved.reverify() {
+                    Err(why) => Err((State::Skipped, why.to_string())),
+                    Ok(()) => {
+                        let dest = items.join(&manifest.entries[i].stored);
+                        fs::rename(approved.path(), &dest)
+                            .map_err(|e| (State::Failed, e.to_string()))
+                    }
+                },
             };
             let entry = &mut manifest.entries[i];
             match outcome {
@@ -266,10 +303,19 @@ impl Store {
         let mut manifest = self.load(run_id)?;
         let picked = selection(&manifest, run_id, item)?;
         let io = |e: std::io::Error| Error::Io(run_id.to_owned(), e.to_string());
+        let owner = owner_of(&self.root).map_err(|e| Error::Store(self.root.clone(), e))?;
 
         for i in picked {
             let entry = &mut manifest.entries[i];
-            let src = dir.join("items").join(&entry.stored);
+            let src = match items_of(&dir, run_id, entry, owner) {
+                Ok(items) => items.join(&entry.stored),
+                Err(why) => {
+                    if entry.state == State::Moved {
+                        entry.note = Some(why);
+                    }
+                    continue;
+                }
+            };
             if !held(entry, &src) {
                 continue;
             }
@@ -308,11 +354,19 @@ impl Store {
     pub fn purge(&self, run_id: &str) -> Result<Manifest, Error> {
         let dir = self.run_dir(run_id)?;
         let mut manifest = self.load(run_id)?;
-        let items = dir.join("items");
         let io = |e: std::io::Error| Error::Io(run_id.to_owned(), e.to_string());
+        let owner = owner_of(&self.root).map_err(|e| Error::Store(self.root.clone(), e))?;
 
         for entry in &mut manifest.entries {
-            let target = items.join(&entry.stored);
+            let target = match items_of(&dir, run_id, entry, owner) {
+                Ok(items) => items.join(&entry.stored),
+                Err(why) => {
+                    if entry.state == State::Moved {
+                        entry.note = Some(why);
+                    }
+                    continue;
+                }
+            };
             if !held(entry, &target) {
                 continue;
             }
@@ -386,7 +440,13 @@ pub fn parse_manifest(run_id: &str, text: &str) -> Result<Manifest, Error> {
             && absolute_plain(&e.original)
             && e.original.starts_with(&e.project_root)
             && e.original != e.project_root;
-        if !valid_stored(&e.stored) || !inside {
+        // A drive quarantine sits at the top of the drive the item came from.
+        let volume_ok = e.volume.as_ref().map_or(true, |v| {
+            absolute_plain(v)
+                && v.file_name().is_some_and(|n| n == VOLUME_STORE)
+                && v.parent().is_some_and(|d| e.original.starts_with(d))
+        });
+        if !valid_stored(&e.stored) || !inside || !volume_ok {
             return Err(bad(format!("entry {:?} is malformed", e.stored)));
         }
     }
@@ -442,6 +502,102 @@ fn valid_run_id(id: &str) -> bool {
 
 fn valid_stored(name: &str) -> bool {
     name.len() >= 4 && name.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// The drive quarantine for the drive holding `path`, and a new items folder
+/// for this run in it. Creates both, owner-only; refuses network drives and
+/// a quarantine someone else could change (I19).
+fn drive_run(
+    path: &Path,
+    run_id: &str,
+    owner: u32,
+    mounts: Option<&[Mount]>,
+) -> Result<(PathBuf, PathBuf), String> {
+    let drive = volumes::drive_root(path).ok_or("its drive could not be read")?;
+    if let Some(why) = volumes::unusable(&drive, mounts) {
+        return Err(why);
+    }
+    let store = drive.join(VOLUME_STORE);
+    let run = store.join("runs").join(run_id);
+    let items = run.join("items");
+    let fail = |e: String| format!("no quarantine on its drive: {e}");
+    private_dir(&store, owner, true).map_err(fail)?;
+    private_dir(&store.join("runs"), owner, true).map_err(fail)?;
+    private_dir(&run, owner, false).map_err(fail)?;
+    private_dir(&items, owner, false).map_err(fail)?;
+    Ok((store, items))
+}
+
+/// Creates `dir` owner-only (it must be new unless `existing_ok`), then
+/// checks it is trusted.
+fn private_dir(dir: &Path, owner: u32, existing_ok: bool) -> Result<(), String> {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    match builder.create(dir) {
+        Ok(()) => {}
+        Err(e) if existing_ok && e.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(e) => return Err(format!("{}: {e}", dir.display())),
+    }
+    trusted(dir, owner)
+}
+
+/// I19: a real folder (not a link), owned by `owner`, that no one else can
+/// change.
+pub(crate) fn trusted(dir: &Path, owner: u32) -> Result<(), String> {
+    let meta = fs::symlink_metadata(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    // `symlink_metadata` never reports a link as a directory.
+    if !meta.is_dir() {
+        return Err(format!("{} is not a real folder", dir.display()));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if meta.uid() != owner {
+            return Err(format!("{} belongs to another user", dir.display()));
+        }
+        if meta.mode() & 0o022 != 0 {
+            return Err(format!("{} can be changed by other users", dir.display()));
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = owner;
+    Ok(())
+}
+
+/// Where an entry's item is held: the main store's items folder, or the
+/// drive quarantine's, checked again before every use.
+fn items_of(run_dir: &Path, run_id: &str, entry: &Entry, owner: u32) -> Result<PathBuf, String> {
+    let Some(store) = &entry.volume else {
+        return Ok(run_dir.join("items"));
+    };
+    if fs::symlink_metadata(store).is_err() {
+        return Err(format!("its drive is not connected ({})", store.display()));
+    }
+    let run = store.join("runs").join(run_id);
+    let items = run.join("items");
+    for dir in [store, &store.join("runs"), &run, &items] {
+        trusted(dir, owner)?;
+    }
+    Ok(items)
+}
+
+fn owner_of(path: &Path) -> Result<u32, String> {
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    let uid = {
+        use std::os::unix::fs::MetadataExt;
+        meta.uid()
+    };
+    #[cfg(not(unix))]
+    let uid = {
+        let _ = meta;
+        0
+    };
+    Ok(uid)
 }
 
 fn device_of(path: &Path) -> std::io::Result<u64> {

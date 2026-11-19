@@ -34,6 +34,16 @@ jobs:
         run: cargo fmt --all --check
       - name: Lint
         run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Second drive for the drive-quarantine test
+        working-directory: ${{ runner.temp }}
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            hdiutil create -size 50m -fs APFS -volname ACTest drive.dmg -quiet
+            hdiutil attach drive.dmg -nobrowse -mountpoint "$RUNNER_TEMP/drive"
+            echo "AGENTCLEAN_TEST_VOLUME=$RUNNER_TEMP/drive" >> "$GITHUB_ENV"
+          else
+            echo "AGENTCLEAN_TEST_VOLUME=/dev/shm" >> "$GITHUB_ENV"
+          fi
       - name: Test
         run: cargo test --locked
       - name: Validate bundled rules

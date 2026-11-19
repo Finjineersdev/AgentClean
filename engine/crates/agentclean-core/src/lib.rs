@@ -16,6 +16,7 @@ pub mod guard;
 pub mod quarantine;
 pub mod rules;
 pub mod size;
+pub mod volumes;
 
 #[cfg(test)]
 mod activity_tests;

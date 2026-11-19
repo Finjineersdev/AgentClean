@@ -51,7 +51,8 @@ $B purge <run-id> --execute                      # delete from quarantine, free 
 Cleaning moves folders into `~/Library/Application Support/AgentClean/Quarantine`
 on macOS (`~/.local/share/agentclean/quarantine` on Linux). Because it is a
 move on the same disk, **space is freed only when you purge**. Projects on
-another volume are skipped in this version.
+another drive go to a hidden `.agentclean-quarantine` folder at the top of
+that drive; projects on network drives are skipped.
 
 Add `--json` to any command for machine-readable output
 ([`docs/CLI-JSON.md`](docs/CLI-JSON.md)). The rule catalogue is built in; `--rules DIR` uses a folder of rule files

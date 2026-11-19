@@ -5,7 +5,7 @@ something that cannot be rebuilt. This document states the invariants that
 prevent it. Each invariant names the code that enforces it and the test that
 proves it. A change that weakens an invariant needs an ADR.
 
-Status: **I1–I15c and I18 are implemented and tested** in `engine/crates/agentclean-core`.
+Status: **I1–I15c, I18 and I19 are implemented and tested** in `engine/crates/agentclean-core`.
 I16 and I17 are specified and not implemented yet.
 
 ## Model
@@ -66,11 +66,12 @@ which allows no transport and overrides the repository's own
 
 | # | Invariant | Enforced by | Test |
 | --- | --- | --- | --- |
-| I13 | Cleaning moves each approved folder into the quarantine by rename on the same volume; nothing is copied or unlinked at clean time. A folder on another volume is skipped and recorded | `Store::clean` | `clean_then_restore_round_trips_exactly` |
+| I13 | Cleaning moves each approved folder by rename into a quarantine on its own drive: the main store, or `.agentclean-quarantine` at the top of another local drive (ADR 0004); nothing is copied or unlinked at clean time. A folder on a network drive, or a drive whose type is unknown, is skipped and recorded | `Store::clean`, `volumes::unusable` | `clean_then_restore_round_trips_exactly`, `folders_on_another_drive_use_that_drives_quarantine`, `only_known_local_drives_are_usable` |
 | I14 | The manifest is written before the first move and rewritten atomically after each one; `reverify` runs immediately before each move | `Store::clean`, `write_manifest` | `changed_items_are_skipped_and_recorded`, `a_crash_after_a_move_is_recoverable` |
 | I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
 | I14b | Purge deletes only real directories at `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `parse_manifest` | `purge_deletes_only_quarantined_items`, `purge_removes_only_real_directories`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
 | I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
+| I19 | A drive quarantine is used only if each of its folders is a real folder owned by the main store's owner and writable by no one else, checked before every clean, restore and purge; a manifest's `volume` must be an absolute `.agentclean-quarantine` folder whose parent contains the item's original | `quarantine::trusted`, `items_of`, `parse_manifest` | `a_drive_quarantine_must_be_a_private_folder_of_the_owner`, `manifests_cannot_point_at_another_drives_quarantine`, `folders_on_another_drive_use_that_drives_quarantine` |
 | I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution`. `pin` and `unpin` are the exception: they change only AgentClean's config, and pinning only adds protection. `clean --only` can only narrow: a pick the rules do not offer is an error before anything moves, and every pick still passes the guard | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag`, `only_narrows_the_selection` |
 
 Space is freed only when a run is purged, because a rename on the same volume

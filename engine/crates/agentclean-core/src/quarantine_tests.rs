@@ -434,3 +434,140 @@ fn history_lists_runs_newest_first() {
     assert_eq!(f.store.purge_older_than(1).unwrap().len(), 0);
     assert_eq!(f.store.purge_older_than(0).unwrap().len(), 2);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_drive_quarantine_must_be_a_private_folder_of_the_owner() {
+    use crate::quarantine::trusted;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("q");
+    fs::create_dir(&dir).unwrap();
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let me = fs::metadata(&dir).unwrap().uid();
+    assert_eq!(trusted(&dir, me), Ok(()));
+    let other = trusted(&dir, me + 1).unwrap_err();
+    assert!(other.contains("another user"), "{other}");
+    for mode in [0o720, 0o702, 0o777] {
+        fs::set_permissions(&dir, fs::Permissions::from_mode(mode)).unwrap();
+        let why = trusted(&dir, me).unwrap_err();
+        assert!(why.contains("changed by other users"), "{mode:o}: {why}");
+    }
+    let link = tmp.path().join("link");
+    std::os::unix::fs::symlink(&dir, &link).unwrap();
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(trusted(&link, me)
+        .unwrap_err()
+        .contains("not a real folder"));
+}
+
+#[test]
+fn manifests_cannot_point_at_another_drives_quarantine() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    let path = f.store.root().join("runs").join(&run.run_id).join(MANIFEST);
+    let good = fs::read_to_string(&path).unwrap();
+    let base = f.base.to_str().unwrap();
+    for volume in [
+        "/elsewhere/.agentclean-quarantine".to_owned(),
+        format!("{base}/work/not-the-store"),
+        format!("{base}/work/../.agentclean-quarantine"),
+        ".agentclean-quarantine".to_owned(),
+    ] {
+        let bad = good.replacen(
+            "\"state\"",
+            &format!("\"volume\": {volume:?},\n      \"state\""),
+            1,
+        );
+        fs::write(&path, bad).unwrap();
+        assert!(
+            matches!(f.store.load(&run.run_id), Err(Error::BadManifest(..))),
+            "{volume}"
+        );
+    }
+    let ok = good.replacen(
+        "\"state\"",
+        &format!("\"volume\": \"{base}/work/.agentclean-quarantine\",\n      \"state\""),
+        1,
+    );
+    fs::write(&path, ok).unwrap();
+    assert!(f.store.load(&run.run_id).is_ok());
+}
+
+/// Runs on a real second drive: set AGENTCLEAN_TEST_VOLUME to a writable
+/// folder on another local drive (CI uses a disk image on macOS and
+/// /dev/shm on Linux).
+#[cfg(unix)]
+#[test]
+fn folders_on_another_drive_use_that_drives_quarantine() {
+    use crate::quarantine::VOLUME_STORE;
+    use std::os::unix::fs::PermissionsExt;
+    let Some(volume) = std::env::var_os("AGENTCLEAN_TEST_VOLUME") else {
+        eprintln!("skipped: AGENTCLEAN_TEST_VOLUME is not set");
+        return;
+    };
+    let f = fixture();
+    let work = tempfile::tempdir_in(&volume).unwrap();
+    let root = fs::canonicalize(work.path()).unwrap().join("proj");
+    fs::create_dir_all(root.join("target/debug")).unwrap();
+    fs::write(root.join("target/debug/app"), vec![1u8; 9_000]).unwrap();
+    let before = snapshot(&root.join("target"));
+    let drive = crate::volumes::drive_root(&root).unwrap();
+    let store = drive.join(VOLUME_STORE);
+    let approve = |rel: &str| {
+        f.guard
+            .check(&idle(&root), &Candidate::unchecked(rel))
+            .unwrap()
+    };
+
+    // Clean, then restore, through the drive's own quarantine.
+    let run = f
+        .store
+        .clean(vec![approve("target"), f.approve("node_modules")])
+        .unwrap();
+    assert_eq!(
+        run.entries[0].state,
+        State::Moved,
+        "{:?}",
+        run.entries[0].note
+    );
+    assert_eq!(run.entries[0].volume.as_deref(), Some(store.as_path()));
+    assert_eq!(run.entries[1].volume, None);
+    let held = store.join("runs").join(&run.run_id).join("items/0000");
+    assert!(held.is_dir() && !root.join("target").exists());
+    assert_eq!(read_manifest(&f, &run), run);
+    let back = f.store.restore(&run.run_id, None).unwrap();
+    assert_eq!(back.entries[0].state, State::Restored);
+    assert_eq!(snapshot(&root.join("target")), before);
+
+    // A drive that is not connected leaves the item where it is, with a note.
+    let run = f.store.clean(vec![approve("target")]).unwrap();
+    let away = drive.join(".agentclean-away");
+    fs::rename(&store, &away).unwrap();
+    let kept = f.store.restore(&run.run_id, None).unwrap();
+    assert_eq!(kept.entries[0].state, State::Moved);
+    assert!(kept.entries[0]
+        .note
+        .as_deref()
+        .unwrap()
+        .contains("not connected"));
+    fs::rename(&away, &store).unwrap();
+
+    // A quarantine others can change is never used, for moves or for purges.
+    fs::set_permissions(&store, fs::Permissions::from_mode(0o777)).unwrap();
+    let purged = f.store.purge(&run.run_id).unwrap();
+    assert_eq!(purged.entries[0].state, State::Moved);
+    fs::create_dir_all(root.join("target")).unwrap();
+    let refused = f.store.clean(vec![approve("target")]).unwrap();
+    assert_eq!(refused.entries[0].state, State::Skipped);
+    assert!(root.join("target").is_dir());
+    fs::set_permissions(&store, fs::Permissions::from_mode(0o700)).unwrap();
+
+    let purged = f.store.purge(&run.run_id).unwrap();
+    assert_eq!(purged.entries[0].state, State::Purged);
+    assert!(!store
+        .join("runs")
+        .join(&run.run_id)
+        .join("items/0000")
+        .exists());
+}
