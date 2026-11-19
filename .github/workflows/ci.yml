@@ -57,8 +57,8 @@ jobs:
           codesign --verify --deep --strict "$app"
 
   ui-tests:
-    name: UI tests (macOS 14)
-    runs-on: macos-14
+    name: UI tests (macOS 15, Xcode 16)
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:

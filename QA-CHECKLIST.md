@@ -25,7 +25,7 @@ The walkthrough expects projects named `shop-web` (dormant Next.js),
 `xcodebuild test -project AgentClean.xcodeproj -scheme AgentClean -destination 'platform=macOS'`.
 On a developer Mac, enable automation mode once:
 `sudo automationmodetool enable-automationmode-without-authentication`.
-CI runs them on macOS 14.
+CI runs them on macOS 15 with Xcode 16.
 
 ## By hand
 

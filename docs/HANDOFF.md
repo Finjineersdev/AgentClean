@@ -109,7 +109,7 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 - Tests: `AgentEngineTests` (contract, end to end, selection rules for F14);
   `AgentCleanUITests` (XCUITest: scan, clean only what is ticked and undo,
   active-project consent, pinning, history restore and purge confirmation),
-  run on a macOS 14 runner in CI. Debug builds have a walkthrough
+  run on a macOS 15 runner in CI (GitHub retired macOS 14 runners; the macOS 14 floor is checked by the deployment target only). Debug builds have a walkthrough
   (`AGENTCLEAN_QA=<folder>`) that drives every screen against throwaway
   projects, checks the results on disk and saves window snapshots; see
   `QA-CHECKLIST.md`.
