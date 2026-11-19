@@ -461,6 +461,25 @@ fn a_drive_quarantine_must_be_a_private_folder_of_the_owner() {
         .contains("not a real folder"));
 }
 
+#[cfg(unix)]
+#[test]
+fn a_shared_drive_top_needs_the_sticky_bit() {
+    use crate::quarantine::shared_safely;
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let top = tmp.path();
+    for (mode, ok) in [
+        (0o755, true),
+        (0o1777, true),
+        (0o777, false),
+        (0o775, false),
+    ] {
+        fs::set_permissions(top, fs::Permissions::from_mode(mode)).unwrap();
+        assert_eq!(shared_safely(top).is_ok(), ok, "{mode:o}");
+    }
+    fs::set_permissions(top, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
 #[test]
 fn manifests_cannot_point_at_another_drives_quarantine() {
     let f = fixture();
@@ -503,6 +522,11 @@ fn folders_on_another_drive_use_that_drives_quarantine() {
     use crate::quarantine::VOLUME_STORE;
     use std::os::unix::fs::PermissionsExt;
     let Some(volume) = std::env::var_os("AGENTCLEAN_TEST_VOLUME") else {
+        // CI provides a second drive; there, a missing one is a failure.
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "AGENTCLEAN_TEST_VOLUME is not set"
+        );
         eprintln!("skipped: AGENTCLEAN_TEST_VOLUME is not set");
         return;
     };

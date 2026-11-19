@@ -304,10 +304,16 @@ impl Store {
         let picked = selection(&manifest, run_id, item)?;
         let io = |e: std::io::Error| Error::Io(run_id.to_owned(), e.to_string());
         let owner = owner_of(&self.root).map_err(|e| Error::Store(self.root.clone(), e))?;
+        let mounts = manifest
+            .entries
+            .iter()
+            .any(|e| e.volume.is_some())
+            .then(volumes::mounts)
+            .flatten();
 
         for i in picked {
             let entry = &mut manifest.entries[i];
-            let src = match items_of(&dir, run_id, entry, owner) {
+            let src = match items_of(&dir, run_id, entry, owner, mounts.as_deref()) {
                 Ok(items) => items.join(&entry.stored),
                 Err(why) => {
                     if entry.state == State::Moved {
@@ -356,9 +362,15 @@ impl Store {
         let mut manifest = self.load(run_id)?;
         let io = |e: std::io::Error| Error::Io(run_id.to_owned(), e.to_string());
         let owner = owner_of(&self.root).map_err(|e| Error::Store(self.root.clone(), e))?;
+        let mounts = manifest
+            .entries
+            .iter()
+            .any(|e| e.volume.is_some())
+            .then(volumes::mounts)
+            .flatten();
 
         for entry in &mut manifest.entries {
-            let target = match items_of(&dir, run_id, entry, owner) {
+            let target = match items_of(&dir, run_id, entry, owner, mounts.as_deref()) {
                 Ok(items) => items.join(&entry.stored),
                 Err(why) => {
                     if entry.state == State::Moved {
@@ -517,6 +529,7 @@ fn drive_run(
     if let Some(why) = volumes::unusable(&drive, mounts) {
         return Err(why);
     }
+    shared_safely(&drive)?;
     let store = drive.join(VOLUME_STORE);
     let run = store.join("runs").join(run_id);
     let items = run.join("items");
@@ -545,6 +558,27 @@ fn private_dir(dir: &Path, owner: u32, existing_ok: bool) -> Result<(), String> 
     trusted(dir, owner)
 }
 
+/// The top of a drive may be shared only with the sticky bit set, so no one
+/// else can rename or replace the quarantine folder in it.
+pub(crate) fn shared_safely(drive: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let mode = fs::metadata(drive)
+            .map_err(|e| format!("{}: {e}", drive.display()))?
+            .mode();
+        if mode & 0o022 != 0 && mode & 0o1000 == 0 {
+            return Err(format!(
+                "the top of its drive ({}) can be changed by other users",
+                drive.display()
+            ));
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = drive;
+    Ok(())
+}
+
 /// I19: a real folder (not a link), owned by `owner`, that no one else can
 /// change.
 pub(crate) fn trusted(dir: &Path, owner: u32) -> Result<(), String> {
@@ -570,13 +604,28 @@ pub(crate) fn trusted(dir: &Path, owner: u32) -> Result<(), String> {
 
 /// Where an entry's item is held: the main store's items folder, or the
 /// drive quarantine's, checked again before every use.
-fn items_of(run_dir: &Path, run_id: &str, entry: &Entry, owner: u32) -> Result<PathBuf, String> {
+fn items_of(
+    run_dir: &Path,
+    run_id: &str,
+    entry: &Entry,
+    owner: u32,
+    mounts: Option<&[Mount]>,
+) -> Result<PathBuf, String> {
     let Some(store) = &entry.volume else {
         return Ok(run_dir.join("items"));
     };
     if fs::symlink_metadata(store).is_err() {
         return Err(format!("its drive is not connected ({})", store.display()));
     }
+    // The quarantine must still sit at the top of a local drive.
+    let drive = store.parent().ok_or("its quarantine has no drive")?;
+    if volumes::drive_root(store).as_deref() != Some(drive) {
+        return Err(format!("{} is not at the top of a drive", store.display()));
+    }
+    if let Some(why) = volumes::unusable(drive, mounts) {
+        return Err(why);
+    }
+    shared_safely(drive)?;
     let run = store.join("runs").join(run_id);
     let items = run.join("items");
     for dir in [store, &store.join("runs"), &run, &items] {

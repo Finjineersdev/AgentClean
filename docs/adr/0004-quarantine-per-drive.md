@@ -18,7 +18,10 @@ not show.
 Every folder of a drive quarantine must be a real folder (not a link), owned
 by the owner of the main store, and not writable by group or others. It is
 created that way (`0700`) and checked again before every clean, restore and
-purge (invariant I19). Each run's folder there must be new.
+purge (invariant I19). Each run's folder there must be new. The top of the
+drive may be writable by others only with the sticky bit set, so no one else
+can rename the quarantine away between the check and the move. Restore and
+purge check again that the quarantine is at the top of a local drive.
 
 ## Why
 
@@ -35,6 +38,13 @@ purge (invariant I19). Each run's folder there must be new.
   planted to redirect moves or purges; I19 refuses it.
 
 ## Consequences
+
+- macOS mounts most external drives with ownership ignored (`noowners`):
+  every file appears to belong to whoever looks. On such a drive the owner
+  check proves nothing; what still holds is that no folder on the way may be
+  a link, each run's folder is new, purge deletes only real folders, and
+  restore puts items back only inside their project. Anyone holding the drive
+  could change its files anyway.
 
 - A drive that does not keep Unix permissions (exFAT, FAT) may report every
   folder as writable by others; its folders are then skipped with that
