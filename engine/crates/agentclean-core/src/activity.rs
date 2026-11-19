@@ -31,6 +31,8 @@ pub struct Config {
     pub dormant_days: u64,
     /// Never cleaned, and nor is anything inside them.
     pub pinned: Vec<PathBuf>,
+    /// Folders `scan` does not look in.
+    pub exclude: Vec<PathBuf>,
 }
 
 impl Default for Config {
@@ -39,6 +41,7 @@ impl Default for Config {
             idle_days: 14,
             dormant_days: 90,
             pinned: Vec::new(),
+            exclude: Vec::new(),
         }
     }
 }
@@ -53,6 +56,13 @@ impl Config {
             Err(e) => return Err(format!("{}: {e}", path.display())),
         };
         let cfg: Self = toml::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        if let Some(p) = cfg.exclude.iter().find(|p| !p.is_absolute()) {
+            return Err(format!(
+                "{}: exclusion {} is not absolute",
+                path.display(),
+                p.display()
+            ));
+        }
         if let Some(p) = cfg.pinned.iter().find(|p| !p.is_absolute()) {
             return Err(format!(
                 "{}: pin {} is not absolute",

@@ -36,10 +36,12 @@ cargo test
 cargo build
 B=target/debug/agentclean
 
-$B plan  --rules rules ~/code/my-site            # what would be allowed, read-only
-$B clean --rules rules ~/code/my-site            # dry run: lists what would move
-$B clean --rules rules --execute ~/code/my-site  # move Safe folders into quarantine
-$B clean --rules rules --execute --include-caution ~/code/my-site   # node_modules, .venv too
+$B scan                                          # every project in your home folder, read-only
+$B scan ~/code                                   # or just these folders
+$B plan  ~/code/my-site                          # one project: what would be allowed
+$B clean ~/code/my-site                          # dry run: lists what would move
+$B clean --execute ~/code/my-site                # move Safe folders into quarantine
+$B clean --execute --include-caution ~/code/my-site   # node_modules, .venv too
 $B pin ~/code/client-app                          # never clean this folder
 $B history                                       # runs, newest first
 $B restore <run-id>                              # put everything back
@@ -51,7 +53,8 @@ on macOS (`~/.local/share/agentclean/quarantine` on Linux). Because it is a
 move on the same disk, **space is freed only when you purge**. Projects on
 another volume are skipped in this version.
 
-Each project gets a verdict first. **Active** projects (edited or committed in
+The rule catalogue is built in; `--rules DIR` uses a folder of rule files
+instead. Each project gets a verdict first. **Active** projects (edited or committed in
 the last 14 days, or with a tool running inside) are left alone unless you
 pass `--include-active`; **pinned** projects are never cleaned.
 

@@ -560,17 +560,48 @@ pub fn load_dir(dir: &Path) -> Result<Vec<RuleFile>, RuleError> {
         .filter(|p| p.extension().is_some_and(|x| x == "toml"))
         .collect();
     files.sort();
-    let mut ids = BTreeSet::new();
-    let mut out = Vec::with_capacity(files.len());
+    let mut texts = Vec::with_capacity(files.len());
     for path in files {
         let label = path.display().to_string();
         let text = std::fs::read_to_string(&path).map_err(|e| RuleError::Io {
             file: label.clone(),
             message: e.to_string(),
         })?;
-        let rule = parse(&label, &text)?;
+        texts.push((label, text));
+    }
+    load_texts(texts.iter().map(|(l, t)| (l.as_str(), t.as_str())))
+}
+
+/// The rule files built into the binary, so the CLI works without the
+/// source tree. `bundled_rules_match_the_rules_folder` keeps this list whole.
+const BUNDLED: &[(&str, &str)] = &[
+    ("android.toml", include_str!("../../../rules/android.toml")),
+    ("dotnet.toml", include_str!("../../../rules/dotnet.toml")),
+    ("flutter.toml", include_str!("../../../rules/flutter.toml")),
+    ("go.toml", include_str!("../../../rules/go.toml")),
+    ("java.toml", include_str!("../../../rules/java.toml")),
+    ("node.toml", include_str!("../../../rules/node.toml")),
+    ("php.toml", include_str!("../../../rules/php.toml")),
+    ("python.toml", include_str!("../../../rules/python.toml")),
+    ("rust.toml", include_str!("../../../rules/rust.toml")),
+    ("swiftpm.toml", include_str!("../../../rules/swiftpm.toml")),
+    ("xcode.toml", include_str!("../../../rules/xcode.toml")),
+];
+
+/// The built-in catalogue, linted like any rule folder.
+pub fn bundled() -> Result<Vec<RuleFile>, RuleError> {
+    load_texts(BUNDLED.iter().copied())
+}
+
+fn load_texts<'a>(
+    files: impl Iterator<Item = (&'a str, &'a str)>,
+) -> Result<Vec<RuleFile>, RuleError> {
+    let mut ids = BTreeSet::new();
+    let mut out = Vec::new();
+    for (label, text) in files {
+        let rule = parse(label, text)?;
         if !ids.insert(rule.id.clone()) {
-            return Err(lint_err(&label, format!("duplicate rule id {:?}", rule.id)));
+            return Err(lint_err(label, format!("duplicate rule id {:?}", rule.id)));
         }
         out.push(rule);
     }
@@ -979,6 +1010,26 @@ mod tests {
         let rules = load_dir(&dir);
         assert!(rules.is_ok(), "{rules:?}");
         assert!(rules.is_ok_and(|r| r.len() >= 11));
+    }
+
+    #[test]
+    fn bundled_rules_match_the_rules_folder() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules");
+        let mut on_disk: Vec<String> = ok(std::fs::read_dir(&dir))
+            .filter_map(Result::ok)
+            .filter_map(|e| e.file_name().into_string().ok())
+            .filter(|n| n.ends_with(".toml"))
+            .collect();
+        on_disk.sort();
+        let listed: Vec<&str> = BUNDLED.iter().map(|(n, _)| *n).collect();
+        assert_eq!(on_disk, listed, "add new rule files to rules::BUNDLED");
+        for (name, text) in BUNDLED {
+            assert_eq!(ok(std::fs::read_to_string(dir.join(name))), *text);
+        }
+        let bundled = ok(bundled());
+        let from_disk = ok(load_dir(&dir));
+        let ids = |r: &[RuleFile]| r.iter().map(|r| r.id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&bundled), ids(&from_disk));
     }
 
     #[test]

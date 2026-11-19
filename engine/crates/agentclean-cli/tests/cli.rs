@@ -261,3 +261,80 @@ fn a_broken_config_stops_cleaning() {
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("not absolute"));
 }
+
+#[test]
+fn scan_reports_projects_and_what_they_could_free() {
+    let e = env();
+    let work = e.project.parent().unwrap();
+    fs::create_dir_all(work.join("notes/doc")).unwrap();
+    fs::create_dir_all(work.join("empty-app")).unwrap();
+    fs::write(work.join("empty-app/package.json"), "{}").unwrap();
+    age(work);
+    let out = e.ok(&["scan", work.to_str().unwrap()]);
+    assert!(out.contains("Dormant"), "{out}");
+    assert!(out.contains("work/site  (edited 200 days ago)"), "{out}");
+    assert!(out.contains(".next  [node]  Safe"), "{out}");
+    assert!(out.contains("node_modules  [node]  Caution"), "{out}");
+    assert!(!out.contains("empty-app"), "{out}");
+    assert!(out.contains("2 projects. Ready to clean: "), "{out}");
+    assert!(out.contains(" in 1 folder (Safe"), "{out}");
+    assert!(e
+        .ok(&["scan", "--all", work.to_str().unwrap()])
+        .contains("empty-app"));
+    // Read-only: nothing moved, no quarantine.
+    assert!(exists(&e.project, ".next/cache/build.bin"));
+    assert!(!e.store.exists());
+}
+
+#[test]
+fn scan_skips_excluded_folders() {
+    let e = env();
+    let work = e.project.parent().unwrap();
+    let path = config_file(&e);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(
+        &path,
+        format!("exclude = [{:?}]", e.project.to_str().unwrap()),
+    )
+    .unwrap();
+    let out = e.ok(&["scan", work.to_str().unwrap()]);
+    assert!(out.contains("skipped"), "{out}");
+    assert!(out.contains("excluded"), "{out}");
+    assert!(out.contains("0 projects"), "{out}");
+}
+
+#[test]
+fn the_built_in_rules_are_the_default() {
+    let e = env();
+    let project = e.project.to_str().unwrap();
+    let out = e.ok(&["plan", project]);
+    assert!(out.contains("allow   .next  [node]"), "{out}");
+    let out = e.ok(&["clean", "--store", e.store.to_str().unwrap(), project]);
+    assert!(out.contains("Dry run: 1 folder"), "{out}");
+}
+
+#[test]
+fn a_closed_pipe_ends_quietly() {
+    use std::process::Stdio;
+    let e = env();
+    let work = e.project.parent().unwrap();
+    // Far more output than a pipe buffers, so writing must hit the closed end.
+    for i in 0..2000 {
+        let p = work.join(format!("app-with-a-long-folder-name-{i:04}"));
+        fs::create_dir_all(&p).unwrap();
+        fs::write(p.join("package.json"), "{}").unwrap();
+    }
+    let mut child = Command::new(env!("CARGO_BIN_EXE_agentclean"))
+        .args(["scan", "--all", work.to_str().unwrap()])
+        .env("HOME", &e.home)
+        .env_remove("XDG_CONFIG_HOME")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let out = child.wait_with_output().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(!stderr.contains("panicked"), "{stderr}");
+}

@@ -403,6 +403,7 @@ fn config_is_read_strictly() {
         idle_days: 7,
         dormant_days: 30,
         pinned: vec![PathBuf::from("/w/keep")],
+        exclude: vec![PathBuf::from("/w/sdk")],
     };
     cfg.save(&path).unwrap();
     assert_eq!(Config::load(&path).unwrap(), cfg);
@@ -410,6 +411,7 @@ fn config_is_read_strictly() {
 
     for bad in [
         "pinned = [\"relative/path\"]",
+        "exclude = [\"relative/path\"]",
         "pined = []",
         "idle_days = 30\ndormant_days = 7",
         "idle_days = -1",
