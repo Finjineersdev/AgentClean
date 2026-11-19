@@ -301,6 +301,105 @@ fn restore_does_not_follow_a_replaced_parent() {
     assert!(f.items(&run).join("0000").is_dir());
 }
 
+#[cfg(unix)]
+#[test]
+fn the_store_may_not_be_a_link() {
+    let f = fixture();
+    let link = f.base.join("store-link");
+    std::os::unix::fs::symlink(f.store.root(), &link).unwrap();
+    assert!(matches!(Store::open(&link), Err(Error::Store(..))));
+}
+
+#[cfg(unix)]
+#[test]
+fn purge_removes_only_real_directories() {
+    let f = fixture();
+    let run = f
+        .store
+        .clean(vec![f.approve("target"), f.approve("node_modules")])
+        .unwrap();
+    let items = f.items(&run);
+    let keep = f.base.join("keep");
+    fs::create_dir_all(keep.join("inner")).unwrap();
+    // Item 0 becomes a link to a folder outside the store, item 1 a file.
+    fs::remove_dir_all(items.join("0000")).unwrap();
+    std::os::unix::fs::symlink(&keep, items.join("0000")).unwrap();
+    fs::remove_dir_all(items.join("0001")).unwrap();
+    fs::write(items.join("0001"), "x").unwrap();
+
+    let after = f.store.purge(&run.run_id).unwrap();
+    for e in &after.entries {
+        assert_eq!(e.state, State::Moved);
+        assert!(e.note.is_some());
+    }
+    assert!(keep.join("inner").is_dir());
+    assert!(fs::symlink_metadata(items.join("0000")).is_ok());
+    assert!(items.join("0001").is_file());
+}
+
+#[test]
+fn purging_by_age_skips_runs_holding_nothing() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    f.store.restore(&run.run_id, None).unwrap();
+    assert!(f.store.purge_older_than(0).unwrap().is_empty());
+}
+
+#[test]
+fn runs_record_the_current_time() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    assert!(now.abs_diff(run.created_unix) < 60, "{}", run.created_unix);
+}
+
+#[cfg(unix)]
+#[test]
+fn an_unwritable_store_fails_with_the_real_reason() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = fixture();
+    let runs = f.store.root().join("runs");
+    fs::set_permissions(&runs, fs::Permissions::from_mode(0o555)).unwrap();
+    let result = f.store.clean(vec![f.approve("target")]);
+    fs::set_permissions(&runs, fs::Permissions::from_mode(0o755)).unwrap();
+    match result {
+        Err(Error::Store(_, why)) => assert!(!why.contains("allocate"), "{why}"),
+        other => panic!("{other:?}"),
+    }
+    assert!(f.root.join("target").is_dir());
+}
+
+#[test]
+fn a_pending_entry_without_its_item_is_left_alone() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    // Simulate a crash before the move: the item never reached `items/`.
+    fs::rename(f.items(&run).join("0000"), f.base.join("elsewhere")).unwrap();
+    let mut pending = read_manifest(&f, &run);
+    pending.entries[0].state = State::Pending;
+    let path = f.store.root().join("runs").join(&run.run_id).join(MANIFEST);
+    fs::write(&path, serde_json::to_vec(&pending).unwrap()).unwrap();
+
+    let after = f.store.restore(&run.run_id, None).unwrap();
+    assert_eq!(after.entries[0].state, State::Pending);
+    assert_eq!(after.entries[0].note, None);
+    let after = f.store.purge(&run.run_id).unwrap();
+    assert_eq!(after.entries[0].state, State::Pending);
+}
+
+#[test]
+fn restoring_an_item_past_the_end_is_refused() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    assert!(matches!(
+        f.store.restore(&run.run_id, Some(1)),
+        Err(Error::UnknownItem(_, 1))
+    ));
+}
+
 #[test]
 fn run_ids_cannot_escape_the_store() {
     let f = fixture();

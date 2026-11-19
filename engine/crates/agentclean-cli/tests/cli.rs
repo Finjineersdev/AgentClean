@@ -157,3 +157,15 @@ fn source_folders_are_never_offered() {
     assert!(!out.contains("src"), "{out}");
     assert!(exists(&e.project, "src/page.tsx"));
 }
+
+#[test]
+fn the_default_store_lives_in_the_home_folder() {
+    let e = env();
+    e.ok(&["history"]);
+    let expected = if cfg!(target_os = "macos") {
+        "Library/Application Support/AgentClean/Quarantine/runs"
+    } else {
+        ".local/share/agentclean/quarantine/runs"
+    };
+    assert!(e.home.join(expected).is_dir(), "{expected}");
+}

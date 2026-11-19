@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "run_id": "20261119T094828Z-42",
+  "created_unix": 1795086508,
+  "entries": [
+    {
+      "original": "/Users/dev/proj/node_modules",
+      "project_root": "/Users/dev/proj",
+      "stored": "0000",
+      "rule_id": "node",
+      "class": "caution",
+      "bytes": 4096,
+      "state": "moved",
+      "note": "x"
+    }
+  ]
+}

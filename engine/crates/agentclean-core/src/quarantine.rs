@@ -111,11 +111,18 @@ pub enum Error {
 /// Elsewhere: `$XDG_DATA_HOME/agentclean/quarantine`, or
 /// `~/.local/share/agentclean/quarantine`.
 pub fn default_location() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    if cfg!(target_os = "macos") {
+    location_for(
+        cfg!(target_os = "macos"),
+        std::env::var_os("HOME").map(PathBuf::from),
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+    )
+}
+
+fn location_for(macos: bool, home: Option<PathBuf>, xdg: Option<PathBuf>) -> Option<PathBuf> {
+    if macos {
         return home.map(|h| h.join("Library/Application Support/AgentClean/Quarantine"));
     }
-    match std::env::var_os("XDG_DATA_HOME").map(PathBuf::from) {
+    match xdg {
         Some(x) if x.is_absolute() => Some(x.join("agentclean/quarantine")),
         _ => home.map(|h| h.join(".local/share/agentclean/quarantine")),
     }
@@ -133,7 +140,8 @@ impl Store {
         let fail = |m: String| Error::Store(root.to_path_buf(), m);
         fs::create_dir_all(root.join("runs")).map_err(|e| fail(e.to_string()))?;
         let meta = fs::symlink_metadata(root).map_err(|e| fail(e.to_string()))?;
-        if meta.file_type().is_symlink() || !meta.is_dir() {
+        // `symlink_metadata` never reports a link as a directory.
+        if !meta.is_dir() {
             return Err(fail("must be a real directory".to_owned()));
         }
         let root = fs::canonicalize(root).map_err(|e| fail(e.to_string()))?;
@@ -309,7 +317,8 @@ impl Store {
                 continue;
             }
             match fs::symlink_metadata(&target) {
-                Ok(m) if m.is_dir() && !m.file_type().is_symlink() => {
+                // `symlink_metadata` never reports a link as a directory.
+                Ok(m) if m.is_dir() => {
                     // `remove_dir_all` does not follow symbolic links.
                     match fs::remove_dir_all(&target) {
                         Ok(()) => {
@@ -435,15 +444,19 @@ fn valid_stored(name: &str) -> bool {
     name.len() >= 4 && name.bytes().all(|b| b.is_ascii_digit())
 }
 
-#[cfg(unix)]
 fn device_of(path: &Path) -> std::io::Result<u64> {
-    use std::os::unix::fs::MetadataExt;
-    fs::metadata(path).map(|m| m.dev())
-}
-
-#[cfg(not(unix))]
-fn device_of(_path: &Path) -> std::io::Result<u64> {
-    Ok(0)
+    let meta = fs::metadata(path)?;
+    #[cfg(unix)]
+    let dev = {
+        use std::os::unix::fs::MetadataExt;
+        meta.dev()
+    };
+    #[cfg(not(unix))]
+    let dev = {
+        let _ = meta;
+        0
+    };
+    Ok(dev)
 }
 
 fn now_unix() -> u64 {
@@ -455,7 +468,7 @@ fn now_unix() -> u64 {
 
 /// `YYYYMMDDTHHMMSSZ` for a Unix time.
 pub fn utc_stamp(secs: u64) -> String {
-    let (y, m, d) = civil_from_days((secs / 86_400) as i64);
+    let (y, m, d) = civil_from_days(secs / 86_400);
     let rem = secs % 86_400;
     format!(
         "{y:04}{m:02}{d:02}T{:02}{:02}{:02}Z",
@@ -466,17 +479,17 @@ pub fn utc_stamp(secs: u64) -> String {
 }
 
 /// Days since 1970-01-01 to a proleptic Gregorian date (Howard Hinnant's
-/// `civil_from_days`).
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+/// `civil_from_days`), for dates from 1970 on, so no negative era.
+fn civil_from_days(days: u64) -> (u64, u32, u32) {
     let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let era = z / 146_097;
     let doe = z - era * 146_097;
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    let y = yoe + era * 400 + u64::from(m <= 2);
     (y, m, d)
 }
 
@@ -489,6 +502,52 @@ mod tests {
         assert_eq!(utc_stamp(0), "19700101T000000Z");
         assert_eq!(utc_stamp(951_782_400), "20000229T000000Z");
         assert_eq!(utc_stamp(1_795_086_508), "20261119T110828Z");
+    }
+
+    #[test]
+    fn dates_match_day_by_day_counting_to_2500() {
+        let leap = |y: u64| (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+        let (mut y, mut m, mut d) = (1970u64, 1u32, 1u32);
+        for days in 0..(531 * 366) {
+            assert_eq!(civil_from_days(days), (y, m, d), "day {days}");
+            let len = match m {
+                2 if leap(y) => 29,
+                2 => 28,
+                4 | 6 | 9 | 11 => 30,
+                _ => 31,
+            };
+            d += 1;
+            if d > len {
+                d = 1;
+                m += 1;
+                if m > 12 {
+                    m = 1;
+                    y += 1;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn store_location_per_platform() {
+        let home = Some(PathBuf::from("/home/u"));
+        let at = |s: &str| Some(PathBuf::from(s));
+        assert_eq!(
+            location_for(true, home.clone(), at("/x")),
+            at("/home/u/Library/Application Support/AgentClean/Quarantine")
+        );
+        assert_eq!(
+            location_for(false, home.clone(), at("/x")),
+            at("/x/agentclean/quarantine")
+        );
+        // A relative XDG_DATA_HOME is ignored, as the XDG spec says.
+        for xdg in [at("rel"), None] {
+            assert_eq!(
+                location_for(false, home.clone(), xdg),
+                at("/home/u/.local/share/agentclean/quarantine")
+            );
+        }
+        assert_eq!(location_for(true, None, None), None);
     }
 
     #[test]

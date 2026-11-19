@@ -76,6 +76,7 @@ fn approves_plain_artifact_directories() {
         let ok = f.check(d).unwrap();
         assert_eq!(ok.path(), f.root.join(d));
         assert_eq!(ok.project_root(), f.root);
+        assert_eq!(ok.rule_id(), "test");
         ok.reverify().unwrap();
     }
 }
@@ -99,6 +100,11 @@ fn refuses_paths_that_are_not_plain_relative() {
         .guard
         .check(Path::new("work/proj"), &Candidate::unchecked("target"));
     assert_eq!(relative_root, Err(Refusal::NotAbsolute));
+    // The root itself must be normalized too, even though it resolves.
+    let dotted_root = f
+        .guard
+        .check(&f.root.join("../proj"), &Candidate::unchecked("target"));
+    assert_eq!(dotted_root, Err(Refusal::NotNormalized));
 }
 
 #[test]
@@ -133,6 +139,11 @@ fn refuses_home_and_shallow_roots() {
     );
     assert_eq!(
         f.guard.check(Path::new("/"), &Candidate::unchecked("usr")),
+        Err(Refusal::ProjectRootTooBroad)
+    );
+    // Without a home folder to compare against, depth alone refuses `/`.
+    assert_eq!(
+        Guard::new(None).check(Path::new("/"), &Candidate::unchecked("usr")),
         Err(Refusal::ProjectRootTooBroad)
     );
 }
@@ -189,6 +200,13 @@ fn reverify_catches_a_swap_after_approval() {
     // Removed.
     let approved = f.check("node_modules").unwrap();
     fs::remove_dir_all(f.root.join("node_modules")).unwrap();
+    assert_eq!(approved.reverify(), Err(Refusal::ChangedSinceApproval));
+
+    // The same directory, reached through a parent that is now a link: its
+    // identity matches but its real path does not.
+    let approved = f.check("android/app/build").unwrap();
+    fs::rename(f.root.join("android"), f.base.join("moved")).unwrap();
+    symlink(f.base.join("moved"), f.root.join("android")).unwrap();
     assert_eq!(approved.reverify(), Err(Refusal::ChangedSinceApproval));
 }
 

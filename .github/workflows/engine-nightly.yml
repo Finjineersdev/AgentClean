@@ -1,0 +1,64 @@
+name: engine-nightly
+
+# Slow checks for the safety code: time-boxed fuzzing and mutation testing.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [rules_parse, manifest_load]
+    defaults:
+      run:
+        working-directory: engine/fuzz
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup toolchain install nightly --profile minimal && cargo install --locked cargo-fuzz@0.13.2
+      - name: Fuzz for 10 minutes
+        run: |
+          mkdir -p corpus/${{ matrix.target }}
+          cargo +nightly fuzz run ${{ matrix.target }} corpus/${{ matrix.target }} seeds/${{ matrix.target }} -- -max_total_time=600
+      - name: Keep crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: engine/fuzz/artifacts/
+
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable && cargo install --locked cargo-mutants@27.1.0
+      # Fails if any mutant in the safety code survives (exit code 2).
+      - name: Mutation testing
+        run: >-
+          cargo mutants -p agentclean-core --test-workspace=true
+          -f crates/agentclean-core/src/guard.rs
+          -f crates/agentclean-core/src/deny.rs
+          -f crates/agentclean-core/src/quarantine.rs
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutants
+          path: engine/mutants.out/

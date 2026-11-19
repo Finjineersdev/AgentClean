@@ -63,7 +63,7 @@ configuration can name programs for git to run, so the guard calls git with
 | I13 | Cleaning moves each approved folder into the quarantine by rename on the same volume; nothing is copied or unlinked at clean time. A folder on another volume is skipped and recorded | `Store::clean` | `clean_then_restore_round_trips_exactly` |
 | I14 | The manifest is written before the first move and rewritten atomically after each one; `reverify` runs immediately before each move | `Store::clean`, `write_manifest` | `changed_items_are_skipped_and_recorded`, `a_crash_after_a_move_is_recoverable` |
 | I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
-| I14b | Purge deletes only `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `Store::load` | `purge_deletes_only_quarantined_items`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
+| I14b | Purge deletes only real directories at `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `parse_manifest` | `purge_deletes_only_quarantined_items`, `purge_removes_only_real_directories`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
 | I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
 | I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution` | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag` |
 
@@ -90,5 +90,11 @@ but are not otherwise coordinated.
 - Every invariant has at least one test that fails if the check is removed.
 - `approval_implies_invariants` (property test) asserts I3, I4, I7 and I8 for
   arbitrary paths.
-- Still owed from M1: fuzzing of the rule parser and manifest reader, and
-  mutation testing of `guard.rs`, `deny.rs` and `quarantine.rs`.
+- Fuzz targets in `engine/fuzz/`: `rules_parse` asserts that any accepted rule
+  satisfies I2 and I8; `manifest_load` asserts that any accepted manifest
+  satisfies I14b and I14d and survives a write and re-read unchanged. Both run
+  nightly for 10 minutes each (`engine-nightly` workflow).
+- `cargo mutants` on `guard.rs`, `deny.rs` and `quarantine.rs` must report no
+  surviving mutants; it runs nightly and the command is in `CONTRIBUTING.md`.
+  Code that only one platform compiles is kept inside a shared function, so
+  the tests that run cover the code that ships.

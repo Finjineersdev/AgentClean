@@ -71,5 +71,26 @@ cargo test
 cargo run -p agentclean-cli -- rules-check rules
 ```
 
+The `engine-nightly` workflow also runs two slower checks. Before you merge a
+change to `guard.rs`, `deny.rs` or `quarantine.rs`, run them locally.
+Mutation testing must report no surviving ("missed") mutants:
+
+```bash
+cargo install --locked cargo-mutants cargo-fuzz
+cd engine
+cargo mutants -p agentclean-core --test-workspace=true \
+  -f crates/agentclean-core/src/guard.rs \
+  -f crates/agentclean-core/src/deny.rs \
+  -f crates/agentclean-core/src/quarantine.rs
+```
+
+Fuzzing needs the nightly toolchain (`rustup toolchain install nightly`). The
+targets are `rules_parse` and `manifest_load`:
+
+```bash
+cd engine/fuzz
+cargo +nightly fuzz run rules_parse corpus/rules_parse seeds/rules_parse -- -max_total_time=600
+```
+
 Rule files are covered by `docs/RULE-SCHEMA.md`. New work is contributed under
 the Apache License 2.0.

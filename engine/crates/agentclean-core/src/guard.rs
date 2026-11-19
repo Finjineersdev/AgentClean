@@ -60,23 +60,21 @@ struct FileId {
     born: Option<std::time::SystemTime>,
 }
 
-#[cfg(unix)]
 fn file_id(meta: &fs::Metadata) -> FileId {
-    use std::os::unix::fs::MetadataExt;
+    // One function with the platform split inside, so the tests that run
+    // exercise the code that ships. Windows support lands with the Windows
+    // port; until then identity there is the creation time plus the canonical
+    // path, which `reverify` also compares.
+    #[cfg(unix)]
+    let (dev, ino) = {
+        use std::os::unix::fs::MetadataExt;
+        (meta.dev(), meta.ino())
+    };
+    #[cfg(not(unix))]
+    let (dev, ino) = (0, 0);
     FileId {
-        dev: meta.dev(),
-        ino: meta.ino(),
-        born: meta.created().ok(),
-    }
-}
-
-#[cfg(not(unix))]
-fn file_id(meta: &fs::Metadata) -> FileId {
-    // Windows support lands with the Windows port; until then identity is the
-    // creation time plus the canonical path, which `reverify` also compares.
-    FileId {
-        dev: 0,
-        ino: 0,
+        dev,
+        ino,
         born: meta.created().ok(),
     }
 }
@@ -122,7 +120,9 @@ impl Approved {
     /// directory was replaced, turned into a link, or moved since approval.
     pub fn reverify(&self) -> Result<(), Refusal> {
         let meta = fs::symlink_metadata(&self.path).map_err(|_| Refusal::ChangedSinceApproval)?;
-        if meta.file_type().is_symlink() || !meta.is_dir() || file_id(&meta) != self.id {
+        // `symlink_metadata` never reports a link as a directory, so this also
+        // refuses a directory that was replaced by a link.
+        if !meta.is_dir() || file_id(&meta) != self.id {
             return Err(Refusal::ChangedSinceApproval);
         }
         match fs::canonicalize(&self.path) {
@@ -177,7 +177,7 @@ impl Guard {
         if !root_meta.is_dir() {
             return Err(Refusal::NotADirectory);
         }
-        if depth(&root) < MIN_ROOT_DEPTH {
+        if too_shallow(&root) {
             return Err(Refusal::ProjectRootTooBroad);
         }
         if let Some(home) = &self.home {
@@ -257,10 +257,13 @@ fn is_normalized(path: &Path) -> bool {
     })
 }
 
-fn depth(path: &Path) -> usize {
-    path.components()
+/// True for `/` and top-level folders such as `/Users`.
+fn too_shallow(root: &Path) -> bool {
+    let depth = root
+        .components()
         .filter(|c| matches!(c, Component::Normal(_)))
-        .count()
+        .count();
+    depth < MIN_ROOT_DEPTH
 }
 
 /// True if `dir` or any ancestor holds a `.git` entry.
@@ -305,5 +308,19 @@ fn check_untracked(root: &Path, rel: &Path) -> Result<(), Refusal> {
         Ok(())
     } else {
         Err(Refusal::ContainsTrackedFiles)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::too_shallow;
+    use std::path::Path;
+
+    #[test]
+    fn roots_need_two_components() {
+        assert!(too_shallow(Path::new("/")));
+        assert!(too_shallow(Path::new("/Users")));
+        assert!(!too_shallow(Path::new("/Users/dev")));
+        assert!(!too_shallow(Path::new("/Users/dev/proj")));
     }
 }

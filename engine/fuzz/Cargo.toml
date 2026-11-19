@@ -1,0 +1,32 @@
+[package]
+name = "agentclean-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+agentclean-core = { path = "../crates/agentclean-core" }
+
+# Its own workspace: fuzzing needs nightly and must not touch the stable build.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "rules_parse"
+path = "fuzz_targets/rules_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "manifest_load"
+path = "fuzz_targets/manifest_load.rs"
+test = false
+doc = false
+bench = false
