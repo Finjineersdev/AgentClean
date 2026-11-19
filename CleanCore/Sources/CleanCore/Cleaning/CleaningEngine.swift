@@ -5,7 +5,7 @@ import OSLog
 /// through `SafetyGuard` first. Every operation is appended to a log file.
 ///
 /// Quarantine moves the item into
-/// `~/Library/Application Support/CleanMyDev/Quarantine/<run-id>/` with a
+/// `~/Library/Application Support/AgentClean/Quarantine/<run-id>/` with a
 /// manifest so `restore(run:)` can put it back. `QuarantineStore.purge` drops
 /// runs older than the retention window and actually frees the space.
 ///

@@ -1,4 +1,4 @@
-# Contributing to CleanMyDev
+# Contributing to AgentClean
 
 Thanks for looking under the hood. This is a tool that deletes files, so the bar for changes that touch scanning or cleaning is higher than for UI work. Read the safety section before anything else.
 
@@ -13,10 +13,10 @@ Thanks for looking under the hood. This is a tool that deletes files, so the bar
 ## Setup
 
 ```bash
-git clone https://github.com/Zouuabi/CleanMyDev.git
-cd CleanMyDev
+git clone https://github.com/AGENTCLEAN_OWNER/AgentClean.git
+cd AgentClean
 cd CleanCore && swift test          # engine tests, no Xcode project needed
-cd .. && open CleanMyDev.xcodeproj  # Xcode 26+, macOS 26 SDK
+cd .. && open AgentClean.xcodeproj  # Xcode 26+, macOS 26 SDK
 ```
 
 Signing: pick your own development team in the target's Signing settings, or create a self-signed "Code Signing" certificate in Keychain Access and set it as `CODE_SIGN_IDENTITY`. A stable signature matters: macOS ties Full Disk Access to the signature, and an ad-hoc build gets re-prompted on every rebuild.
@@ -35,7 +35,7 @@ CleanCore/            SwiftPM package, Swift 6 strict concurrency, no UI
   Services/           Docker, simulators, process probe, system stats
   Hardware/           SMC, IOHID sensors, speed test
   DiskMap/            Disk tree scanner and treemap layout
-CleanMyDev/           SwiftUI app: AppModel, RadialMapView, module screens, menu bar
+AgentClean/           SwiftUI app: AppModel, RadialMapView, module screens, menu bar
 ```
 
 ## Adding a scan module
@@ -55,4 +55,21 @@ CleanMyDev/           SwiftUI app: AppModel, RadialMapView, module screens, menu
 
 ## Reporting a bug that deleted something it shouldn't have
 
-Open an issue with the `[DELETED]`/`[QUARANTINED]` lines from `~/Library/Logs/CleanMyDev/operations.log` and the category it came from. If it went through quarantine, restore from the Quarantine screen first.
+Open an issue with the `[DELETED]`/`[QUARANTINED]` lines from `~/Library/Logs/AgentClean/operations.log` and the category it came from. If it went through quarantine, restore from the Quarantine screen first.
+
+## Engine (Rust)
+
+The engine in `engine/` is the only code allowed to move or delete files. Read
+`docs/SAFETY-SPEC.md` before changing `guard.rs`, `deny.rs` or `rules.rs`; a
+change there needs a test that fails without it.
+
+```bash
+cd engine
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo run -p agentclean-cli -- rules-check rules
+```
+
+Rule files are covered by `docs/RULE-SCHEMA.md`. New work is contributed under
+the Apache License 2.0.

@@ -5,8 +5,8 @@ import Foundation
 ///
 /// Path tables adapted from Mac Sai (BSD-3-Clause, © iliyami contributors).
 public enum CMConstants {
-    public static let appName = "CleanMyDev"
-    public static let bundleIdentifier = "Mouvema.CleanMyDev"
+    public static let appName = "AgentClean"
+    public static let bundleIdentifier = "app.agentclean.AgentClean"
 
     // MARK: - Safety limits
 

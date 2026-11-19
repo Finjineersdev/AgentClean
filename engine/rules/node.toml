@@ -1,0 +1,24 @@
+schema = 1
+id = "node"
+name = "Node.js"
+
+[detect]
+any_files = ["package.json"]
+
+[[artifact]]
+path = "node_modules"
+class = "caution"
+reason = "Installed dependencies. Reinstall from the lockfile."
+restore = "npm install (or pnpm install / yarn install)"
+
+[[artifact]]
+path = ".next"
+class = "safe"
+reason = "Next.js build output. Recreated by the next build or dev run."
+restore = "next build"
+
+[[artifact]]
+path = ".turbo"
+class = "safe"
+reason = "Turborepo local task cache."
+restore = "Recreated on the next turbo run"

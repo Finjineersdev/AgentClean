@@ -1,6 +1,6 @@
 # Security and safety
 
-CleanMyDev deletes files, reads your whole home folder, talks to the Docker daemon, and (optionally) writes to the SMC. Here is exactly what that means.
+AgentClean deletes files, reads your whole home folder, talks to the Docker daemon, and (optionally) writes to the SMC. Here is exactly what that means.
 
 ## What it never does
 
@@ -22,7 +22,7 @@ CleanMyDev deletes files, reads your whole home folder, talks to the Docker daem
 - Cleaning goes to **Quarantine** (restorable for 7 days) unless you choose Trash or permanent.
 - Projects touched in the last 14 days, with running containers, a dev server, or an open shell are **Active**: nothing inside them is offered.
 - Docker images are review-only: a hand-built image has no label tying it to a project, so you decide.
-- Every action is logged to `~/Library/Logs/CleanMyDev/operations.log`.
+- Every action is logged to `~/Library/Logs/AgentClean/operations.log`.
 
 ## Reporting
 

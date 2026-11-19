@@ -1,0 +1,12 @@
+schema = 1
+id = "rust"
+name = "Rust"
+
+[detect]
+any_files = ["Cargo.toml"]
+
+[[artifact]]
+path = "target"
+class = "safe"
+reason = "Cargo build output. Recreated by the next build."
+restore = "cargo build"

@@ -1,0 +1,41 @@
+name: engine
+
+on:
+  push:
+    branches: [main]
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+  pull_request:
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      # TODO(M0): pin actions to commit SHAs before the first release.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --locked
+      - name: Validate bundled rules
+        run: cargo run --locked -q -p agentclean-cli -- rules-check rules

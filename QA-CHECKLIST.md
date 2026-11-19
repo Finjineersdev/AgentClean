@@ -1,10 +1,10 @@
-# CleanMyDev QA checklist
+# AgentClean QA checklist
 
 Run from Xcode (⌘R) or the built app. Every scenario says what to click and what you must see. Tick what passes; note anything else in the "Result" column.
 
 Layout note: results screens open on the **map** (bubbles/radial graph); the list view is one toggle away (top right). Run each scenario in both. Security has two tabs (Malware check, Startup items); Space Lens has Map and Large & old files; Dev Stack has Stack and Ports.
 
-Before you start: Quarantine lives in `~/Library/Application Support/CleanMyDev/Quarantine`, the log in `~/Library/Logs/CleanMyDev/operations.log`.
+Before you start: Quarantine lives in `~/Library/Application Support/AgentClean/Quarantine`, the log in `~/Library/Logs/AgentClean/operations.log`.
 
 ## 1. Smart Care, scan and review
 
@@ -107,7 +107,7 @@ Before you start: Quarantine lives in `~/Library/Application Support/CleanMyDev/
 |---|---|---|---|
 | 9.1 | ⌘, → General: set Dormant to 20 days, rescan Projects | FarmManagementSystem (25 days) becomes Dormant; set it back to 30 | |
 | 9.2 | Folders: add `~/dev/your active projectInc` to Never touch, run Smart Care | No row anywhere under that folder; remove it afterwards | |
-| 9.3 | Schedule: enable daily run | `~/Library/LaunchAgents/Mouvema.CleanMyDev.daily.plist` exists; `launchctl list | grep CleanMyDev` shows it; disable → plist gone | |
+| 9.3 | Schedule: enable daily run | `~/Library/LaunchAgents/app.agentclean.AgentClean.daily.plist` exists; `launchctl list | grep AgentClean` shows it; disable → plist gone | |
 | 9.4 | Menu bar sparkle icon | Popover with CPU/memory/disk rings, CPU temperature, fan rpm with Manual toggle + slider + Apply (asks your password; Auto hands control back), network speed **Test** button showing ↓/↑ Mbps and ping, security card with last check and flag count that opens Security, "Smart Care" button; turning the toggle off in Settings removes the icon | |
 | 9.4b | Settings → Sound effects off | No sounds on scan start/done or clean | |
 | 9.5 | Log tab | Shows the operations log with today's entries | |

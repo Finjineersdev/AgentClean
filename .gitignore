@@ -6,3 +6,5 @@ cleanup-log-*.txt
 vendor/
 .build/
 dist/
+
+engine/target/

@@ -8,7 +8,7 @@ final class ProjectKindTests: XCTestCase {
     }
 
     func testXcodeDetectedBySuffix() {
-        let kinds = ProjectDetector.matchKinds(forEntries: ["CleanMyDev.xcodeproj", "CleanMyDev"])
+        let kinds = ProjectDetector.matchKinds(forEntries: ["AgentClean.xcodeproj", "AgentClean"])
         XCTAssertEqual(kinds.map(\.name), ["Xcode"])
     }
 
@@ -24,8 +24,8 @@ final class ProjectKindTests: XCTestCase {
 
 final class GitProbeTests: XCTestCase {
     func testNormalizeSSHAndHTTPSAgree() {
-        XCTAssertEqual(GitProbe.normalize("git@github.com:Example/CleanMyDev.git"), "github.com/example/cleanmydev")
-        XCTAssertEqual(GitProbe.normalize("https://github.com/Example/CleanMyDev"), "github.com/example/cleanmydev")
+        XCTAssertEqual(GitProbe.normalize("git@github.com:Example/AgentClean.git"), "github.com/example/agentclean")
+        XCTAssertEqual(GitProbe.normalize("https://github.com/Example/AgentClean"), "github.com/example/agentclean")
         XCTAssertEqual(GitProbe.normalize("ssh://git@github.com/a/b.git"), "github.com/a/b")
     }
 }

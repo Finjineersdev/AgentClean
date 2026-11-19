@@ -1,0 +1,19 @@
+[package]
+name = "agentclean-cli"
+description = "AgentClean command-line interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "agentclean"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+agentclean-core = { path = "../agentclean-core" }
+clap.workspace = true

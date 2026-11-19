@@ -18,7 +18,7 @@ jobs:
       #   MACOS_CERT_PASSWORD   its password
       #   MACOS_SIGN_IDENTITY   e.g. "Developer ID Application: Your Name (TEAMID)"
       #   APPLE_ID, APPLE_APP_PASSWORD, APPLE_TEAM_ID   for notarytool
-      # Optional: TAP_GITHUB_TOKEN (fine-grained PAT with contents:write on Zouuabi/homebrew-tap) to bump the cask.
+      # Optional: TAP_GITHUB_TOKEN (fine-grained PAT with contents:write on AGENTCLEAN_OWNER/homebrew-tap) to bump the cask.
       HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' }}
       HAS_TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN != '' }}
     steps:
@@ -45,7 +45,7 @@ jobs:
       - name: Build Release (Developer ID)
         if: env.HAS_CERT == 'true'
         run: |
-          xcodebuild -project CleanMyDev.xcodeproj -scheme CleanMyDev -configuration Release \
+          xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
             -derivedDataPath build/dd build CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="${{ secrets.MACOS_SIGN_IDENTITY }}" DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime"
@@ -53,15 +53,15 @@ jobs:
       - name: Build Release (ad-hoc)
         if: env.HAS_CERT != 'true'
         run: |
-          xcodebuild -project CleanMyDev.xcodeproj -scheme CleanMyDev -configuration Release \
+          xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
             -derivedDataPath build/dd build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=""
 
       - name: Package DMG
         run: |
           V="${VERSION#v}"
-          APP=build/dd/Build/Products/Release/CleanMyDev.app
-          mkdir -p dist/root && cp -R "$APP" dist/root/CleanMyDev.app && ln -s /Applications dist/root/Applications
-          hdiutil create -volname "CleanMyDev $V" -srcfolder dist/root -ov -format UDZO "dist/CleanMyDev-$V.dmg"
+          APP=build/dd/Build/Products/Release/AgentClean.app
+          mkdir -p dist/root && cp -R "$APP" dist/root/AgentClean.app && ln -s /Applications dist/root/Applications
+          hdiutil create -volname "AgentClean $V" -srcfolder dist/root -ov -format UDZO "dist/AgentClean-$V.dmg"
 
       - name: Notarize and staple
         if: env.HAS_CERT == 'true'
@@ -71,25 +71,25 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           V="${VERSION#v}"
-          xcrun notarytool submit "dist/CleanMyDev-$V.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-          xcrun stapler staple "dist/CleanMyDev-$V.dmg"
+          xcrun notarytool submit "dist/AgentClean-$V.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "dist/AgentClean-$V.dmg"
 
       - name: Checksum
-        run: cd dist && V="${VERSION#v}" && shasum -a 256 "CleanMyDev-$V.dmg" > "CleanMyDev-$V.dmg.sha256"
+        run: cd dist && V="${VERSION#v}" && shasum -a 256 "AgentClean-$V.dmg" > "AgentClean-$V.dmg.sha256"
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/CleanMyDev-*.dmg
-            dist/CleanMyDev-*.dmg.sha256
+            dist/AgentClean-*.dmg
+            dist/AgentClean-*.dmg.sha256
           generate_release_notes: true
           body: |
             ## Install
             ```bash
-            brew install --cask zouuabi/tap/cleanmydev
+            brew install --cask AGENTCLEAN_OWNER/tap/agentclean
             ```
-            or download the `.dmg` below, drag **CleanMyDev** to Applications, and on first launch **right-click → Open** (unless this build is notarized). Then grant **Full Disk Access** when the app asks.
+            or download the `.dmg` below, drag **AgentClean** to Applications, and on first launch **right-click → Open** (unless this build is notarized). Then grant **Full Disk Access** when the app asks.
 
             Requires macOS 26 or later.
 
@@ -99,10 +99,10 @@ jobs:
           TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
           V="${VERSION#v}"
-          SHA=$(awk '{print $1}' "dist/CleanMyDev-$V.dmg.sha256")
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Zouuabi/homebrew-tap.git" tap
+          SHA=$(awk '{print $1}' "dist/AgentClean-$V.dmg.sha256")
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/AGENTCLEAN_OWNER/homebrew-tap.git" tap
           cd tap
-          sed -i '' -E "s/^  version \".*\"/  version \"$V\"/; s/^  sha256 \".*\"/  sha256 \"$SHA\"/" Casks/cleanmydev.rb
-          git config user.name "cleanmydev-release-bot"
+          sed -i '' -E "s/^  version \".*\"/  version \"$V\"/; s/^  sha256 \".*\"/  sha256 \"$SHA\"/" Casks/agentclean.rb
+          git config user.name "agentclean-release-bot"
           git config user.email "release-bot@users.noreply.github.com"
-          git commit -am "cleanmydev $V" && git push
+          git commit -am "agentclean $V" && git push

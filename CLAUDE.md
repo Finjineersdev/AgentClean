@@ -1,4 +1,4 @@
-# CleanMyDev — notes for coding agents
+# AgentClean — notes for coding agents
 
 Read `CONTRIBUTING.md` and `SECURITY.md` first; the safety rules there are non-negotiable.
 
@@ -6,17 +6,17 @@ Read `CONTRIBUTING.md` and `SECURITY.md` first; the safety rules there are non-n
 
 ```bash
 cd CleanCore && swift test                                   # engine tests (fast, no Xcode project)
-xcodebuild -project CleanMyDev.xcodeproj -scheme CleanMyDev \
+xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
   -configuration Debug -derivedDataPath build/dd build       # app (macOS 26 SDK, Xcode 26+)
 ```
 
-Run the built app with `open build/dd/Build/Products/Debug/CleanMyDev.app --args <flags>`, never the raw binary from a sandboxed shell (no window server). Flags: `--open <item>`, `--scan`, `--demo smartcare|projects|devstack`, `--dump-projects <file>`, `--debug-telemetry`, `--skip-fda`.
+Run the built app with `open build/dd/Build/Products/Debug/AgentClean.app --args <flags>`, never the raw binary from a sandboxed shell (no window server). Flags: `--open <item>`, `--scan`, `--demo smartcare|projects|devstack`, `--dump-projects <file>`, `--debug-telemetry`, `--skip-fda`.
 
-Screenshots for verification: `screencapture -x -o -l <windowID> out.png`; window IDs via `CGWindowListCopyWindowInfo` (owner "CleanMyDev").
+Screenshots for verification: `screencapture -x -o -l <windowID> out.png`; window IDs via `CGWindowListCopyWindowInfo` (owner "AgentClean").
 
 ## Architecture in one paragraph
 
-`CleanCore` (SwiftPM, Swift 6 strict) owns everything that touches the disk: `ScanModule`s produce `[ScanResult]` of `FileItem`s, `CleaningEngine` deletes only what `SafetyGuard` allows, `ProjectDetector` + `ProjectClassifier` decide which projects are Active/Idle/Dormant (overrides in `ProjectRegistry`, keyed by git remote), `DevStackInventory` discovers installed tooling, `DockerService`/`SimulatorService` implement `VirtualCleaner` for non-file items. The app (`CleanMyDev/`, Swift 5 mode, default MainActor) has one `AppModel`, one `RadialMapView` that renders every map, and thin module screens.
+`CleanCore` (SwiftPM, Swift 6 strict) owns everything that touches the disk: `ScanModule`s produce `[ScanResult]` of `FileItem`s, `CleaningEngine` deletes only what `SafetyGuard` allows, `ProjectDetector` + `ProjectClassifier` decide which projects are Active/Idle/Dormant (overrides in `ProjectRegistry`, keyed by git remote), `DevStackInventory` discovers installed tooling, `DockerService`/`SimulatorService` implement `VirtualCleaner` for non-file items. The app (`AgentClean/`, Swift 5 mode, default MainActor) has one `AppModel`, one `RadialMapView` that renders every map, and thin module screens.
 
 ## Things that bit us, don't repeat them
 

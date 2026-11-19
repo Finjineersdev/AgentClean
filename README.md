@@ -1,115 +1,58 @@
-<p align="center">
-  <img src="CleanMyDev/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" alt="CleanMyDev icon" />
-</p>
+# AgentClean
 
-<h1 align="center">CleanMyDev</h1>
+A developer disk cleaner you can read the source of. It finds your projects,
+shows which rebuildable folders are taking space (`node_modules`, `target`,
+`.venv`, build output), explains why each one is safe to remove, and makes
+every clean reversible. Local only: no account, no telemetry.
 
-<p align="center">
-  <strong>A Mac cleaner that understands developers.</strong><br>
-  Project-aware junk removal, a map of your dev stack, Docker, simulators, caches, startup items.<br>
-  Discovered, not configured. Quarantined, not deleted. Native SwiftUI on macOS 26.
-</p>
+> **Status: pre-alpha (milestone M0).** The Rust engine can validate rules and
+> tell you what it *would* allow in a project. It does not delete anything yet.
+> The Mac app in this repository is the inherited upstream app, renamed; it has
+> not been rebuilt or re-verified since the rename. Do not use it on data you
+> care about.
 
-<p align="center">
-  <a href="https://github.com/Zouuabi/CleanMyDev/releases/latest"><img src="https://img.shields.io/github/v/release/Zouuabi/CleanMyDev?style=flat-square&color=2DD4BF" alt="Release" /></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey?style=flat-square" alt="macOS 26+" />
-  <img src="https://img.shields.io/badge/swift-6-orange?style=flat-square" alt="Swift 6" />
-  <img src="https://img.shields.io/badge/telemetry-none-2DD4BF?style=flat-square" alt="No telemetry" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT" />
-  <a href="https://github.com/Zouuabi/homebrew-tap"><img src="https://img.shields.io/badge/brew-zouuabi%2Ftap%2Fcleanmydev-fbb040?style=flat-square" alt="Homebrew" /></a>
-</p>
+AgentClean is a fork of [Zouuabi/CleanMyDev](https://github.com/Zouuabi/CleanMyDev)
+(MIT). The upstream README is kept at [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
 
-<p align="center">
-  <img src="docs/media/smartcare.gif" width="880" alt="Smart Care: scan, then review on the map" />
-</p>
+## What is here
 
----
+| Path | What | State |
+| --- | --- | --- |
+| `engine/` | Rust workspace: rule catalogue, safety guard, `agentclean` CLI | New; tested on Linux |
+| `engine/rules/` | One TOML rule file per ecosystem | Node.js, Rust, Python so far |
+| `AgentClean/`, `CleanCore/` | SwiftUI Mac app and its Swift engine, inherited | Renamed only |
+| `docs/` | Requirements, safety specification, rule schema, decisions | Current |
 
-## Why another Mac cleaner
-
-Generic cleaners are blind to the thing that actually fills a developer's disk: `node_modules` in forty projects, three Python venvs per repo, Docker layers, Xcode's DerivedData, half a dozen Node versions under nvm, and the npm cache from every `npx` you ever ran. Worse, they are dangerous around it: the one `node_modules` you must not touch is the one you're shipping on Sunday.
-
-CleanMyDev starts from the projects.
-
-- **Every project on your Mac is found** by its marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `Podfile`, `.xcodeproj`, `docker-compose.yml`, 20 more) and identified by its git remote, so pins survive renames and moves.
-- **Each one gets a status with a reason**: *Active* (commit or file change in the last 14 days, a running compose container, a dev server, or a shell open in it), *Idle*, *Dormant*. You can *Pin* one until a date or mark it *Cleanable*. Nothing inside an Active or Pinned project is ever offered, including its Docker containers and volumes. Sub-packages inherit their monorepo's protection.
-- **Only dormant projects give up** their dependencies and build output, and they're shown with "untouched for 94 days" next to the size.
-
-Everything else a cleaner should do is here too, but with the same honesty: Docker image sizes count only unshared layers, database data is shown with a lock and never deleted, and every removal lands in a quarantine you can restore from for 7 days.
-
-## What's inside
-
-| Area | What it does |
-|---|---|
-| **Smart Care** | One pass over everything below, reviewed on an interactive radial map: modules sized by what they found, categories fanning out, items in a side panel, a checkbox on every bubble. Clean goes to quarantine by default. |
-| **Projects** | The map of your projects by status. Pin, unpin, mark cleanable, see why each one is what it is, reveal in Finder. |
-| **Dev Stack** | Inventory of what's installed for development: databases and *where their data lives* (Homebrew `var/`, Postgres.app, Docker containers), runtimes and which version is default (nvm, pyenv, rustup, Homebrew), globally installed tools (npm `-g`, pipx, uv, cargo, go), SDKs, VM disks. Copies the right `brew uninstall` / `npm uninstall -g` command instead of guessing. Plus a Ports tab with a kill switch. |
-| **System Junk** | User and system caches, logs, crash reports, trash on every volume, leftovers of uninstalled apps, broken preferences and launch agents, editor caches (VS Code, Cursor, Antigravity), AI tool caches (Claude, Codex), chat app caches. |
-| **Dev Junk** | npm, pnpm, yarn, bun, pip, uv, poetry, cargo, go, gradle, maven, CocoaPods, Homebrew, Playwright and Cypress browsers, Hugging Face and Torch weights, Xcode DerivedData / Archives / device support, dead simulators, and the dependencies of dormant projects. |
-| **Docker** | Unused images (unique size), orphan volumes, exited containers, build cache. Anything attached to an Active or Pinned project is skipped by compose label and image name. |
-| **Browsers** | Page caches for Chrome, Edge, Brave, Arc, Firefox, Safari; history only when the browser is closed. Cookies, logins and bookmarks are never touched. |
-| **Security** | Known adware families, plus an audit of every launch agent and daemon with its code signature; unsigned programs in user-writable locations and shell payloads are flagged. |
-| **Apps** | Installed apps with icon, size, last used, source (App Store / Homebrew / direct), leftovers across 17 `~/Library` folders. Uninstall or remove leftovers only. |
-| **Space Lens** | Treemap of any folder with header bands, drill-down, reveal, quarantine. Large & old files tab. |
-| **Quarantine** | Every clean is a restorable run with its original paths. Expired runs are purged automatically. |
-| **Menu bar** | CPU, memory, disk, CPU temperature, fan rpm with manual control, a network speed test, and your last security check. |
-
-<p align="center">
-  <img src="docs/media/projects.gif" width="430" alt="Projects map" />
-  <img src="docs/media/devstack.gif" width="430" alt="Dev Stack map" />
-</p>
-
-## Install
-
-**Homebrew** (recommended, no Gatekeeper dance):
+## Try the engine
 
 ```bash
-brew install --cask zouuabi/tap/cleanmydev
+cd engine
+cargo test
+cargo run -p agentclean-cli -- rules-check rules
+cargo run -p agentclean-cli -- plan --rules rules /path/to/a/project
 ```
 
-**Or the DMG**: download the latest `.dmg` from [Releases](https://github.com/Zouuabi/CleanMyDev/releases/latest), open it, drag **CleanMyDev** to Applications. The build is signed but not notarized yet, so the first launch needs **right-click → Open**, or:
+`plan` prints each folder a rule matched and whether the safety guard would
+allow it, with the reason for any refusal. It is read-only.
 
-```bash
-xattr -d com.apple.quarantine /Applications/CleanMyDev.app
-```
+## Design in three rules
 
-On first launch the app asks for **Full Disk Access** and refuses to go further without it. That is deliberate: without it macOS hides Mail, Safari and parts of `~/Library`, and consent dialogs would stall scans half way. Nothing leaves your Mac; the only network call is the speed test you trigger yourself.
+1. **One deletion path.** Only the Rust engine may move or delete, and only a
+   path that a rule matched and the safety guard approved. See
+   [docs/SAFETY-SPEC.md](docs/SAFETY-SPEC.md).
+2. **Rules are data.** Ecosystems are declared in linted, tested TOML files.
+   See [docs/RULE-SCHEMA.md](docs/RULE-SCHEMA.md).
+3. **Refuse when unsure.** Tracked files, symlinks, unreadable repositories and
+   anything that changed since it was checked are all refusals.
 
-Requires macOS 26 (Tahoe) or later. Apple Silicon and Intel.
+Scope, milestones and non-goals are in [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
 
-### Build from source
+## Licence
 
-```bash
-git clone https://github.com/Zouuabi/CleanMyDev.git
-cd CleanMyDev/CleanCore && swift test      # engine tests
-cd .. && open CleanMyDev.xcodeproj         # Xcode 26+
-```
+New work is under the Apache License 2.0 ([LICENSE](LICENSE)). Code inherited
+from the upstream project stays under its MIT licence, and code it adapted
+from other projects keeps theirs; see [NOTICE](NOTICE) and
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
 
-Pick your own signing team in the target settings (or a self-signed Code Signing certificate). See `CONTRIBUTING.md`.
-
-## Safety model
-
-- **Quarantine first.** Cleaned items move to `~/Library/Application Support/CleanMyDev/Quarantine/<run>/` with a manifest; one click restores a whole run. Trash and permanent delete are options, never defaults.
-- **SafetyGuard on every path.** Protected system paths, your never-touch folders, and Active / Pinned projects are refused after symlink resolution. Batches are capped and chunked.
-- **Review-only categories.** Large files, project dependencies, Docker images, app leftovers, browser history, startup items: never pre-checked.
-- **Never deleted at all.** Database data directories, VM disks, Keychains, SSH keys, Claude's VM bundles. Shown with a lock so you know where the space is.
-- **Logged.** `~/Library/Logs/CleanMyDev/operations.log` has every dry-run, quarantine, restore, and error.
-
-## Settings worth knowing
-
-| Setting | Default |
-|---|---|
-| Active if touched within | 14 days |
-| Dormant after | 30 days |
-| Default clean mode | Quarantine, 7-day retention |
-| Scan roots | your home folder |
-| Never touch | Keychains, `.ssh`, `.gnupg`, `.colima`, Claude VM bundles (editable) |
-| Scheduled daily run | off; when on, quarantines only the categories you allow |
-
-## Thanks
-
-Engines in `CleanCore` adapt code from [Mac Sai](https://github.com/iliyami/MacSai) (BSD-3), [MacDirStat](https://github.com/phalladar/MacDirStat) (MIT), [kondo](https://github.com/tbillington/kondo) (MIT) and [Stats](https://github.com/exelban/stats) (MIT). Full texts in `THIRD-PARTY-LICENSES.md`.
-
-## License
-
-MIT. See `LICENSE`.
+Before publishing, replace the `AGENTCLEAN_OWNER` placeholder with the GitHub
+account or organisation that will host the project.
