@@ -43,7 +43,7 @@ in this repository. Keep it that way.
   `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
   the name check and the `SECURITY.md` rewrite.
-- M0, M1 and M2.1 are committed.
+- M0, M1, M2.1 and M2.2 are committed.
 - Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
   owner names a domain they control.
 

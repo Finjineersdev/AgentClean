@@ -5,7 +5,7 @@ something that cannot be rebuilt. This document states the invariants that
 prevent it. Each invariant names the code that enforces it and the test that
 proves it. A change that weakens an invariant needs an ADR.
 
-Status: **I1–I14 are implemented and tested** in `engine/crates/agentclean-core`.
+Status: **I1–I14d are implemented and tested** in `engine/crates/agentclean-core`.
 I15–I17 are specified and not implemented yet.
 
 ## Model
@@ -22,8 +22,9 @@ through a linted rule and the guard. There is no free-form delete.
 
 | # | Invariant | Enforced by | Refusal |
 | --- | --- | --- | --- |
-| I1 | A path is a candidate only if a linted rule names it and the rule's marker file is in the project root | `RuleFile::candidates` | (no candidate) |
+| I1 | A path is a candidate only if a linted rule names it, it exists, the rule's marker (file, folder or one-`*` name, never through a link) is directly in the project root, no `exclude_if` condition holds, and the artifact's `requires` evidence holds | `RuleFile::detects`, `RuleFile::candidates` | (no candidate) |
 | I2 | Rule paths are plain relative paths: no `.`, `..`, root, wildcard, expansion, or more than 4 components | `rules::lint_artifact_path` | lint error |
+| I2a | Rule markers are plain names and globs have exactly one `*` in a single component. Evidence paths obey I2 and never name a protected file. Evidence counts only as a regular file whose real path is the written path inside the project, read at most 1 MB; anything unreadable is no evidence | `rules::lint_name`, `lint_glob`, `lint_evidence`, `evidence_file` | lint error, or (no candidate) |
 | I3 | The candidate, joined to the root, resolves strictly inside the root and is not the root | `Guard::check` | `OutsideProject`, `IsProjectRoot` |
 | I4 | The target is a real directory: not a symlink, not a file | `Guard::check` | `Symlink`, `NotADirectory` |
 | I5 | No symlink sits between the root and the target, even one pointing inside the project | `Guard::check` | `SymlinkInPath` |
@@ -87,14 +88,17 @@ but are not otherwise coordinated.
 
 ## Test obligations
 
+- Every rule has match and nomatch fixtures (`docs/RULE-SCHEMA.md`);
+  `rule_fixtures_produce_the_expected_candidates` checks them.
+
 - Every invariant has at least one test that fails if the check is removed.
 - `approval_implies_invariants` (property test) asserts I3, I4, I7 and I8 for
   arbitrary paths.
 - Fuzz targets in `engine/fuzz/`: `rules_parse` asserts that any accepted rule
-  satisfies I2 and I8; `manifest_load` asserts that any accepted manifest
+  satisfies I2, I2a and I8; `manifest_load` asserts that any accepted manifest
   satisfies I14b and I14d and survives a write and re-read unchanged. Both run
   nightly for 10 minutes each (`engine-nightly` workflow).
-- `cargo mutants` on `guard.rs`, `deny.rs` and `quarantine.rs` must report no
+- `cargo mutants` on `guard.rs`, `deny.rs`, `quarantine.rs` and `rules.rs` must report no
   surviving mutants; it runs nightly and the command is in `CONTRIBUTING.md`.
   Code that only one platform compiles is kept inside a shared function, so
   the tests that run cover the code that ships.

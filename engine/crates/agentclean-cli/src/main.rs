@@ -160,9 +160,6 @@ fn assess(
     let mut out = Vec::new();
     for rule in rules {
         for candidate in rule.candidates(project) {
-            if std::fs::symlink_metadata(project.join(candidate.rel())).is_err() {
-                continue;
-            }
             let label = format!("{}  [{}]", candidate.rel().display(), candidate.rule_id());
             let verdict = match guard.check(project, &candidate) {
                 Err(why) => Verdict::Refused(why.to_string()),

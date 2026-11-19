@@ -72,7 +72,7 @@ cargo run -p agentclean-cli -- rules-check rules
 ```
 
 The `engine-nightly` workflow also runs two slower checks. Before you merge a
-change to `guard.rs`, `deny.rs` or `quarantine.rs`, run them locally.
+change to `guard.rs`, `deny.rs`, `quarantine.rs` or `rules.rs`, run them locally.
 Mutation testing must report no surviving ("missed") mutants:
 
 ```bash
@@ -81,7 +81,8 @@ cd engine
 cargo mutants -p agentclean-core --test-workspace=true \
   -f crates/agentclean-core/src/guard.rs \
   -f crates/agentclean-core/src/deny.rs \
-  -f crates/agentclean-core/src/quarantine.rs
+  -f crates/agentclean-core/src/quarantine.rs \
+  -f crates/agentclean-core/src/rules.rs
 ```
 
 Fuzzing needs the nightly toolchain (`rustup toolchain install nightly`). The

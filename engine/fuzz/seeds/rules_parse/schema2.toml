@@ -1,0 +1,16 @@
+schema = 2
+id = "seed"
+name = "Seed"
+
+[detect]
+any_files = ["build.gradle"]
+any_glob = ["*.csproj"]
+any_dirs = ["App.xcodeproj"]
+exclude_if = { parent_any_files = ["pubspec.yaml"] }
+
+[[artifact]]
+path = "dist"
+class = "safe"
+reason = "r"
+restore = "s"
+requires = { any_files = ["a/b.json"], any_glob = ["*.sln"], inside = ["pyvenv.cfg"], json = { file = "package.json", key = "scripts.build" } }
