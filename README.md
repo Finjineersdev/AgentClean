@@ -5,11 +5,16 @@ shows which rebuildable folders are taking space (`node_modules`, `target`,
 `.venv`, build output), explains why each one is safe to remove, and makes
 every clean reversible. Local only: no account, no telemetry.
 
-> **Status: pre-alpha (milestone M0).** The Rust engine can validate rules and
-> tell you what it *would* allow in a project. It does not delete anything yet.
+> **Status: pre-alpha (milestone M1).** The Rust engine and CLI can clean a
+> project into a quarantine, restore it, and purge it to free the space. The
+> rule catalogue covers Node.js, Rust and Python only, and there is no
+> project discovery yet: you name each project folder.
 > The Mac app in this repository is the inherited upstream app, renamed; it has
 > not been rebuilt or re-verified since the rename. Do not use it on data you
 > care about.
+
+Contributors and coding agents: start with [CLAUDE.md](CLAUDE.md) and
+[docs/HANDOFF.md](docs/HANDOFF.md).
 
 AgentClean is a fork of [Zouuabi/CleanMyDev](https://github.com/Zouuabi/CleanMyDev)
 (MIT). The upstream README is kept at [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
@@ -18,22 +23,32 @@ AgentClean is a fork of [Zouuabi/CleanMyDev](https://github.com/Zouuabi/CleanMyD
 
 | Path | What | State |
 | --- | --- | --- |
-| `engine/` | Rust workspace: rule catalogue, safety guard, `agentclean` CLI | New; tested on Linux |
+| `engine/` | Rust workspace: rule catalogue, safety guard, quarantine, `agentclean` CLI | New; tested on Linux |
 | `engine/rules/` | One TOML rule file per ecosystem | Node.js, Rust, Python so far |
 | `AgentClean/`, `CleanCore/` | SwiftUI Mac app and its Swift engine, inherited | Renamed only |
-| `docs/` | Requirements, safety specification, rule schema, decisions | Current |
+| `docs/` | Handoff, requirements, safety spec, rule schema, ADRs, research, milestone plans | Current |
 
 ## Try the engine
 
 ```bash
 cd engine
 cargo test
-cargo run -p agentclean-cli -- rules-check rules
-cargo run -p agentclean-cli -- plan --rules rules /path/to/a/project
+cargo build
+B=target/debug/agentclean
+
+$B plan  --rules rules ~/code/my-site            # what would be allowed, read-only
+$B clean --rules rules ~/code/my-site            # dry run: lists what would move
+$B clean --rules rules --execute ~/code/my-site  # move Safe folders into quarantine
+$B clean --rules rules --execute --include-caution ~/code/my-site   # node_modules, .venv too
+$B history                                       # runs, newest first
+$B restore <run-id>                              # put everything back
+$B purge <run-id> --execute                      # delete from quarantine, free the space
 ```
 
-`plan` prints each folder a rule matched and whether the safety guard would
-allow it, with the reason for any refusal. It is read-only.
+Cleaning moves folders into `~/Library/Application Support/AgentClean/Quarantine`
+on macOS (`~/.local/share/agentclean/quarantine` on Linux). Because it is a
+move on the same disk, **space is freed only when you purge**. Projects on
+another volume are skipped in this version.
 
 ## Design in three rules
 

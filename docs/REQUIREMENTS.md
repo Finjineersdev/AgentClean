@@ -23,10 +23,10 @@ with notarization and a Homebrew cask.
 
 | ID | Requirement | Milestone | Accepted when |
 | --- | --- | --- | --- |
-| F1 | Validate rule files | M0 | `rules-check` passes bundled rules and rejects every case in the linter tests |
-| F2 | Report what the guard would allow in a project | M0 | `plan` lists matches with allow or refuse and a reason; changes nothing |
-| F3 | Clean to quarantine with a manifest; restore a run or an item | M1 | Round-trip test restores byte-identical trees; restore never overwrites |
-| F4 | Dry run is the default; a clean needs an explicit flag | M1 | No path changes without the flag, proven by test |
+| F1 | Validate rule files | M0 (done) | `rules-check` passes bundled rules and rejects every case in the linter tests |
+| F2 | Report what the guard would allow in a project | M0 (done) | `plan` lists matches with allow or refuse and a reason; changes nothing |
+| F3 | Clean to quarantine with a manifest; restore a run or an item; purge to free space | M1 (done) | Round-trip test restores byte-identical trees; restore never overwrites |
+| F4 | Dry run is the default; a clean needs an explicit flag | M1 (done) | No path changes without the flag, proven by test |
 | F5 | Discover projects under chosen roots, streaming results | M2 | Finds every fixture project, including nested workspaces; reports skipped and unreadable folders |
 | F6 | Rule catalogue for Node.js, Rust, Python, Xcode, Android, Flutter, PHP, Go, .NET, Java, Swift packages | M2 | Each rule has must-match and must-not-match fixtures |
 | F7 | Idle or active verdict with reasons: last commit, last source edit, processes with a working directory in the project | M2 | Reasons shown for every project; pinned projects never offered |
