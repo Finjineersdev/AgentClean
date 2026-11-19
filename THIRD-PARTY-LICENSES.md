@@ -9,7 +9,7 @@ texts are reproduced here as those licenses require.
 | [Mac Sai](https://github.com/iliyami/MacSai) | SafetyGuard, cleaning engine, targeted scanner, system-junk category tables, uninstaller matching, malware signature list | BSD-3-Clause |
 | [MacDirStat](https://github.com/phalladar/MacDirStat) | BSD directory walker and squarified treemap layout | MIT |
 | [kondo](https://github.com/tbillington/kondo) | Project marker → artifact directory table | MIT |
-| [Stats](https://github.com/exelban/stats) | SMC client, Apple Silicon sensor key tables, IOHID temperature reader | MIT |
+| [Stats](https://github.com/exelban/stats) | SMC client, Apple Silicon sensor key tables, IOHID temperature reader (inherited; the code was removed in M3, the notice is kept for the history) | MIT |
 
 Methodology only, no code copied: [KnockKnock](https://github.com/objective-see/KnockKnock) (persistence audit approach), [Mole](https://github.com/tw93/Mole) (cleanup categories).
 

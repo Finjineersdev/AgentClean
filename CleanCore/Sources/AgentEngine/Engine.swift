@@ -89,6 +89,22 @@ public struct Engine: Sendable {
         return out.pinned
     }
 
+    /// The settings; with arguments, changes them first. Only AgentClean's
+    /// config changes.
+    public func config(
+        idleDays: Int? = nil,
+        dormantDays: Int? = nil,
+        exclude: [URL] = [],
+        include: [URL] = []
+    ) async throws -> ConfigOutput {
+        var args = ["config"]
+        if let idleDays { args += ["--idle-days", String(idleDays)] }
+        if let dormantDays { args += ["--dormant-days", String(dormantDays)] }
+        for folder in exclude { args += ["--exclude", folder.path] }
+        for folder in include { args += ["--include", folder.path] }
+        return try await call(args)
+    }
+
     /// Projects as they are found, then skipped folders and a summary last.
     /// Cancelling the consuming task stops the engine.
     public func scan(roots: [URL]) -> AsyncThrowingStream<ScanEvent, Error> {

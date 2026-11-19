@@ -43,7 +43,7 @@ in this repository. Keep it that way.
   `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
   the name check and the `SECURITY.md` rewrite.
-- M0, M1 and M2 (M2.1 to M2.7) are committed.
+- M0, M1, M2 (M2.1 to M2.7) and M3 are committed. Next: M4 (beta).
 - Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
   owner names a domain they control.
 
@@ -82,28 +82,53 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 (macOS), `$XDG_DATA_HOME/agentclean/quarantine` or
 `~/.local/share/agentclean/quarantine` (Linux).
 
-### Inherited and untouched
+### M3 (done): the app on the engine
 
-- `AgentClean/` (SwiftUI app) and `CleanCore/` (Swift engine, about 8,900
-  lines with the app). `CleanCore` still has its own deletion code; that is
-  allowed only until M3.
-- `SECURITY.md` still describes upstream behaviour (Full Disk Access required,
-  fan control, speed test). **It is inaccurate for AgentClean** and must be
-  rewritten in M3; until then the README status note warns users.
-- `.github/workflows/ci.yml` and `release.yml` are upstream's (macOS 26
-  runners, Swift tests, cask bump), renamed only.
-- `QA-CHECKLIST.md`, `docs/RELEASING.md`: upstream, renamed only.
+- The app runs the engine as a subprocess (ADR 0005). `CleanCore/Sources/AgentEngine`
+  is the Swift client: argument lists, never a shell; it decodes every shape in
+  `docs/CLI-JSON.md` and streams `scan`. Its tests decode the engine's own
+  snapshot files and run the real binary.
+- The engine binary is built by an Xcode build phase and embedded at
+  `Contents/Helpers/agentclean` (not `Contents/MacOS`: the file system ignores
+  case, and `agentclean` would replace the app's `AgentClean` executable).
+- All inherited deletion code and out-of-scope modules are gone (malware,
+  uninstaller, system junk, privacy, large files, disk map, fans, sensors,
+  speed test, ports, the scheduler and the Full Disk Access gate). `CleanCore`
+  keeps only the read-only Dev Stack inventory (about 850 lines).
+  `scripts/check-swift-never-deletes.sh` fails CI if app code calls a file
+  removal or move API.
+- Screens: Overview (live scan, ready / Caution / active totals), Projects
+  with per-folder selection (Safe pre-ticked in idle and dormant projects,
+  Caution never, active projects need a per-project "clean anyway"), a Review
+  sheet showing the engine's dry run before the real clean, Undo, History
+  (restore a run or one item, purge with a confirmation), Dev Stack
+  (read-only, removal commands to copy), Settings (scan folders, idle and
+  dormant days, never-scan folders, pins), all through engine commands; the
+  new `agentclean config` command writes settings.
+- macOS 14 floor. Liquid Glass on macOS 26, a material fallback before it.
+- Tests: `AgentEngineTests` (contract, end to end, selection rules for F14);
+  `AgentCleanUITests` (XCUITest: scan, clean only what is ticked and undo,
+  active-project consent, pinning, history restore and purge confirmation),
+  run on a macOS 14 runner in CI. Debug builds have a walkthrough
+  (`AGENTCLEAN_QA=<folder>`) that drives every screen against throwaway
+  projects, checks the results on disk and saves window snapshots; see
+  `QA-CHECKLIST.md`.
+
+### Still inherited
+
+- `.github/workflows/release.yml` and `docs/RELEASING.md` are upstream's
+  (DMG, cask bump), renamed only; M4 replaces them with signed, notarized
+  releases.
 
 ## 5. Known gaps and risks
 
 | Gap | Where it gets fixed |
 | --- | --- |
-| Fuzzing and mutation testing owed | M2 (first tasks) |
 | Projects on network drives, and on drives without Unix permissions (exFAT, FAT), are skipped | ADR 0004 |
-| Mac app unbuilt since the rename; macOS 26 floor; Swift deletion path still present | M3 |
-| `SECURITY.md` inaccurate | M3 |
 | GitHub Actions not pinned to commit SHAs | Before first release |
-| No signing, notarization or updater configured for AgentClean | M4 |
+| No signing, notarization or updater configured for AgentClean; the engine helper must be signed with the app | M4 |
+| UI tests need macOS automation mode; on a developer Mac run `sudo automationmodetool enable-automationmode-without-authentication` once (CI runners have it) | Owner's Mac |
+| No menu bar yet (F13) | M4 |
 
 ## 6. Roadmap
 
@@ -114,27 +139,15 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 | M4 Beta | Menu bar, global caches via each tool's own command (toolchains listed separately, review-only), accessibility, signing, notarization, Sparkle updates, Homebrew cask | External beta with at least 20 testers, no open severity-one bugs |
 | M5 v1.0 | Scheduled automatic clean (Safe only, size cap, undo), Docker and AI model stores (review-only), local stats and original character, user rules and per-repo config, docs site | Release checklist, security review |
 
-## 7. First session in Claude Code
+## 7. Next session
 
-1. Install Rust if needed: `curl https://sh.rustup.rs -sSf | sh` (or
-   `brew install rustup` then `rustup-init`).
-2. Run the four engine checks from `CLAUDE.md`; all should pass.
-3. Commit the existing work, for example:
-   - `chore: fork CleanMyDev as AgentClean, add Rust engine skeleton (M0)`
-     (the staged changes)
-   - `feat(engine): quarantine, restore, purge and CLI (M1)`
-   - `docs: handoff, research and M2 plan`
-4. Decide the GitHub owner, replace `AGENTCLEAN_OWNER`, push, and confirm the
-   `engine` workflow goes green on both runners.
-5. Optional but useful early: open `AgentClean.xcodeproj` in Xcode 26 and
-   build once, to confirm the rename did not break the project.
-6. Start M2 with `docs/milestones/M2.md`, task M2.1.
-
-A first prompt that works well:
-
-> Read CLAUDE.md, docs/HANDOFF.md and docs/milestones/M2.md. Run the engine
-> checks and report the results. Then propose how you will implement task M2.1
-> before writing code.
+1. Run the engine checks from `CLAUDE.md`, `cd CleanCore && swift test`, and
+   `scripts/check-swift-never-deletes.sh`; all should pass.
+2. Build the app (see `CLAUDE.md`) and run the Debug walkthrough in
+   `QA-CHECKLIST.md` against throwaway projects.
+3. Start M4 (beta): menu bar, global caches through each tool's own command,
+   accessibility, signing and notarization (including the embedded engine),
+   Sparkle updates, Homebrew cask.
 
 ## 8. Facts worth keeping
 

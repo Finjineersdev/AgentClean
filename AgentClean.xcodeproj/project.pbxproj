@@ -8,9 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		9A1DFD802F33916E002A11EE /* CleanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9A1DFD7F2F33916E002A11EE /* CleanCore */; };
+		AC0E00022F40000000A11EE0 /* AgentEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AC0E00012F40000000A11EE0 /* AgentEngine */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AC0E00192F40000000A11EE0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9A1DFD642F33916E002A11EE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9A1DFD6B2F33916E002A11EE;
+			remoteInfo = AgentClean;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		AC0E00102F40000000A11EE0 /* AgentCleanUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentCleanUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A1DFD6C2F33916E002A11EE /* AgentClean.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentClean.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -18,6 +30,11 @@
 		9A1DFD6E2F33916E002A11EE /* AgentClean */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AgentClean;
+			sourceTree = "<group>";
+		};
+		AC0E00112F40000000A11EE0 /* AgentCleanUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AgentCleanUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -28,6 +45,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A1DFD802F33916E002A11EE /* CleanCore in Frameworks */,
+				AC0E00022F40000000A11EE0 /* AgentEngine in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AC0E00142F40000000A11EE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -38,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				9A1DFD6E2F33916E002A11EE /* AgentClean */,
+				AC0E00112F40000000A11EE0 /* AgentCleanUITests */,
 				9A1DFD6D2F33916E002A11EE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -46,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				9A1DFD6C2F33916E002A11EE /* AgentClean.app */,
+				AC0E00102F40000000A11EE0 /* AgentCleanUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -60,6 +87,7 @@
 				9A1DFD682F33916E002A11EE /* Sources */,
 				9A1DFD692F33916E002A11EE /* Frameworks */,
 				9A1DFD6A2F33916E002A11EE /* Resources */,
+				AC0E00032F40000000A11EE0 /* Build and embed the engine */,
 			);
 			buildRules = (
 			);
@@ -71,10 +99,32 @@
 			name = AgentClean;
 			packageProductDependencies = (
 				9A1DFD7F2F33916E002A11EE /* CleanCore */,
+				AC0E00012F40000000A11EE0 /* AgentEngine */,
 			);
 			productName = AgentClean;
 			productReference = 9A1DFD6C2F33916E002A11EE /* AgentClean.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AC0E00122F40000000A11EE0 /* AgentCleanUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC0E00162F40000000A11EE0 /* Build configuration list for PBXNativeTarget "AgentCleanUITests" */;
+			buildPhases = (
+				AC0E00132F40000000A11EE0 /* Sources */,
+				AC0E00142F40000000A11EE0 /* Frameworks */,
+				AC0E00152F40000000A11EE0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AC0E001A2F40000000A11EE0 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AC0E00112F40000000A11EE0 /* AgentCleanUITests */,
+			);
+			name = AgentCleanUITests;
+			productName = AgentCleanUITests;
+			productReference = AC0E00102F40000000A11EE0 /* AgentCleanUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -88,6 +138,10 @@
 				TargetAttributes = {
 					9A1DFD6B2F33916E002A11EE = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					AC0E00122F40000000A11EE0 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = 9A1DFD6B2F33916E002A11EE;
 					};
 				};
 			};
@@ -109,6 +163,7 @@
 			projectRoot = "";
 			targets = (
 				9A1DFD6B2F33916E002A11EE /* AgentClean */,
+				AC0E00122F40000000A11EE0 /* AgentCleanUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -121,7 +176,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AC0E00152F40000000A11EE0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AC0E00032F40000000A11EE0 /* Build and embed the engine */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build and embed the engine";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\n# ADR 0005: the app runs the engine binary bundled next to its own executable.\nexport PATH=\"$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/engine\"\n# Not Contents/MacOS: the file system ignores case, and agentclean would\n# replace the app's own AgentClean executable.\nout=\"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/agentclean\"\nbins=()\nfor arch in $ARCHS; do\n  case \"$arch\" in\n    arm64) triple=aarch64-apple-darwin ;;\n    x86_64) triple=x86_64-apple-darwin ;;\n    *) echo \"error: no Rust target for $arch\"; exit 1 ;;\n  esac\n  cargo build --locked --release -p agentclean-cli --target \"$triple\"\n  bins+=(\"target/$triple/release/agentclean\")\ndone\nmkdir -p \"$(dirname \"$out\")\"\nlipo -create \"${bins[@]}\" -output \"$out\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --options runtime --timestamp=none --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" \"$out\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9A1DFD682F33916E002A11EE /* Sources */ = {
@@ -131,7 +216,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AC0E00132F40000000A11EE0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AC0E001A2F40000000A11EE0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9A1DFD6B2F33916E002A11EE /* AgentClean */;
+			targetProxy = AC0E00192F40000000A11EE0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		9A1DFD752F33916E002A11EE /* Debug */ = {
@@ -187,7 +287,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -244,7 +344,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -263,6 +363,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -294,6 +395,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -311,6 +413,42 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AC0E00172F40000000A11EE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.agentclean.AgentCleanUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = AgentClean;
+			};
+			name = Debug;
+		};
+		AC0E00182F40000000A11EE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "-";
+				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.agentclean.AgentCleanUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = AgentClean;
 			};
 			name = Release;
 		};
@@ -335,6 +473,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		AC0E00162F40000000A11EE0 /* Build configuration list for PBXNativeTarget "AgentCleanUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC0E00172F40000000A11EE0 /* Debug */,
+				AC0E00182F40000000A11EE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -348,6 +495,10 @@
 		9A1DFD7F2F33916E002A11EE /* CleanCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CleanCore;
+		};
+		AC0E00012F40000000A11EE0 /* AgentEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentEngine;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

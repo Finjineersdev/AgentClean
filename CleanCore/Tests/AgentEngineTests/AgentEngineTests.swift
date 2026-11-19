@@ -55,6 +55,7 @@ final class EngineContractTests: XCTestCase {
         XCTAssertEqual(try one(RestoreOutput.self, "restore").run.entries[0].state, .restored)
         XCTAssertFalse(try one(PurgeOutput.self, "purge-dry-run").execute)
         XCTAssertEqual(try one(PinsOutput.self, "pin").pinned, ["$TMP/work/site"])
+        XCTAssertEqual(try one(ConfigOutput.self, "config").idleDays, 7)
         XCTAssertEqual(try one(ErrorOutput.self, "error").error, #"no run named "nope""#)
     }
 }
@@ -141,5 +142,39 @@ final class EngineEndToEndTests: XCTestCase {
         } catch EngineError.failed(let message) {
             XCTAssertTrue(message.contains("No such file") || message.contains("not a folder"), message)
         }
+    }
+}
+
+/// F14: Caution is never pre-selected; active and pinned projects start empty.
+final class SelectionTests: XCTestCase {
+    private func project(_ verdict: Verdict, pinned: Bool = false) -> Project {
+        Project(root: "/w/site", verdict: verdict, pinned: pinned, reason: "", items: [
+            Item(path: ".next", rule: "node", kind: .safe, bytes: 10, refused: nil),
+            Item(path: "node_modules", rule: "node", kind: .caution, bytes: 20, refused: nil),
+            Item(path: "dist", rule: "node", kind: .safe, bytes: nil, refused: "not a directory"),
+        ])
+    }
+
+    func testDefaultsAreSafeAllowedFoldersOnly() {
+        XCTAssertEqual(Selection.defaults(for: project(.dormant)), ["/w/site/.next"])
+        XCTAssertEqual(Selection.defaults(for: project(.idle)), ["/w/site/.next"])
+    }
+
+    func testActiveAndPinnedProjectsStartEmpty() {
+        XCTAssertEqual(Selection.defaults(for: project(.active)), [])
+        XCTAssertEqual(Selection.defaults(for: project(.dormant, pinned: true)), [])
+    }
+
+    func testRefusedItemsAreNotSelectable() {
+        let p = project(.idle)
+        XCTAssertEqual(p.items.map(Selection.selectable), [true, true, false])
+    }
+
+    func testFlagsFollowThePicks() {
+        let p = project(.idle)
+        XCTAssertFalse(Selection.flags(for: ["/w/site/.next"], in: p).caution)
+        XCTAssertTrue(Selection.flags(for: ["/w/site/node_modules"], in: p).caution)
+        XCTAssertTrue(Selection.flags(for: [], in: project(.active)).active)
+        XCTAssertEqual(Selection.bytes(of: ["/w/site/.next", "/w/site/node_modules"], in: p), 30)
     }
 }

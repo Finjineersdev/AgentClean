@@ -1,0 +1,174 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Drives the real app against throwaway projects. HOME points at a temporary
+// folder, so the bundled engine uses a throwaway config and quarantine.
+
+import XCTest
+
+final class AgentCleanUITests: XCTestCase {
+    private var base: URL!
+    private var work: URL { base.appendingPathComponent("work") }
+    private var app: XCUIApplication!
+    private let fm = FileManager.default
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        base = fm.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent("agentclean-ui-\(UUID().uuidString)")
+        try makeProjects()
+        app = XCUIApplication()
+        app.launchEnvironment["HOME"] = base.appendingPathComponent("home").path
+        app.launchEnvironment["XDG_CONFIG_HOME"] = ""
+        app.launchEnvironment["XDG_DATA_HOME"] = ""
+        app.launchArguments += ["-scanRoots", "(\"\(work.path)\")"]
+        app.launch()
+    }
+
+    override func tearDownWithError() throws {
+        app?.terminate()
+        if let base { try? fm.removeItem(at: base) }
+    }
+
+    // MARK: Fixtures
+
+    private func file(_ rel: String, _ size: Int) throws {
+        let url = work.appendingPathComponent(rel)
+        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(count: size).write(to: url)
+    }
+
+    private func makeProjects() throws {
+        try file("shop-web/package.json", 0)
+        try Data(#"{"dependencies":{"next":"14"}}"#.utf8).write(to: work.appendingPathComponent("shop-web/package.json"))
+        try file("shop-web/.next/cache/webpack.bin", 3_000_000)
+        try file("shop-web/node_modules/react/index.js", 5_000_000)
+        try file("ledger-rs/Cargo.toml", 10)
+        try file("ledger-rs/target/debug/ledger", 8_000_000)
+        try file("live-api/.next/cache/x.bin", 2_000_000)
+        try Data(#"{"dependencies":{"next":"14"}}"#.utf8).write(to: work.appendingPathComponent("live-api/package.json"))
+        try fm.createDirectory(at: base.appendingPathComponent("home"), withIntermediateDirectories: true)
+        // Everything but live-api is old enough to be Dormant.
+        let old = Date(timeIntervalSinceNow: -200 * 86_400)
+        for project in ["shop-web", "ledger-rs"] {
+            let root = work.appendingPathComponent(project)
+            let all = (fm.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? []) + [root]
+            for url in all { try fm.setAttributes([.modificationDate: old], ofItemAtPath: url.path) }
+        }
+    }
+
+    private func exists(_ rel: String) -> Bool {
+        fm.fileExists(atPath: work.appendingPathComponent(rel).path)
+    }
+
+    private func shot(_ name: String) {
+        let a = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        a.name = name
+        a.lifetime = .keepAlways
+        add(a)
+    }
+
+    private func scan() {
+        app.buttons["scan"].click()
+        XCTAssertTrue(app.staticTexts["ready.bytes"].waitForExistence(timeout: 30), "scan finished")
+    }
+
+    private func open(_ project: String) {
+        app.outlines.cells.containing(.any, identifier: "nav.projects").firstMatch.click()
+        let row = app.buttons["project.\(project)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), project)
+        row.click()
+    }
+
+    private func checked(_ id: String) -> Bool {
+        (app.checkBoxes[id].value as? Int ?? 0) == 1
+            || (app.checkBoxes[id].value as? Bool ?? false)
+    }
+
+    // MARK: Flows
+
+    func testScanShowsTotals() {
+        shot("01-overview-before-scan")
+        scan()
+        XCTAssertTrue(app.staticTexts["11 MB"].exists || app.staticTexts["ready.bytes"].label.contains("MB"))
+        shot("02-overview-after-scan")
+    }
+
+    /// F14: Safe folders start ticked in a dormant project, Caution never.
+    /// Then a real clean of exactly the ticked folder, and Undo.
+    func testCleanOnlyWhatIsTickedThenUndo() {
+        scan()
+        open("shop-web")
+        XCTAssertTrue(app.checkBoxes["item..next"].waitForExistence(timeout: 10))
+        XCTAssertTrue(checked("item..next"), "Safe is pre-selected")
+        XCTAssertFalse(checked("item.node_modules"), "Caution is never pre-selected")
+        shot("03-project-detail")
+
+        app.buttons["review"].click()
+        let confirm = app.buttons["confirmClean"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 15))
+        XCTAssertTrue(exists("shop-web/.next"), "review is a dry run")
+        shot("04-review-sheet")
+        confirm.click()
+
+        XCTAssertTrue(app.buttons["undo"].waitForExistence(timeout: 15))
+        XCTAssertFalse(exists("shop-web/.next"), ".next moved to quarantine")
+        XCTAssertTrue(exists("shop-web/node_modules/react/index.js"), "node_modules untouched")
+        shot("05-cleaned")
+
+        app.buttons["undo"].click()
+        let restored = NSPredicate { _, _ in self.exists("shop-web/.next/cache/webpack.bin") }
+        wait(for: [expectation(for: restored, evaluatedWith: nil)], timeout: 15)
+    }
+
+    /// An active project needs explicit consent before review.
+    func testActiveProjectNeedsConsent() {
+        scan()
+        open("live-api")
+        XCTAssertTrue(app.buttons["review"].waitForExistence(timeout: 10))
+        XCTAssertFalse(checked("item..next"), "nothing pre-selected in an active project")
+        app.checkBoxes["item..next"].click()
+        XCTAssertFalse(app.buttons["review"].isEnabled, "review needs consent")
+        app.checkBoxes["allowActive"].click()
+        XCTAssertTrue(app.buttons["review"].isEnabled)
+        shot("06-active-project")
+    }
+
+    /// Pinning from the project page: its folders can no longer be ticked.
+    func testPinnedProjectCannotBeCleaned() {
+        scan()
+        open("ledger-rs")
+        XCTAssertTrue(app.buttons["pin"].waitForExistence(timeout: 10))
+        app.buttons["pin"].click()
+        let disabled = NSPredicate(format: "isEnabled == false")
+        wait(for: [expectation(for: disabled, evaluatedWith: app.checkBoxes["item.target"])], timeout: 15)
+        XCTAssertFalse(app.buttons["review"].isEnabled)
+        shot("07-pinned")
+    }
+
+    /// History restores a run, and purge asks before deleting.
+    func testHistoryRestoreAndPurge() {
+        scan()
+        open("ledger-rs")
+        XCTAssertTrue(app.buttons["review"].waitForExistence(timeout: 10))
+        app.buttons["review"].click()
+        XCTAssertTrue(app.buttons["confirmClean"].waitForExistence(timeout: 15))
+        app.buttons["confirmClean"].click()
+        XCTAssertTrue(app.buttons["done"].waitForExistence(timeout: 15))
+        app.buttons["done"].click()
+        XCTAssertFalse(exists("ledger-rs/target"))
+
+        app.outlines.cells.containing(.any, identifier: "nav.history").firstMatch.click()
+        let purge = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'purge.'")).firstMatch
+        XCTAssertTrue(purge.waitForExistence(timeout: 10))
+        shot("08-history")
+        purge.click()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 10) || app.buttons["confirmPurge"].waitForExistence(timeout: 1))
+        shot("09-purge-confirmation")
+        app.typeKey(.escape, modifierFlags: [])
+
+        let restore = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'restore.'")).firstMatch
+        restore.click()
+        let back = NSPredicate { _, _ in self.exists("ledger-rs/target/debug/ledger") }
+        wait(for: [expectation(for: back, evaluatedWith: nil)], timeout: 15)
+    }
+}

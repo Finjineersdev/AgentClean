@@ -187,6 +187,14 @@ public struct PinsOutput: Codable, Sendable, Hashable {
     public let pinned: [String]
 }
 
+public struct ConfigOutput: Codable, Sendable, Hashable {
+    public let path: String
+    public let idleDays: Int
+    public let dormantDays: Int
+    public let pinned: [String]
+    public let exclude: [String]
+}
+
 struct ErrorOutput: Decodable {
     let error: String
 }

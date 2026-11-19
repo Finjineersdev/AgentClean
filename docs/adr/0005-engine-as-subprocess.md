@@ -4,7 +4,9 @@ Status: accepted, 20 Nov 2026. Replaces the UniFFI bridge planned in ADR 0001.
 
 ## Decision
 
-The Mac app bundles the `agentclean` binary (`Contents/Helpers/agentclean`)
+The Mac app bundles the `agentclean` binary at `Contents/Helpers/agentclean`
+(not `Contents/MacOS`, where on a case-insensitive file system it would
+replace the app's own `AgentClean` executable)
 and drives it through `--json`, as documented in `docs/CLI-JSON.md`. The
 Swift side is the `AgentEngine` target in `CleanCore/`: it starts the binary
 with an argument list (never a shell), decodes each command's one JSON

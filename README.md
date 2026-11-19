@@ -5,13 +5,11 @@ shows which rebuildable folders are taking space (`node_modules`, `target`,
 `.venv`, build output), explains why each one is safe to remove, and makes
 every clean reversible. Local only: no account, no telemetry.
 
-> **Status: pre-alpha (milestone M1).** The Rust engine and CLI can clean a
-> project into a quarantine, restore it, and purge it to free the space. The
-> rule catalogue covers Node.js, Rust and Python only, and there is no
-> project discovery yet: you name each project folder.
-> The Mac app in this repository is the inherited upstream app, renamed; it has
-> not been rebuilt or re-verified since the rename. Do not use it on data you
-> care about.
+> **Status: alpha (milestone M3).** The Rust engine and CLI find projects,
+> judge whether each is in use, and clean rebuildable folders into a
+> quarantine you can restore from. The Mac app (macOS 14 or later) runs that
+> same engine: scan, pick folders, review the dry run, clean, undo. Builds are
+> not signed or notarized yet (M4).
 
 Contributors and coding agents: start with [CLAUDE.md](CLAUDE.md) and
 [docs/HANDOFF.md](docs/HANDOFF.md).
@@ -24,8 +22,9 @@ AgentClean is a fork of [Zouuabi/CleanMyDev](https://github.com/Zouuabi/CleanMyD
 | Path | What | State |
 | --- | --- | --- |
 | `engine/` | Rust workspace: rule catalogue, safety guard, quarantine, `agentclean` CLI | New; tested on Linux |
-| `engine/rules/` | One TOML rule file per ecosystem | Node.js, Rust, Python so far |
-| `AgentClean/`, `CleanCore/` | SwiftUI Mac app and its Swift engine, inherited | Renamed only |
+| `engine/rules/` | One TOML rule file per ecosystem | Eleven ecosystems |
+| `AgentClean/` | SwiftUI Mac app; runs the bundled engine (ADR 0005) | Alpha; macOS 14+ |
+| `CleanCore/` | `AgentEngine` (Swift client for the engine) and the read-only Dev Stack inventory | Tested |
 | `docs/` | Handoff, requirements, safety spec, rule schema, ADRs, research, milestone plans | Current |
 
 ## Try the engine

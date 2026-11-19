@@ -1,0 +1,73 @@
+import SwiftUI
+import AppKit
+import AgentEngine
+
+struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+    @State private var idle = 14
+    @State private var dormant = 90
+
+    var body: some View {
+        Form {
+            Section("Scan these folders") {
+                ForEach(model.scanRoots, id: \.self) { root in
+                    HStack {
+                        Text((root as NSString).abbreviatingWithTildeInPath)
+                        Spacer()
+                        Button("Remove") { model.scanRoots.removeAll { $0 == root } }
+                            .disabled(model.scanRoots.count == 1)
+                    }
+                }
+                Button("Add Folder…") { if let url = pickFolder() { model.scanRoots.append(url.path) } }
+            }
+
+            Section {
+                Stepper("Active if changed within \(idle) days", value: $idle, in: 1...dormant)
+                Stepper("Dormant after \(dormant) days", value: $dormant, in: idle...3650)
+                Button("Save") { Task { await model.setDays(idle: idle, dormant: dormant) } }
+                    .disabled(idle == model.config?.idleDays && dormant == model.config?.dormantDays)
+            } header: {
+                Text("Activity")
+            } footer: {
+                Text("Active projects are only cleaned when you say so in the project.").foregroundStyle(.secondary)
+            }
+
+            Section("Never scan") {
+                ForEach(model.config?.exclude ?? [], id: \.self) { folder in
+                    HStack {
+                        Text((folder as NSString).abbreviatingWithTildeInPath)
+                        Spacer()
+                        Button("Remove") { Task { await model.include(folder) } }
+                    }
+                }
+                Button("Add Folder…") { if let url = pickFolder() { Task { await model.exclude(url) } } }
+            }
+
+            Section("Pinned: never cleaned") {
+                if model.config?.pinned.isEmpty ?? true {
+                    Text("Nothing is pinned. Pin a project from its page.").foregroundStyle(.secondary)
+                }
+                ForEach(model.config?.pinned ?? [], id: \.self) { folder in
+                    HStack {
+                        Text((folder as NSString).abbreviatingWithTildeInPath)
+                        Spacer()
+                        Button("Unpin") { Task { await model.setPinned(folder, false) } }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .task {
+            await model.loadConfig()
+            if let c = model.config { idle = c.idleDays; dormant = c.dormantDays }
+        }
+    }
+
+    private func pickFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+}

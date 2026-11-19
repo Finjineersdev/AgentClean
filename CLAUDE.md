@@ -22,8 +22,8 @@ and what to do next. The milestone plan in progress is `docs/milestones/M2.md`.
 4. **Changing commands are dry runs unless `--execute`.** Caution-class folders
    also need `--include-caution`, and active projects `--include-active`;
    pinned projects are never cleaned. Keep it that way in every new command.
-   Only `pin` and `unpin` skip `--execute`: they change AgentClean's config,
-   never a project.
+   Only `pin`, `unpin` and `config` skip `--execute`: they change AgentClean's
+   config, never a project.
 5. **No network code** in the engine, and none in the app beyond the updater.
 6. **Treat scanned repositories as hostile input.** Run git only with the
    hardened flags in `guard::check_untracked`; never build shell strings.
@@ -54,13 +54,17 @@ $B plan  --rules rules /tmp/some-copy
 $B clean --rules rules --store /tmp/q /tmp/some-copy        # dry run
 ```
 
-Inherited Mac app (Swift, untouched since the rename, not yet rebuilt):
+Mac app (runs the bundled engine, ADR 0005; macOS 14+, Xcode 16+):
 
 ```bash
-cd CleanCore && swift test
-xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
-  -configuration Debug -derivedDataPath build/dd build       # macOS 26 SDK, Xcode 26+
+(cd engine && cargo build) && (cd CleanCore && swift test)
+scripts/check-swift-never-deletes.sh
+xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Debug \
+  -derivedDataPath build/dd build CODE_SIGN_IDENTITY=-    # also builds the engine
 ```
+
+QA the app against throwaway projects with the Debug walkthrough in
+`QA-CHECKLIST.md` (`AGENTCLEAN_QA=<folder>`, `HOME` pointed at a temp folder).
 
 ## Layout
 
@@ -76,7 +80,10 @@ xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
 | `engine/crates/agentclean-core/src/volumes.rs` | Mount table, drive roots, network drives |
 | `engine/crates/agentclean-cli/` | `agentclean` binary and end-to-end tests |
 | `engine/rules/*.toml` | Rule catalogue, one file per ecosystem |
-| `AgentClean/`, `CleanCore/` | Inherited SwiftUI app and Swift engine (to be reduced in M3) |
+| `CleanCore/Sources/AgentEngine` | Swift client for the engine CLI; selection rules |
+| `AgentClean/` | SwiftUI app; never touches files itself |
+| `CleanCore/Sources/CleanCore` | Read-only Dev Stack inventory |
+| `AgentCleanUITests/` | XCUITest suite |
 | `docs/` | Handoff, requirements, safety spec, rule schema, ADRs, research, milestones |
 
 ## Conventions
@@ -88,12 +95,14 @@ xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
   a restore hint.
 - Sizes in decimal units (KB, MB, GB), as Finder shows them.
 
-## Inherited Swift app: things that bit upstream
+## Swift app: things that bit
 
+- The engine helper lives in `Contents/Helpers`, never `Contents/MacOS`: the
+  file system ignores case and `agentclean` replaces `AgentClean`.
+- Never call `Process.waitUntilExit()` from async code; it hangs on Swift's
+  concurrency threads. Use the termination handler (see `Engine.launch`).
 - Never read the observable `AppModel` from `.commands {}` or a Scene-level
   binding setter without a change guard; it spins the main thread.
-- A stable code signature is required; ad-hoc builds re-trigger Full Disk
-  Access prompts that look like a hung scan.
 - Docker sizes: use `UniqueSize` from `docker system df -v`.
 - `URL.path(percentEncoded:)` for the home folder ends with `/`.
 - Project discovery must walk below a project (monorepos) but skip bundles
