@@ -5,8 +5,8 @@ something that cannot be rebuilt. This document states the invariants that
 prevent it. Each invariant names the code that enforces it and the test that
 proves it. A change that weakens an invariant needs an ADR.
 
-Status: **I1–I12 are implemented and tested** in `engine/crates/agentclean-core`.
-I13–I17 are specified for M1 and not implemented.
+Status: **I1–I14 are implemented and tested** in `engine/crates/agentclean-core`.
+I15–I17 are specified and not implemented yet.
 
 ## Model
 
@@ -56,12 +56,30 @@ configuration can name programs for git to run, so the guard calls git with
 - Only git is checked for tracked files. Mercurial, Jujutsu and Subversion
   checkouts are refused only at the directory level (I7).
 
-## Specified for M1
+## Quarantine (M1)
+
+| # | Invariant | Enforced by | Test |
+| --- | --- | --- | --- |
+| I13 | Cleaning moves each approved folder into the quarantine by rename on the same volume; nothing is copied or unlinked at clean time. A folder on another volume is skipped and recorded | `Store::clean` | `clean_then_restore_round_trips_exactly` |
+| I14 | The manifest is written before the first move and rewritten atomically after each one; `reverify` runs immediately before each move | `Store::clean`, `write_manifest` | `changed_items_are_skipped_and_recorded`, `a_crash_after_a_move_is_recoverable` |
+| I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
+| I14b | Purge deletes only `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `Store::load` | `purge_deletes_only_quarantined_items`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
+| I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution` | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag` |
+
+Space is freed only when a run is purged, because a rename on the same volume
+moves no data. The CLI says so after every clean.
+
+Known limits: a crash between a rename and the manifest update leaves the entry
+`pending`; restore and purge treat it as moved if its item is present. Restore
+checks the destination is free and then renames, so a directory created in
+that instant could, if empty, be replaced; a non-empty one makes the rename
+fail safely. Two cleans running at the same moment use separate run folders
+but are not otherwise coordinated.
+
+## Specified, not implemented
 
 | # | Invariant |
 | --- | --- |
-| I13 | Cleaning moves to a quarantine folder on the same volume by rename; nothing is unlinked at clean time |
-| I14 | Every run writes a manifest before the first move; a run restores whole or per item; restore never overwrites |
 | I15 | A project with a running tool whose working directory is inside it, or that is pinned, is refused |
 | I16 | Automatic cleaning takes Safe-class candidates only, from projects idle past the threshold, under a per-run size cap |
 | I17 | No `sudo`, no privileged helper; external tools run with fixed argument lists |
@@ -71,5 +89,5 @@ configuration can name programs for git to run, so the guard calls git with
 - Every invariant has at least one test that fails if the check is removed.
 - `approval_implies_invariants` (property test) asserts I3, I4, I7 and I8 for
   arbitrary paths.
-- Before M1 closes: fuzzing of the rule parser, and mutation testing of
-  `guard.rs` and `deny.rs`.
+- Still owed from M1: fuzzing of the rule parser and manifest reader, and
+  mutation testing of `guard.rs`, `deny.rs` and `quarantine.rs`.

@@ -13,7 +13,7 @@ use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::deny::{protected_component, protected_target};
-use crate::rules::Candidate;
+use crate::rules::{Candidate, Class};
 
 /// Why a path was refused. Each variant maps to an invariant in the spec.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -88,6 +88,8 @@ pub struct Approved {
     path: PathBuf,
     project_root: PathBuf,
     id: FileId,
+    rule_id: String,
+    class: Class,
 }
 
 impl Approved {
@@ -99,6 +101,21 @@ impl Approved {
     /// Canonical project root the path was approved under.
     pub fn project_root(&self) -> &Path {
         &self.project_root
+    }
+
+    /// Rule that produced the candidate.
+    pub fn rule_id(&self) -> &str {
+        &self.rule_id
+    }
+
+    /// Class the rule gave the candidate.
+    pub fn class(&self) -> Class {
+        self.class
+    }
+
+    /// Device the directory was on when approved.
+    pub(crate) fn device(&self) -> u64 {
+        self.id.dev
     }
 
     /// Must be called immediately before moving the path. Refuses if the
@@ -225,6 +242,8 @@ impl Guard {
             path: canon,
             project_root: root,
             id,
+            rule_id: candidate.rule_id().to_owned(),
+            class: candidate.class(),
         })
     }
 }

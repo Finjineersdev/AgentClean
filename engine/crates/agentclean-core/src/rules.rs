@@ -14,7 +14,7 @@ use crate::deny::{protected_component, protected_target};
 
 pub const SCHEMA_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Class {
     /// Recreated by the next build with no user action.

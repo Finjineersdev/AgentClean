@@ -11,7 +11,11 @@
 
 pub mod deny;
 pub mod guard;
+pub mod quarantine;
 pub mod rules;
+pub mod size;
 
 #[cfg(test)]
 mod guard_tests;
+#[cfg(test)]
+mod quarantine_tests;

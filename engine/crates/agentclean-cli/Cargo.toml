@@ -17,3 +17,6 @@ workspace = true
 [dependencies]
 agentclean-core = { path = "../agentclean-core" }
 clap.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
