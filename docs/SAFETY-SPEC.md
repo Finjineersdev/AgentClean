@@ -5,8 +5,8 @@ something that cannot be rebuilt. This document states the invariants that
 prevent it. Each invariant names the code that enforces it and the test that
 proves it. A change that weakens an invariant needs an ADR.
 
-Status: **I1–I14d and I18 are implemented and tested** in `engine/crates/agentclean-core`.
-I15–I17 are specified and not implemented yet.
+Status: **I1–I15c and I18 are implemented and tested** in `engine/crates/agentclean-core`.
+I16 and I17 are specified and not implemented yet.
 
 ## Model
 
@@ -66,15 +66,7 @@ configuration can name programs for git to run, so the guard calls git with
 | I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
 | I14b | Purge deletes only real directories at `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `parse_manifest` | `purge_deletes_only_quarantined_items`, `purge_removes_only_real_directories`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
 | I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
-| I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution` | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag` |
-
-## Discovery (M2)
-
-Discovery only reads; what it finds still passes I1–I12 before anything moves.
-
-| # | Invariant | Enforced by | Test |
-| --- | --- | --- | --- |
-| I18 | The project walk never follows a link, never enters another volume, the quarantine store, a bundle, a hidden folder, an artifact folder of a project it found, or a folder that belongs to its parent's project (Flutter's `android/`). A candidate is reported once, by the outermost project that claims it | `discover::discover` | `links_are_never_followed`, `other_volumes_are_not_entered`, `the_quarantine_store_is_not_entered`, `bundles_and_hidden_folders_are_not_entered`, `finds_every_project_in_a_layout_like_the_owners` |
+| I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution`. `pin` and `unpin` are the exception: they change only AgentClean's config, and pinning only adds protection | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag` |
 
 Space is freed only when a run is purged, because a rename on the same volume
 moves no data. The CLI says so after every clean.
@@ -86,11 +78,33 @@ that instant could, if empty, be replaced; a non-empty one makes the rename
 fail safely. Two cleans running at the same moment use separate run folders
 but are not otherwise coordinated.
 
+## Discovery (M2)
+
+Discovery only reads; what it finds still passes I1–I12 before anything moves.
+
+| # | Invariant | Enforced by | Test |
+| --- | --- | --- | --- |
+| I18 | The project walk never follows a link, never enters another volume, the quarantine store, a bundle, a hidden folder, an artifact folder of a project it found, or a folder that belongs to its parent's project (Flutter's `android/`). A candidate is reported once, by the outermost project that claims it | `discover::discover` | `links_are_never_followed`, `other_volumes_are_not_entered`, `the_quarantine_store_is_not_entered`, `bundles_and_hidden_folders_are_not_entered`, `finds_every_project_in_a_layout_like_the_owners` |
+
+## Activity and pins (M2.5)
+
+`Guard::check` takes an `Activity`, which only `activity::assess` can make, so
+nothing is approved without an activity assessment.
+
+| # | Invariant | Enforced by | Test |
+| --- | --- | --- | --- |
+| I15 | A pinned project, or one inside a pinned folder, is refused with no override. An Active project (a process other than AgentClean's own process family and pipeline runs inside it, or a file or commit is newer than `idle_days`) is refused unless the guard is built with `allow_active` (`--include-active`) | `Guard::check`, `activity::assess` | `active_and_pinned_projects_are_refused`, `pinned_projects_are_never_cleaned`, `projects_in_use_need_an_explicit_flag`, `a_tool_running_inside_makes_it_active` |
+| I15a | Dormant needs every signal checked in full: git answered, the edit walk finished within its limits, and processes were listed. Otherwise the verdict is at most Idle | `activity::decide` | `an_incomplete_check_is_never_dormant`, `too_many_files_is_never_dormant`, `a_broken_repository_is_never_dormant` |
+| I15b | Reading the last commit runs git with the I11 settings plus `log.showSignature=false`, so a repository cannot make it run `gpg.program` | `guard::hardened_git` | `reading_commits_does_not_run_repository_programs` |
+| I15c | A config file that exists but cannot be read, has an unknown key, a relative pin, or `idle_days` above `dormant_days` stops `plan` and `clean`: pins are never silently dropped | `Config::load` | `config_is_read_strictly`, `a_broken_config_stops_cleaning` |
+
+Known limit: activity is assessed once, before approval. A tool started in
+the seconds between the plan and the move is not seen.
+
 ## Specified, not implemented
 
 | # | Invariant |
 | --- | --- |
-| I15 | A project with a running tool whose working directory is inside it, or that is pinned, is refused |
 | I16 | Automatic cleaning takes Safe-class candidates only, from projects idle past the threshold, under a per-run size cap |
 | I17 | No `sudo`, no privileged helper; external tools run with fixed argument lists |
 
@@ -106,7 +120,7 @@ but are not otherwise coordinated.
   satisfies I2, I2a and I8; `manifest_load` asserts that any accepted manifest
   satisfies I14b and I14d and survives a write and re-read unchanged. Both run
   nightly for 10 minutes each (`engine-nightly` workflow).
-- `cargo mutants` on `guard.rs`, `deny.rs`, `quarantine.rs`, `rules.rs` and `discover.rs` must report no
+- `cargo mutants` on `guard.rs`, `deny.rs`, `quarantine.rs`, `rules.rs`, `discover.rs` and `activity.rs` must report no
   surviving mutants; it runs nightly and the command is in `CONTRIBUTING.md`.
   Code that only one platform compiles is kept inside a shared function, so
   the tests that run cover the code that ships.

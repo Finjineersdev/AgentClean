@@ -40,6 +40,7 @@ $B plan  --rules rules ~/code/my-site            # what would be allowed, read-o
 $B clean --rules rules ~/code/my-site            # dry run: lists what would move
 $B clean --rules rules --execute ~/code/my-site  # move Safe folders into quarantine
 $B clean --rules rules --execute --include-caution ~/code/my-site   # node_modules, .venv too
+$B pin ~/code/client-app                          # never clean this folder
 $B history                                       # runs, newest first
 $B restore <run-id>                              # put everything back
 $B purge <run-id> --execute                      # delete from quarantine, free the space
@@ -49,6 +50,10 @@ Cleaning moves folders into `~/Library/Application Support/AgentClean/Quarantine
 on macOS (`~/.local/share/agentclean/quarantine` on Linux). Because it is a
 move on the same disk, **space is freed only when you purge**. Projects on
 another volume are skipped in this version.
+
+Each project gets a verdict first. **Active** projects (edited or committed in
+the last 14 days, or with a tool running inside) are left alone unless you
+pass `--include-active`; **pinned** projects are never cleaned.
 
 ## Design in three rules
 

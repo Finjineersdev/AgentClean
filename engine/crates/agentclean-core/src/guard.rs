@@ -12,6 +12,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use crate::activity::{Activity, Verdict};
 use crate::deny::{protected_component, protected_target};
 use crate::rules::{Candidate, Class};
 
@@ -48,6 +49,10 @@ pub enum Refusal {
     VcsCheckFailed,
     #[error("path changed since it was approved")]
     ChangedSinceApproval,
+    #[error("the project is pinned: it is never cleaned")]
+    Pinned,
+    #[error("the project is in use: {0}")]
+    ActiveProject(String),
 }
 
 /// Identity of a directory at approval time.
@@ -139,6 +144,7 @@ const MIN_ROOT_DEPTH: usize = 2;
 pub struct Guard {
     home: Option<PathBuf>,
     check_git: bool,
+    allow_active: bool,
 }
 
 impl Guard {
@@ -149,7 +155,15 @@ impl Guard {
         Self {
             home,
             check_git: true,
+            allow_active: false,
         }
+    }
+
+    /// Also approves folders in projects that are in use. Pinned projects
+    /// stay refused.
+    pub fn allow_active(mut self) -> Self {
+        self.allow_active = true;
+        self
     }
 
     /// Uses `$HOME` for the home folder.
@@ -157,8 +171,15 @@ impl Guard {
         Self::new(std::env::var_os("HOME").map(PathBuf::from))
     }
 
-    /// Checks one rule candidate under one project root.
-    pub fn check(&self, project_root: &Path, candidate: &Candidate) -> Result<Approved, Refusal> {
+    /// Checks one rule candidate in the project `activity` assessed.
+    pub fn check(&self, activity: &Activity, candidate: &Candidate) -> Result<Approved, Refusal> {
+        if activity.pinned() {
+            return Err(Refusal::Pinned);
+        }
+        if activity.verdict() == Verdict::Active && !self.allow_active {
+            return Err(Refusal::ActiveProject(activity.reason().to_owned()));
+        }
+        let project_root = activity.root();
         if !project_root.is_absolute() {
             return Err(Refusal::NotAbsolute);
         }
@@ -266,8 +287,35 @@ fn too_shallow(root: &Path) -> bool {
     depth < MIN_ROOT_DEPTH
 }
 
+/// git in `root`, with every setting that could run a program supplied by
+/// the (untrusted) repository switched off. Callers add the subcommand.
+pub(crate) fn hardened_git(root: &Path) -> Command {
+    let mut git = Command::new("git");
+    git.args([
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+    ])
+    .args([
+        "-c",
+        "log.showSignature=false",
+        "-c",
+        "core.pager=cat",
+        "-C",
+    ])
+    .arg(root)
+    .env("GIT_OPTIONAL_LOCKS", "0")
+    .env("GIT_TERMINAL_PROMPT", "0")
+    .env_remove("GIT_DIR")
+    .env_remove("GIT_WORK_TREE")
+    .stdin(Stdio::null())
+    .stderr(Stdio::null());
+    git
+}
+
 /// True if `dir` or any ancestor holds a `.git` entry.
-fn inside_git_checkout(dir: &Path) -> bool {
+pub(crate) fn inside_git_checkout(dir: &Path) -> bool {
     dir.ancestors()
         .any(|a| fs::symlink_metadata(a.join(".git")).is_ok())
 }
@@ -280,25 +328,13 @@ fn check_untracked(root: &Path, rel: &Path) -> Result<(), Refusal> {
     if !inside_git_checkout(root) {
         return Ok(());
     }
-    let output = Command::new("git")
+    let output = hardened_git(root)
         .args([
-            OsStr::new("-c"),
-            OsStr::new("core.fsmonitor=false"),
-            OsStr::new("-c"),
-            OsStr::new("core.hooksPath=/dev/null"),
-            OsStr::new("-C"),
-            root.as_os_str(),
             OsStr::new("ls-files"),
             OsStr::new("-z"),
             OsStr::new("--"),
             rel.as_os_str(),
         ])
-        .env("GIT_OPTIONAL_LOCKS", "0")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
         .output()
         .map_err(|_| Refusal::VcsCheckFailed)?;
     if !output.status.success() {

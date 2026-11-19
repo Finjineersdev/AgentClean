@@ -7,9 +7,14 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
+use crate::activity::{Activity, Verdict};
 use crate::guard::{Approved, Guard};
 use crate::quarantine::{Error, Manifest, State, Store, MANIFEST};
 use crate::rules::Candidate;
+
+fn idle(root: &Path) -> Activity {
+    Activity::unchecked(root, Verdict::Idle, false)
+}
 
 struct Fixture {
     _tmp: TempDir,
@@ -22,7 +27,7 @@ struct Fixture {
 impl Fixture {
     fn approve(&self, rel: &str) -> Approved {
         self.guard
-            .check(&self.root, &Candidate::unchecked(rel))
+            .check(&idle(&self.root), &Candidate::unchecked(rel))
             .unwrap()
     }
 

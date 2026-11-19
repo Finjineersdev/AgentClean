@@ -20,7 +20,10 @@ and what to do next. The milestone plan in progress is `docs/milestones/M2.md`.
 3. **A safety change ships with a test that fails without it.** The invariants
    and their tests are listed in `docs/SAFETY-SPEC.md`; keep that table current.
 4. **Changing commands are dry runs unless `--execute`.** Caution-class folders
-   also need `--include-caution`. Keep it that way in every new command.
+   also need `--include-caution`, and active projects `--include-active`;
+   pinned projects are never cleaned. Keep it that way in every new command.
+   Only `pin` and `unpin` skip `--execute`: they change AgentClean's config,
+   never a project.
 5. **No network code** in the engine, and none in the app beyond the updater.
 6. **Treat scanned repositories as hostile input.** Run git only with the
    hardened flags in `guard::check_untracked`; never build shell strings.
@@ -67,6 +70,8 @@ xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
 | `engine/crates/agentclean-core/src/deny.rs` | Names that are never deletable |
 | `engine/crates/agentclean-core/src/guard.rs` | Safety guard, `Approved`, `reverify` |
 | `engine/crates/agentclean-core/src/quarantine.rs` | Runs, manifest, restore, purge |
+| `engine/crates/agentclean-core/src/discover.rs` | Project discovery walk |
+| `engine/crates/agentclean-core/src/activity.rs` | Active, Idle, Dormant verdicts; config and pins |
 | `engine/crates/agentclean-core/src/size.rs` | Allocated-size measurement |
 | `engine/crates/agentclean-cli/` | `agentclean` binary and end-to-end tests |
 | `engine/rules/*.toml` | Rule catalogue, one file per ecosystem |

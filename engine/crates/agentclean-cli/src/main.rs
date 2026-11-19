@@ -2,11 +2,13 @@
 //!
 //! Every command that changes anything is a dry run unless `--execute` is
 //! given. Cleaning moves folders into a quarantine; nothing is deleted until a
-//! run is purged.
+//! run is purged. The exception is `pin` and `unpin`, which change only
+//! AgentClean's own config file, never a project.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use agentclean_core::activity::{self, Config, Processes};
 use agentclean_core::guard::{Approved, Guard};
 use agentclean_core::quarantine::{self, Manifest, State, Store};
 use agentclean_core::rules::{self, Class, RuleFile};
@@ -53,6 +55,10 @@ enum Cmd {
         /// Also move Caution folders, which need a reinstall (node_modules, .venv)
         #[arg(long)]
         include_caution: bool,
+        /// Also clean projects that are in use (recent edits or commits, or a
+        /// tool running inside). Pinned projects are never cleaned.
+        #[arg(long)]
+        include_active: bool,
         /// Actually move the folders
         #[arg(long)]
         execute: bool,
@@ -62,6 +68,10 @@ enum Cmd {
         #[arg(required = true)]
         projects: Vec<PathBuf>,
     },
+    /// Never clean this folder or anything inside it; with no folder, list pins
+    Pin { folder: Option<PathBuf> },
+    /// Remove a pin
+    Unpin { folder: PathBuf },
     /// List clean runs, newest first
     History {
         #[command(flatten)]
@@ -105,10 +115,22 @@ fn main() -> ExitCode {
         Cmd::Clean {
             rules,
             include_caution,
+            include_active,
             execute,
             store,
             projects,
-        } => clean(&rules, &projects, include_caution, execute, &store),
+        } => clean(
+            &rules,
+            &projects,
+            Flags {
+                caution: include_caution,
+                active: include_active,
+                execute,
+            },
+            &store,
+        ),
+        Cmd::Pin { folder } => pin(folder.as_deref()),
+        Cmd::Unpin { folder } => unpin(&folder),
         Cmd::History { store } => history(&store),
         Cmd::Restore { run, item, store } => restore(&run, item, &store),
         Cmd::Purge {
@@ -137,6 +159,55 @@ fn open_store(arg: &StoreArg) -> Result<Store, String> {
     Store::open(&root).map_err(|e| e.to_string())
 }
 
+fn config_path() -> Result<PathBuf, String> {
+    activity::default_config_path()
+        .ok_or_else(|| "cannot find a home folder for the config".to_owned())
+}
+
+/// A broken config stops the command: it may hold pins.
+fn load_config() -> Result<Config, String> {
+    match activity::default_config_path() {
+        Some(path) => Config::load(&path),
+        None => Ok(Config::default()),
+    }
+}
+
+fn pin(folder: Option<&Path>) -> CliResult {
+    let path = config_path()?;
+    let mut cfg = Config::load(&path)?;
+    let Some(folder) = folder else {
+        if cfg.pinned.is_empty() {
+            println!("Nothing is pinned.");
+        }
+        cfg.pinned.iter().for_each(|p| println!("{}", p.display()));
+        return Ok(ExitCode::SUCCESS);
+    };
+    let folder = std::fs::canonicalize(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
+    if !folder.is_dir() {
+        return Err(format!("{} is not a folder", folder.display()));
+    }
+    if !cfg.pinned.contains(&folder) {
+        cfg.pinned.push(folder.clone());
+        cfg.save(&path)?;
+    }
+    println!("Pinned {}: it will never be cleaned.", folder.display());
+    Ok(ExitCode::SUCCESS)
+}
+
+fn unpin(folder: &Path) -> CliResult {
+    let path = config_path()?;
+    let mut cfg = Config::load(&path)?;
+    let canon = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
+    let before = cfg.pinned.len();
+    cfg.pinned.retain(|p| p != folder && p != &canon);
+    if cfg.pinned.len() == before {
+        return Err(format!("{} is not pinned", folder.display()));
+    }
+    cfg.save(&path)?;
+    println!("Unpinned {}.", folder.display());
+    Ok(ExitCode::SUCCESS)
+}
+
 fn rules_check(dir: &Path) -> CliResult {
     let loaded = load_rules(dir)?;
     let artifacts: usize = loaded.iter().map(|r| r.artifacts.len()).sum();
@@ -151,12 +222,48 @@ enum Verdict {
     CautionHeld,
 }
 
+/// What `plan` and `clean` need to judge projects.
+struct Context {
+    rules: Vec<RuleFile>,
+    config: Config,
+    processes: Option<Processes>,
+}
+
+impl Context {
+    fn load(rules: &Path) -> Result<Self, String> {
+        Ok(Self {
+            rules: load_rules(rules)?,
+            config: load_config()?,
+            processes: Processes::snapshot(),
+        })
+    }
+
+    /// Prints the project's activity line and judges its candidates.
+    fn assess(&self, guard: &Guard, project: &Path, caution: bool) -> Vec<(String, Verdict)> {
+        let activity = activity::assess(
+            project,
+            &self.rules,
+            &self.config,
+            self.processes.as_ref(),
+            std::time::SystemTime::now(),
+        );
+        println!(
+            "{}: {:?}, {}",
+            project.display(),
+            activity.verdict(),
+            activity.reason()
+        );
+        assess(&self.rules, guard, &activity, caution)
+    }
+}
+
 fn assess(
     rules: &[RuleFile],
     guard: &Guard,
-    project: &Path,
+    activity: &activity::Activity,
     caution: bool,
 ) -> Vec<(String, Verdict)> {
+    let project = activity.root();
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for rule in rules {
@@ -166,7 +273,7 @@ fn assess(
                 continue;
             }
             let label = format!("{}  [{}]", candidate.rel().display(), candidate.rule_id());
-            let verdict = match guard.check(project, &candidate) {
+            let verdict = match guard.check(activity, &candidate) {
                 Err(why) => Verdict::Refused(why.to_string()),
                 Ok(_) if candidate.class() == Class::Caution && !caution => Verdict::CautionHeld,
                 Ok(ok) => Verdict::Allowed(ok),
@@ -178,8 +285,8 @@ fn assess(
 }
 
 fn plan(rules: &Path, project: &Path) -> CliResult {
-    let rules = load_rules(rules)?;
-    let found = assess(&rules, &Guard::from_env(), project, true);
+    let ctx = Context::load(rules)?;
+    let found = ctx.assess(&Guard::from_env(), project, true);
     if found.is_empty() {
         println!("nothing matched: no rule detects this folder, or it is already clean");
     }
@@ -196,20 +303,28 @@ fn plan(rules: &Path, project: &Path) -> CliResult {
     Ok(ExitCode::SUCCESS)
 }
 
-fn clean(
-    rules: &Path,
-    projects: &[PathBuf],
+struct Flags {
     caution: bool,
+    active: bool,
     execute: bool,
-    store: &StoreArg,
-) -> CliResult {
-    let rules = load_rules(rules)?;
-    let guard = Guard::from_env();
+}
+
+fn clean(rules: &Path, projects: &[PathBuf], flags: Flags, store: &StoreArg) -> CliResult {
+    let Flags {
+        caution,
+        active,
+        execute,
+    } = flags;
+    let ctx = Context::load(rules)?;
+    let guard = if active {
+        Guard::from_env().allow_active()
+    } else {
+        Guard::from_env()
+    };
     let mut approved = Vec::new();
     let mut held = 0usize;
     for project in projects {
-        println!("{}", project.display());
-        for (label, verdict) in assess(&rules, &guard, project, caution) {
+        for (label, verdict) in ctx.assess(&guard, project, caution) {
             match verdict {
                 Verdict::Allowed(ok) => {
                     let bytes = agentclean_core::size::usage(ok.path()).bytes;

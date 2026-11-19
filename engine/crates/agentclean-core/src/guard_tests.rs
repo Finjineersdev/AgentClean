@@ -12,9 +12,14 @@ use std::process::Command;
 use proptest::prelude::*;
 use tempfile::TempDir;
 
+use crate::activity::{Activity, Verdict};
 use crate::deny::{protected_component, protected_target};
 use crate::guard::{Approved, Guard, Refusal};
 use crate::rules::Candidate;
+
+fn idle(root: &Path) -> Activity {
+    Activity::unchecked(root, Verdict::Idle, false)
+}
 
 /// A project at `<tmp>/work/proj` with a fake home at `<tmp>/home`.
 struct Fixture {
@@ -26,7 +31,8 @@ struct Fixture {
 
 impl Fixture {
     fn check(&self, rel: &str) -> Result<Approved, Refusal> {
-        self.guard.check(&self.root, &Candidate::unchecked(rel))
+        self.guard
+            .check(&idle(&self.root), &Candidate::unchecked(rel))
     }
 }
 
@@ -96,14 +102,16 @@ fn refuses_paths_that_are_not_plain_relative() {
         assert_eq!(f.check(rel), Err(Refusal::NotNormalized), "{rel:?}");
     }
     assert_eq!(f.check("missing"), Err(Refusal::NotFound));
-    let relative_root = f
-        .guard
-        .check(Path::new("work/proj"), &Candidate::unchecked("target"));
+    let relative_root = f.guard.check(
+        &idle(Path::new("work/proj")),
+        &Candidate::unchecked("target"),
+    );
     assert_eq!(relative_root, Err(Refusal::NotAbsolute));
     // The root itself must be normalized too, even though it resolves.
-    let dotted_root = f
-        .guard
-        .check(&f.root.join("../proj"), &Candidate::unchecked("target"));
+    let dotted_root = f.guard.check(
+        &idle(&f.root.join("../proj")),
+        &Candidate::unchecked("target"),
+    );
     assert_eq!(dotted_root, Err(Refusal::NotNormalized));
 }
 
@@ -131,19 +139,23 @@ fn refuses_home_and_shallow_roots() {
     let home = f.base.join("home");
     fs::create_dir_all(home.join("node_modules")).unwrap();
     let c = Candidate::unchecked("node_modules");
-    assert_eq!(f.guard.check(&home, &c), Err(Refusal::ProjectRootTooBroad));
+    assert_eq!(
+        f.guard.check(&idle(&home), &c),
+        Err(Refusal::ProjectRootTooBroad)
+    );
     // `base` contains the fake home, so it is too broad whatever its depth.
     assert_eq!(
-        f.guard.check(&f.base, &Candidate::unchecked("work")),
+        f.guard.check(&idle(&f.base), &Candidate::unchecked("work")),
         Err(Refusal::ProjectRootTooBroad)
     );
     assert_eq!(
-        f.guard.check(Path::new("/"), &Candidate::unchecked("usr")),
+        f.guard
+            .check(&idle(Path::new("/")), &Candidate::unchecked("usr")),
         Err(Refusal::ProjectRootTooBroad)
     );
     // Without a home folder to compare against, depth alone refuses `/`.
     assert_eq!(
-        Guard::new(None).check(Path::new("/"), &Candidate::unchecked("usr")),
+        Guard::new(None).check(&idle(Path::new("/")), &Candidate::unchecked("usr")),
         Err(Refusal::ProjectRootTooBroad)
     );
 }
@@ -172,7 +184,10 @@ fn refuses_symlinks_in_every_position() {
     symlink(&f.root, f.base.join("shortcut")).unwrap();
     let ok = f
         .guard
-        .check(&f.base.join("shortcut"), &Candidate::unchecked("target"))
+        .check(
+            &idle(&f.base.join("shortcut")),
+            &Candidate::unchecked("target"),
+        )
         .unwrap();
     assert_eq!(ok.path(), f.root.join("target"));
 }
@@ -283,5 +298,26 @@ proptest! {
             let last = inside.file_name().unwrap().to_str().unwrap();
             prop_assert!(protected_target(last).is_none(), "{}", last);
         }
+    }
+}
+
+#[test]
+fn active_and_pinned_projects_are_refused() {
+    let f = fixture();
+    let c = Candidate::unchecked("target");
+    let active = Activity::unchecked(&f.root, Verdict::Active, false);
+    assert_eq!(
+        f.guard.check(&active, &c),
+        Err(Refusal::ActiveProject("test".to_owned()))
+    );
+    let dormant = Activity::unchecked(&f.root, Verdict::Dormant, false);
+    assert!(f.guard.check(&dormant, &c).is_ok());
+
+    let anyway = f.guard.clone().allow_active();
+    assert!(anyway.check(&active, &c).is_ok());
+    for verdict in [Verdict::Active, Verdict::Idle, Verdict::Dormant] {
+        let pinned = Activity::unchecked(&f.root, verdict, true);
+        assert_eq!(anyway.check(&pinned, &c), Err(Refusal::Pinned));
+        assert_eq!(f.guard.check(&pinned, &c), Err(Refusal::Pinned));
     }
 }

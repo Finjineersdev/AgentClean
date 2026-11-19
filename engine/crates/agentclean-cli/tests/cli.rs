@@ -31,11 +31,27 @@ fn env() -> Env {
     .unwrap();
     fs::write(project.join(".next/cache/build.bin"), vec![0u8; 30_000]).unwrap();
     fs::write(project.join("src/page.tsx"), "export default 1").unwrap();
+    age(&project);
     Env {
         store: base.join("store"),
         _tmp: tmp,
         home,
         project,
+    }
+}
+
+/// Backdates every file below `dir` by 200 days, so the project is Dormant
+/// rather than in use.
+fn age(dir: &Path) {
+    let then = std::time::SystemTime::now() - std::time::Duration::from_secs(200 * 86_400);
+    for entry in fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if entry.file_type().unwrap().is_dir() {
+            age(&path);
+        } else {
+            let file = fs::File::options().write(true).open(&path).unwrap();
+            file.set_modified(then).unwrap();
+        }
     }
 }
 
@@ -45,6 +61,7 @@ impl Env {
             .args(args)
             .env("HOME", &self.home)
             .env_remove("XDG_DATA_HOME")
+            .env_remove("XDG_CONFIG_HOME")
             .output()
             .unwrap()
     }
@@ -108,6 +125,7 @@ fn a_folder_two_rules_claim_is_offered_once() {
     fs::write(p.join("Cargo.toml"), "[package]").unwrap();
     fs::write(p.join("pom.xml"), "<project/>").unwrap();
     fs::create_dir_all(p.join("target/debug")).unwrap();
+    age(p);
     let out = e.clean(&[]);
     assert_eq!(out.matches("target").count(), 1, "{out}");
     assert!(out.contains("2 folders"), "{out}");
@@ -180,4 +198,66 @@ fn the_default_store_lives_in_the_home_folder() {
         ".local/share/agentclean/quarantine/runs"
     };
     assert!(e.home.join(expected).is_dir(), "{expected}");
+}
+
+#[test]
+fn projects_in_use_need_an_explicit_flag() {
+    let e = env();
+    fs::write(e.project.join("src/page.tsx"), "export default 2").unwrap();
+    let out = e.clean(&[]);
+    assert!(out.contains("Active, edited today"), "{out}");
+    assert!(out.contains("the project is in use: edited today"), "{out}");
+    assert!(out.contains("Nothing to clean."), "{out}");
+    let out = e.clean(&["--include-active"]);
+    assert!(out.contains("Dry run: 1 folder"), "{out}");
+}
+
+fn config_file(e: &Env) -> PathBuf {
+    if cfg!(target_os = "macos") {
+        e.home
+            .join("Library/Application Support/AgentClean/config.toml")
+    } else {
+        e.home.join(".config/agentclean/config.toml")
+    }
+}
+
+#[test]
+fn pinned_projects_are_never_cleaned() {
+    let e = env();
+    let project = e.project.to_str().unwrap();
+    assert!(e.ok(&["pin"]).contains("Nothing is pinned."));
+    assert!(e.ok(&["pin", project]).contains("never be cleaned"));
+    e.ok(&["pin", project]); // pinning twice keeps one entry
+    assert_eq!(e.ok(&["pin"]).trim(), project);
+    assert!(config_file(&e).is_file());
+
+    let out = e.clean(&["--include-active", "--include-caution", "--execute"]);
+    assert!(out.contains("pinned; edited 200 days ago"), "{out}");
+    assert!(out.contains("the project is pinned"), "{out}");
+    assert!(out.contains("Nothing to clean."), "{out}");
+    assert!(exists(&e.project, ".next/cache/build.bin"));
+
+    e.ok(&["unpin", project]);
+    assert!(e.ok(&["pin"]).contains("Nothing is pinned."));
+    assert!(!e.run(&["unpin", project]).status.success());
+    assert!(e.clean(&[]).contains("Dry run: 1 folder"));
+}
+
+#[test]
+fn a_broken_config_stops_cleaning() {
+    let e = env();
+    let path = config_file(&e);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, "pinned = [\"relative\"]").unwrap();
+    let store = e.store.to_str().unwrap();
+    let out = e.run(&[
+        "clean",
+        "--rules",
+        RULES,
+        "--store",
+        store,
+        e.project.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("not absolute"));
 }

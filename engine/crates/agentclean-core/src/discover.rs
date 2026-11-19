@@ -25,6 +25,11 @@ const HOME_SKIPS: &[&str] = &[
 /// Folder suffixes of macOS bundles: packaged, not projects to walk into.
 const BUNDLES: &[&str] = &[".app", ".xcodeproj", ".xcworkspace"];
 
+/// Hidden folders and bundles: never walked into.
+pub(crate) fn not_walked(name: &str) -> bool {
+    name.starts_with('.') || BUNDLES.iter().any(|b| name.ends_with(b))
+}
+
 #[derive(Debug, Clone)]
 pub struct Options {
     pub roots: Vec<PathBuf>,
@@ -140,7 +145,7 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
                 }
                 let name = entry.file_name();
                 let Some(name) = name.to_str() else { continue };
-                if name.starts_with('.') || BUNDLES.iter().any(|b| name.ends_with(b)) {
+                if not_walked(name) {
                     continue;
                 }
                 let path = entry.path();

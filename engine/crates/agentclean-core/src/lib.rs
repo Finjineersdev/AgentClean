@@ -9,6 +9,7 @@
 //!
 //! The invariants the guard enforces are specified in `docs/SAFETY-SPEC.md`.
 
+pub mod activity;
 pub mod deny;
 pub mod discover;
 pub mod guard;
@@ -16,6 +17,8 @@ pub mod quarantine;
 pub mod rules;
 pub mod size;
 
+#[cfg(test)]
+mod activity_tests;
 #[cfg(test)]
 mod discover_tests;
 #[cfg(test)]

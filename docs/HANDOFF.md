@@ -43,7 +43,7 @@ in this repository. Keep it that way.
   `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
   the name check and the `SECURITY.md` rewrite.
-- M0, M1 and M2.1 to M2.4 are committed.
+- M0, M1 and M2.1 to M2.5 are committed.
 - Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
   owner names a domain they control.
 
@@ -99,7 +99,6 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 | Gap | Where it gets fixed |
 | --- | --- |
 | Discovery exists in the engine, but no CLI command uses it yet | M2.6 (`scan`) |
-| No idle or active verdict, no pins | M2 |
 | No JSON output for the app to consume | M2 |
 | Fuzzing and mutation testing owed | M2 (first tasks) |
 | Projects on a different volume from the quarantine are skipped, not cleaned | M2 decision, see `docs/milestones/M2.md` |
