@@ -253,7 +253,8 @@ final class OpenSweepUITests: XCTestCase {
     }
 
     /// WCAG contrast between the text and background of a screenshot: the
-    /// brightest and darkest few percent of pixels (text is the minority).
+    /// brightest and darkest 1% of pixels (text is the minority; small
+    /// caption text in a chip may cover only a few percent).
     static func contrast(_ image: NSImage) -> Double {
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return 0 }
         func lum(_ c: NSColor) -> Double {
@@ -269,7 +270,7 @@ final class OpenSweepUITests: XCTestCase {
         }
         guard l.count > 50 else { return 0 }
         l.sort()
-        let dark = l[l.count / 20], light = l[l.count - 1 - l.count / 50]
+        let dark = l[l.count / 100], light = l[l.count - 1 - l.count / 100]
         return (light + 0.05) / (dark + 0.05)
     }
 
