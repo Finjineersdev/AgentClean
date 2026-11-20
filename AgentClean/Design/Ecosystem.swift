@@ -49,7 +49,24 @@ struct Ecosystem: Hashable, Identifiable {
         case "xcode-derived-data", "xcode-archives", "simulator-devices", "simulator-caches", "xcode-previews", "xcode-cache": ("logo-xcode", 0x147EFB)
         case "cargo-registry": ("logo-rust", 0xDEA584)
         case "homebrew-downloads": ("logo-homebrew", 0xFBB040)
+        case "docker-desktop": ("logo-docker", 0x2496ED)
+        case "huggingface": ("logo-huggingface", 0xFFD21E)
+        case "ollama-models": ("logo-ollama", 0xE6E9EE)
+        case "cypress-binaries": ("logo-cypress", 0x69D3A7)
+        case "jetbrains": ("logo-jetbrains", 0xE6E9EE)
+        case "torch-hub": ("logo-pytorch", 0xEE4C2C)
         default: nil
+        }
+        // No Simple Icons logo: a system symbol in the tool's colour.
+        let symbol: (String, UInt32)? = switch id {
+        case "vscode-cache", "vscode-cached-data", "vscode-extension-downloads": ("chevron.left.forwardslash.chevron.right", 0x3B9EE8)
+        case "cursor-cache", "cursor-cached-data": ("cursorarrow.rays", 0xE6E9EE)
+        case "playwright-browsers": ("theatermasks.fill", 0x45BA4B)
+        case "lmstudio-models": ("cpu", 0x8B6CEF)
+        default: nil
+        }
+        if let symbol {
+            return Ecosystem(id: id, name: id, logo: nil, color: Color(hex: symbol.1), symbol: symbol.0)
         }
         return Ecosystem(id: id, name: id, logo: logo?.0, color: logo.map { Color(hex: $0.1) } ?? Brand.muted)
     }

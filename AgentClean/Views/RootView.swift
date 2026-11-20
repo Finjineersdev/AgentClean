@@ -56,10 +56,13 @@ struct RootView: View {
             model.recheckAccess()
             model.scanIfStale()
         }
+        .sheet(isPresented: $model.onboarding) { Onboarding() }
         .task {
             await model.loadConfig()
             await model.freeExpired()
             model.scanIfStale()
+            model.onboarding = !UserDefaults.standard.bool(forKey: "onboarded")
+                && !ProcessInfo.processInfo.arguments.contains("-scanRoots")
             #if DEBUG
             await QAWalkthrough.run(model)
             #endif

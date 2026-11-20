@@ -12,6 +12,9 @@ pub struct Mount {
     pub path: PathBuf,
     pub fs_type: String,
     pub network: bool,
+    pub read_only: bool,
+    /// macOS `nobrowse`: hidden from Finder (system volumes, backups).
+    pub hidden: bool,
 }
 
 /// File system types that are network or remote mounts.
@@ -64,10 +67,15 @@ pub fn parse_proc_mounts(text: &str) -> Vec<Mount> {
             let path = fields.next()?.replace("\\040", " ").replace("\\011", "\t");
             let fs_type = fields.next()?.to_owned();
             let network = NETWORK_TYPES.contains(&fs_type.as_str());
+            let read_only = fields
+                .next()
+                .is_some_and(|o| o.split(',').any(|o| o == "ro"));
             Some(Mount {
                 path: PathBuf::from(path),
                 fs_type,
                 network,
+                read_only,
+                hidden: false,
             })
         })
         .collect()
@@ -87,6 +95,8 @@ pub fn parse_bsd_mount(text: &str) -> Vec<Mount> {
                 path: PathBuf::from(path),
                 fs_type,
                 network,
+                read_only: opts.contains(&"read-only"),
+                hidden: opts.contains(&"nobrowse"),
             })
         })
         .collect()
@@ -117,6 +127,50 @@ pub fn unusable(root: &Path, mounts: Option<&[Mount]>) -> Option<String> {
         Some(m) if m.network => Some(format!("on a network drive ({})", m.fs_type)),
         Some(_) => None,
     }
+}
+
+/// Other drives a whole-disk scan may also walk: local, writable, visible
+/// drives mounted where people plug drives in, never a network drive, a
+/// disk image that cannot change, or a Time Machine backup.
+pub fn other_drives() -> Vec<PathBuf> {
+    // ponytail: Time Machine is spotted by its folder or name; ask diskutil if one slips through.
+    let backup = |p: &Path| {
+        p.join("Backups.backupdb").exists()
+            || p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with("Backups of "))
+    };
+    mounts()
+        .map(|m| other_drives_in(&m, backup))
+        .unwrap_or_default()
+}
+
+pub fn other_drives_in(mounts: &[Mount], is_backup: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
+    const NOT_DRIVES: &[&str] = &[
+        "tmpfs", "autofs", "devfs", "overlay", "squashfs", "iso9660", "udf",
+    ];
+    let plugged_in = |p: &Path| {
+        let parts: Vec<_> = p
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .collect();
+        let name_ok = parts.last().is_some_and(|n| !n.starts_with('.'));
+        let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+        name_ok
+            && matches!(
+                parts.as_slice(),
+                ["/", "Volumes", _]
+                    | ["/", "mnt", _]
+                    | ["/", "media", _, _]
+                    | ["/", "run", "media", _, _]
+            )
+    };
+    mounts
+        .iter()
+        .filter(|m| !m.network && !m.read_only && !m.hidden)
+        .filter(|m| !NOT_DRIVES.contains(&m.fs_type.as_str()))
+        .filter(|m| plugged_in(&m.path) && !is_backup(&m.path))
+        .map(|m| m.path.clone())
+        .collect()
 }
 
 pub(crate) fn device(path: &Path) -> Option<u64> {
@@ -186,6 +240,42 @@ garbage
         );
         assert!(unusable(Path::new("/Volumes/other"), Some(&mounts)).is_some());
         assert!(unusable(Path::new("/Volumes/USB"), None).is_some());
+    }
+
+    #[test]
+    fn other_drives_are_local_writable_and_not_backups() {
+        let mac = parse_bsd_mount(
+            "\
+/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)
+/dev/disk3s5 on /System/Volumes/Data (apfs, local, journaled, nobrowse, protect, root data)
+/dev/disk9s1 on /Volumes/Work SSD (apfs, local, nodev, nosuid, journaled, noowners)
+/dev/disk10s1 on /Volumes/USB (exfat, local, nodev, nosuid, noowners)
+/dev/disk11s1 on /Volumes/Installer (hfs, local, nodev, nosuid, read-only, noowners, quarantine, mounted by me)
+//me@nas/share on /Volumes/share (smbfs, nodev, nosuid, mounted by me)
+/dev/disk12s1 on /Volumes/.timemachine/ABC/2026-11-20.backup (apfs, local, read-only, nobrowse)
+/dev/disk13s1 on /Volumes/Backups of Mac (apfs, local, journaled, nobrowse)
+/dev/disk14s2 on /Volumes/TM Disk (apfs, local, journaled)
+/dev/disk5s1 on /Library/Developer/CoreSimulator/Volumes/iOS_23F77 (apfs, sealed, local, read-only, nobrowse)
+",
+        );
+        let tm = |p: &Path| p.ends_with("TM Disk");
+        assert_eq!(
+            other_drives_in(&mac, tm),
+            vec![
+                PathBuf::from("/Volumes/Work SSD"),
+                PathBuf::from("/Volumes/USB")
+            ]
+        );
+        let linux = parse_proc_mounts(
+            "/dev/sda1 / ext4 rw 0 0\n/dev/sdb1 /media/me/Data ext4 rw,nosuid 0 0\n/dev/sdc1 /mnt/cd iso9660 ro 0 0\nserver:/x /mnt/nfs nfs4 rw 0 0\n/dev/sdd1 /run/media/me/Stick vfat rw 0 0\n",
+        );
+        assert_eq!(
+            other_drives_in(&linux, |_| false),
+            vec![
+                PathBuf::from("/media/me/Data"),
+                PathBuf::from("/run/media/me/Stick")
+            ]
+        );
     }
 
     #[test]

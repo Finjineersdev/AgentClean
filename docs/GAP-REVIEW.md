@@ -21,6 +21,13 @@ Each gap names where the evidence is. Ordered by what hurts a real user most.
 | P3 | The last scan is saved in `~/Library/Application Support/AgentClean/last-scan.json` and shown on launch; with "Rescan when AgentClean opens" (default on) a scan over an hour old refreshes in the background. Totals are recomputed after every clean and restore |
 | U1 | Projects shows "To clean" by default (192 of 709 on the test Mac), with "All" and a sort menu |
 
+| P4 | Settings → "Also scan other drives" (with the whole Mac): local, writable drives you plugged in; never network drives, disk images or Time Machine |
+| C1, C4 | Caches measures Docker Desktop's disk, VS Code and Cursor caches, JetBrains caches, Playwright and Cypress downloads, Hugging Face, PyTorch Hub, Ollama and LM Studio models. All measured only, with what to run yourself |
+| C3 | Simulators can be cleared with `xcrun simctl delete unavailable`, which removes only simulators whose iOS is gone |
+| U3 | A three-step first-run guide: what a scan does, why a clean can be undone, and Full Disk Access with a live check |
+
+C2 (DeviceSupport as a measured cache) is left: it is a toolchain under I20 and Dev Stack already shows its size.
+
 R1 is still open: GitHub refuses to start jobs until the account's billing is fixed.
 
 ## 1. Product gaps (the idea is not delivered without these)

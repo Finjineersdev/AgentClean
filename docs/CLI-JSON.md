@@ -54,11 +54,14 @@ optional `volume`: the quarantine on another drive that holds the item.
 
 ## Commands
 
-**`scan [ROOTS…] [--whole-disk]`**: JSON Lines, in walk order, with every
+**`scan [ROOTS…] [--whole-disk] [--other-drives]`**: JSON Lines, in walk order, with every
 project (the text `--all` filter does not apply). `--whole-disk` adds every
 top folder of this computer's own disk where projects can live (on macOS the
 folders on the data volume: `/Users`, `/Applications`, `/Library`, `/opt`,
-`/usr/local`, `/private/tmp`; elsewhere `/`):
+`/usr/local`, `/private/tmp`; elsewhere `/`). `--other-drives` adds each
+local, writable drive mounted under `/Volumes` (Linux: `/media`, `/run/media`,
+`/mnt`), never a network drive, a read-only disk image or a Time Machine
+backup; each is walked on its own volume:
 
 ```json
 {"schema_version":1,"type":"project", …Project}

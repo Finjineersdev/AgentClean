@@ -68,6 +68,10 @@ enum Cmd {
         /// /private/tmp), plus any folders given
         #[arg(long)]
         whole_disk: bool,
+        /// Also scan other local drives (external SSDs, USB drives); never
+        /// network drives, read-only disk images or Time Machine backups
+        #[arg(long)]
+        other_drives: bool,
         #[command(flatten)]
         store: StoreArg,
     },
@@ -214,8 +218,16 @@ fn main() -> ExitCode {
             rules,
             all,
             whole_disk,
+            other_drives,
             store,
-        } => scan(roots, rules.as_deref(), all, whole_disk, &store),
+        } => scan(
+            roots,
+            rules.as_deref(),
+            all,
+            whole_disk,
+            other_drives,
+            &store,
+        ),
         Cmd::Plan { rules, project } => plan(rules.as_deref(), &project),
         Cmd::Clean {
             rules,
@@ -595,6 +607,7 @@ fn scan(
     rules: Option<&Path>,
     all: bool,
     whole_disk: bool,
+    other_drives: bool,
     store: &StoreArg,
 ) -> CliResult {
     let ctx = Context::load(rules)?;
@@ -602,13 +615,16 @@ fn scan(
     if whole_disk {
         roots.extend(discover::whole_disk_roots());
     }
+    if other_drives {
+        roots.extend(agentclean_core::volumes::other_drives());
+    }
     let roots = match (roots.is_empty(), &home) {
         (false, _) => roots,
         (true, Some(h)) => vec![h.clone()],
         (true, None) => return Err("no home folder: give the folders to scan".to_owned()),
     };
     let mut opts = Options::new(roots);
-    if whole_disk {
+    if whole_disk || other_drives {
         // A whole disk is deeper and larger than a home folder.
         opts.max_depth = 24;
         opts.max_entries = 20_000_000;

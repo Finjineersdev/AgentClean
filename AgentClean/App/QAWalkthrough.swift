@@ -22,7 +22,8 @@ enum QAWalkthrough {
             // permission. CGWindowListCreateImage is obsolete in the SDK, so
             // it is looked up at run time; debug builds only.
             typealias Capture = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
-            guard let window = NSApp.windows.first(where: { $0.isVisible && $0.title != "Settings" }),
+            guard let window = NSApp.windows.first(where: { $0.isVisible && $0.isSheet })
+                    ?? NSApp.windows.first(where: { $0.isVisible && $0.title != "Settings" }),
                   let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return }
             let capture = unsafeBitCast(sym, to: Capture.self)
             // .null bounds = the window's own frame; option 8 = including window;
@@ -113,6 +114,7 @@ enum QAWalkthrough {
         let npm = model.caches.first { $0.id == "npm" }
         check(npm?.clearable == true, "the npm cache is listed and clearable")
         check(model.caches.contains { $0.id == "gradle" && !$0.clearable }, "Gradle is measured only")
+        check(model.caches.contains { $0.id == "huggingface" && !$0.clearable }, "Hugging Face models are measured only")
         snap("09-caches")
         if let npm {
             let done = await model.clearCaches([npm.id])
@@ -127,6 +129,13 @@ enum QAWalkthrough {
         await pause()
         check(!model.devStack.isEmpty, "dev stack inventory loaded (\(model.devStack.count) items)")
         snap("10-dev-stack")
+
+        model.onboarding = true
+        await pause(1.5)
+        check(NSApp.windows.contains { $0.isVisible && $0.isSheet }, "the first-run guide opens")
+        snap("11-onboarding")
+        model.onboarding = false
+        await pause(0.6)
 
         await model.setDays(idle: 7, dormant: 60)
         check(model.config?.idleDays == 7, "settings save through the engine")

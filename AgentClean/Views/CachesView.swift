@@ -41,7 +41,7 @@ struct CachesView: View {
                     SectionLabel(text: "Can be cleared")
                     ForEach(Array(clearable.enumerated()), id: \.element.id) { i, c in row(c).entrance(i + 1) }
                     HStack {
-                        Text("\(picked.count) selected · \(bytes(pickedBytes))")
+                        Text(picked.isEmpty ? "Tick a cache to clear it" : "\(picked.count) selected, \(bytes(pickedBytes))")
                             .foregroundStyle(Brand.muted).monospacedDigit()
                             .accessibilityIdentifier("caches.summary")
                         Spacer()

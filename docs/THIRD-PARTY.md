@@ -7,7 +7,8 @@
 [CC0 1.0](https://github.com/simple-icons/simple-icons/blob/13.21.0/LICENSE.md).
 The marks belong to their projects (Node.js, Rust, Python, Go, Swift, Xcode,
 Flutter, Dart, PHP, Composer, OpenJDK, Kotlin, Gradle, Android, .NET, npm,
-pnpm, Yarn, Bun, PyPI, uv, Deno, CocoaPods, Homebrew, Apache Maven).
+pnpm, Yarn, Bun, PyPI, uv, Deno, CocoaPods, Homebrew, Apache Maven, Docker,
+Hugging Face, Ollama, Cypress, JetBrains, PyTorch).
 AgentClean shows them only to say which tool a folder belongs to; it is not
 endorsed by any of these projects.
 

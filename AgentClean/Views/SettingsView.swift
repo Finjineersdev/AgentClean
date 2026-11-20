@@ -18,7 +18,10 @@ struct SettingsView: View {
                 @Bindable var model = model
                 Toggle("Scan the whole Mac", isOn: $model.wholeDisk)
                     .accessibilityIdentifier("settings.wholeDisk")
-                if !model.wholeDisk {
+                if model.wholeDisk {
+                    Toggle("Also scan other drives", isOn: $model.otherDrives)
+                        .accessibilityIdentifier("settings.otherDrives")
+                } else {
                     ForEach(model.scanRoots, id: \.self) { root in
                         HStack {
                             Text((root as NSString).abbreviatingWithTildeInPath)
@@ -40,7 +43,7 @@ struct SettingsView: View {
                 Text("What to scan")
             } footer: {
                 Text(model.wholeDisk
-                     ? "Every folder on this Mac's own disk: your home folder, /Applications, /Library, /opt, /usr/local and /private/tmp. Installed software is noted, never cleaned. Other drives: add them as folders."
+                     ? "Every folder on this Mac's own disk: your home folder, /Applications, /Library, /opt, /usr/local and /private/tmp. Installed software is noted, never cleaned. Other drives are local drives you plugged in; network drives, disk images and Time Machine backups are never scanned."
                      : "Only these folders and everything inside them.")
                     .foregroundStyle(.secondary)
             }

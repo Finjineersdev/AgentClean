@@ -85,6 +85,23 @@ impl Env {
         }
     }
 
+    /// `~/.cache` (or `$XDG_CACHE_HOME`) on every platform: where tools
+    /// like uv and Hugging Face keep their caches even on macOS.
+    fn dot_cache(&self) -> PathBuf {
+        self.xdg_cache
+            .clone()
+            .unwrap_or_else(|| self.home.join(".cache"))
+    }
+
+    /// Where editors keep their per-user data.
+    fn app_data(&self) -> PathBuf {
+        if self.macos {
+            self.home.join("Library/Application Support")
+        } else {
+            self.home.join(".config")
+        }
+    }
+
     fn data(&self) -> PathBuf {
         self.xdg_data
             .clone()
@@ -204,11 +221,7 @@ pub fn known(env: &Env) -> Vec<Cache> {
             id: "uv",
             tool: "uv",
             name: "uv cache",
-            path: env
-                .xdg_cache
-                .clone()
-                .unwrap_or_else(|| env.home.join(".cache"))
-                .join("uv"),
+            path: env.dot_cache().join("uv"),
             command: &["uv", "cache", "clean"],
             note: "Packages download again on the next install.",
         },
@@ -264,6 +277,108 @@ pub fn known(env: &Env) -> Vec<Cache> {
             note: "Gradle removes entries it has not used for 30 days by itself.",
         },
     ];
+    // F18: editors, test browsers and AI models. Measured only: none has a
+    // command that clears just what comes back on its own.
+    let code = env.app_data().join("Code");
+    let cursor = env.app_data().join("Cursor");
+    all.extend([
+        Cache {
+            id: "vscode-cache",
+            tool: "vscode",
+            name: "VS Code web cache",
+            path: code.join("Cache"),
+            command: &[],
+            note: "Quit VS Code, then delete it; VS Code fills it again as it runs.",
+        },
+        Cache {
+            id: "vscode-cached-data",
+            tool: "vscode",
+            name: "VS Code compiled code cache",
+            path: code.join("CachedData"),
+            command: &[],
+            note: "Kept for every VS Code version you have run. Quit VS Code first; it rebuilds on start.",
+        },
+        Cache {
+            id: "vscode-extension-downloads",
+            tool: "vscode",
+            name: "VS Code extension downloads",
+            path: code.join("CachedExtensionVSIXs"),
+            command: &[],
+            note: "Copies of downloaded extensions. Installed extensions are elsewhere and keep working.",
+        },
+        Cache {
+            id: "cursor-cache",
+            tool: "cursor",
+            name: "Cursor web cache",
+            path: cursor.join("Cache"),
+            command: &[],
+            note: "Quit Cursor, then delete it; Cursor fills it again as it runs.",
+        },
+        Cache {
+            id: "cursor-cached-data",
+            tool: "cursor",
+            name: "Cursor compiled code cache",
+            path: cursor.join("CachedData"),
+            command: &[],
+            note: "Kept for every Cursor version you have run. Quit Cursor first; it rebuilds on start.",
+        },
+        Cache {
+            id: "jetbrains",
+            tool: "jetbrains",
+            name: "JetBrains IDE caches",
+            path: c.join("JetBrains"),
+            command: &[],
+            note: "Indexes for every IDE version. Use File → Invalidate Caches, or delete folders of versions you removed.",
+        },
+        Cache {
+            id: "playwright-browsers",
+            tool: "playwright",
+            name: "Playwright browsers",
+            path: c.join("ms-playwright"),
+            command: &[],
+            note: "Browsers for every Playwright version. npx playwright uninstall --all in a project removes them; npx playwright install brings them back.",
+        },
+        Cache {
+            id: "cypress-binaries",
+            tool: "cypress",
+            name: "Cypress app downloads",
+            path: c.join("Cypress"),
+            command: &[],
+            note: "One copy per Cypress version. npx cypress cache prune in a project keeps only the current one.",
+        },
+        Cache {
+            id: "huggingface",
+            tool: "huggingface",
+            name: "Hugging Face models and datasets",
+            path: env.dot_cache().join("huggingface"),
+            command: &[],
+            note: "Downloaded models can be large and slow to fetch again. hf cache scan lists them; remove ones you no longer use.",
+        },
+        Cache {
+            id: "torch-hub",
+            tool: "torch",
+            name: "PyTorch Hub models",
+            path: env.dot_cache().join("torch/hub"),
+            command: &[],
+            note: "Model weights download again the next time code loads them.",
+        },
+        Cache {
+            id: "ollama-models",
+            tool: "ollama",
+            name: "Ollama models",
+            path: env.home.join(".ollama/models"),
+            command: &[],
+            note: "Your local models. ollama list shows them and ollama rm removes one.",
+        },
+        Cache {
+            id: "lmstudio-models",
+            tool: "lmstudio",
+            name: "LM Studio models",
+            path: env.home.join(".lmstudio/models"),
+            command: &[],
+            note: "Your local models. Remove ones you no longer use from LM Studio's My Models.",
+        },
+    ]);
     if mac {
         all.extend([
             Cache {
@@ -295,8 +410,8 @@ pub fn known(env: &Env) -> Vec<Cache> {
                 tool: "xcode",
                 name: "Simulators",
                 path: env.home.join("Library/Developer/CoreSimulator/Devices"),
-                command: &[],
-                note: "Every simulator and the apps installed in it. xcrun simctl delete unavailable removes simulators for iOS versions no longer installed.",
+                command: &["xcrun", "simctl", "delete", "unavailable"],
+                note: "Removes only simulators for iOS versions no longer installed; they cannot run anyway. Other simulators and their apps stay.",
             },
             Cache {
                 id: "simulator-caches",
@@ -321,6 +436,14 @@ pub fn known(env: &Env) -> Vec<Cache> {
                 path: c.join("com.apple.dt.Xcode"),
                 command: &[],
                 note: "Downloads and indexes Xcode keeps for itself and rebuilds.",
+            },
+            Cache {
+                id: "docker-desktop",
+                tool: "docker",
+                name: "Docker Desktop disk",
+                path: env.home.join("Library/Containers/com.docker.docker/Data/vms"),
+                command: &[],
+                note: "Images, containers and volumes. docker system df shows what is inside; docker system prune removes stopped containers and unused images, which may hold data.",
             },
             Cache {
                 id: "homebrew-downloads",

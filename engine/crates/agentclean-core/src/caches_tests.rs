@@ -164,7 +164,6 @@ fn a_cache_without_a_command_cannot_be_run() {
 fn xcode_archives_and_simulators_are_measured_only() {
     let ids = [
         "xcode-archives",
-        "simulator-devices",
         "simulator-caches",
         "xcode-previews",
         "xcode-cache",
@@ -184,4 +183,50 @@ fn xcode_archives_and_simulators_are_measured_only() {
     }
     let linux = caches::known(&env(Path::new("/home/dev"), false));
     assert!(linux.iter().all(|c| !ids.contains(&c.id)));
+}
+
+/// The only simulator command is the one that removes simulators whose iOS
+/// is no longer installed; never `delete all` or `erase`.
+#[test]
+fn simulators_are_cleared_only_of_unavailable_ones() {
+    let mac = caches::known(&env(Path::new("/Users/dev"), true));
+    let sims = mac.iter().find(|c| c.id == "simulator-devices").unwrap();
+    assert_eq!(sims.command, ["xcrun", "simctl", "delete", "unavailable"]);
+}
+
+/// F18: editor caches, test browsers, Docker's disk and AI model stores are
+/// shown with their size and never cleared by AgentClean.
+#[test]
+fn editor_browser_docker_and_model_stores_are_measured_only() {
+    let mac = caches::known(&env(Path::new("/Users/dev"), true));
+    let linux = caches::known(&env(Path::new("/home/dev"), false));
+    let both = [
+        "vscode-cache",
+        "vscode-cached-data",
+        "vscode-extension-downloads",
+        "cursor-cache",
+        "cursor-cached-data",
+        "playwright-browsers",
+        "cypress-binaries",
+        "huggingface",
+        "torch-hub",
+        "ollama-models",
+        "lmstudio-models",
+    ];
+    for id in both {
+        for (list, home) in [(&mac, "/Users/dev"), (&linux, "/home/dev")] {
+            let c = list
+                .iter()
+                .find(|c| c.id == id)
+                .unwrap_or_else(|| panic!("{id} missing under {home}"));
+            assert!(c.command.is_empty(), "{id} must be measured only");
+            assert!(c.path.starts_with(home), "{id} at {}", c.path.display());
+        }
+    }
+    for id in ["docker-desktop", "jetbrains"] {
+        let c = mac.iter().find(|c| c.id == id).unwrap();
+        assert!(c.command.is_empty(), "{id} must be measured only");
+    }
+    let hf = mac.iter().find(|c| c.id == "huggingface").unwrap();
+    assert_eq!(hf.path, Path::new("/Users/dev/.cache/huggingface"));
 }

@@ -33,6 +33,8 @@ final class AppModel {
     }
 
     var screen: Screen = .overview
+    /// The first-run guide is showing.
+    var onboarding = false
     var selectedProject: String?
 
     // Scan
@@ -77,6 +79,11 @@ final class AppModel {
         didSet { UserDefaults.standard.set(autoFreeDays, forKey: "autoFreeDays") }
     }
 
+    /// With the whole Mac: also local external drives.
+    var otherDrives: Bool {
+        didSet { UserDefaults.standard.set(otherDrives, forKey: "otherDrives") }
+    }
+
     /// Rescan in the background when the app opens and the last scan is over an hour old.
     var scanOnOpen: Bool {
         didSet { UserDefaults.standard.set(scanOnOpen, forKey: "scanOnOpen") }
@@ -90,7 +97,7 @@ final class AppModel {
 
     /// What the scan covers, for people.
     var scanScope: String {
-        wholeDisk ? "your whole Mac" : scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
+        wholeDisk ? (otherDrives ? "your whole Mac and other drives" : "your whole Mac") : scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
     }
 
     init() {
@@ -100,6 +107,7 @@ final class AppModel {
         wholeDisk = UserDefaults.standard.object(forKey: "wholeDisk") as? Bool
             ?? !ProcessInfo.processInfo.arguments.contains("-scanRoots")
         autoFreeDays = UserDefaults.standard.object(forKey: "autoFreeDays") as? Int ?? 7
+        otherDrives = UserDefaults.standard.bool(forKey: "otherDrives")
         scanOnOpen = UserDefaults.standard.object(forKey: "scanOnOpen") as? Bool ?? true
         restoreSavedScan()
         if engine == nil { error = "The engine is missing from the app bundle. Reinstall AgentClean." }
@@ -135,9 +143,10 @@ final class AppModel {
         summary = nil
         let roots = wholeDisk ? [] : scanRoots.map { URL(fileURLWithPath: $0) }
         let whole = wholeDisk
+        let drives = wholeDisk && otherDrives
         scanTask = Task {
             do {
-                for try await event in engine.scan(roots: roots, wholeDisk: whole) {
+                for try await event in engine.scan(roots: roots, wholeDisk: whole, otherDrives: drives) {
                     switch event {
                     case .project(let p): projects.append(p)
                     case .skipped(let path, _, let detail): skipped.append(SkippedFolder(path: path, detail: detail))
@@ -190,7 +199,9 @@ final class AppModel {
         let summary: ScanSummary?
     }
 
-    private var scopeKey: String { wholeDisk ? "whole-disk" : scanRoots.joined(separator: "\n") }
+    private var scopeKey: String {
+        wholeDisk ? (otherDrives ? "whole-disk+drives" : "whole-disk") : scanRoots.joined(separator: "\n")
+    }
 
     private static var savedScanURL: URL {
         let home = ProcessInfo.processInfo.environment["HOME"] ?? CMConstants.homePath
