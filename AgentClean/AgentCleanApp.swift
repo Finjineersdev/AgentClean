@@ -10,7 +10,6 @@ struct AgentCleanApp: App {
             RootView()
                 .environment(model)
                 .frame(minWidth: 980, minHeight: 640)
-                .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1180, height: 760)

@@ -19,17 +19,17 @@ struct Ecosystem: Hashable, Identifiable {
     static func of(rule: String) -> Ecosystem { byRule[rule] ?? Ecosystem(id: rule, name: rule.capitalized, logo: nil, color: Brand.muted) }
 
     private static let byRule: [String: Ecosystem] = [
-        "node": .init(id: "node", name: "Node.js", logo: "logo-nodedotjs", color: Color(hex: 0x5FA04E)),
-        "rust": .init(id: "rust", name: "Rust", logo: "logo-rust", color: Color(hex: 0xDEA584)),
-        "python": .init(id: "python", name: "Python", logo: "logo-python", color: Color(hex: 0x4B8BBE)),
-        "go": .init(id: "go", name: "Go", logo: "logo-go", color: Color(hex: 0x00ADD8)),
-        "swiftpm": .init(id: "swiftpm", name: "Swift", logo: "logo-swift", color: Color(hex: 0xF05138)),
-        "xcode": .init(id: "xcode", name: "Xcode", logo: "logo-xcode", color: Color(hex: 0x147EFB)),
-        "flutter": .init(id: "flutter", name: "Flutter", logo: "logo-flutter", color: Color(hex: 0x47C5FB)),
-        "php": .init(id: "php", name: "PHP", logo: "logo-php", color: Color(hex: 0x8892BF)),
-        "java": .init(id: "java", name: "Java and Kotlin", logo: "logo-openjdk", color: Color(hex: 0xE76F00)),
-        "android": .init(id: "android", name: "Android", logo: "logo-android", color: Color(hex: 0x34A853)),
-        "dotnet": .init(id: "dotnet", name: ".NET", logo: "logo-dotnet", color: Color(hex: 0x8B6CEF)),
+        "node": .init(id: "node", name: "Node.js", logo: "logo-nodedotjs", color: Color(logo: 0x5FA04E)),
+        "rust": .init(id: "rust", name: "Rust", logo: "logo-rust", color: Color(logo: 0xDEA584)),
+        "python": .init(id: "python", name: "Python", logo: "logo-python", color: Color(logo: 0x4B8BBE)),
+        "go": .init(id: "go", name: "Go", logo: "logo-go", color: Color(logo: 0x00ADD8)),
+        "swiftpm": .init(id: "swiftpm", name: "Swift", logo: "logo-swift", color: Color(logo: 0xF05138)),
+        "xcode": .init(id: "xcode", name: "Xcode", logo: "logo-xcode", color: Color(logo: 0x147EFB)),
+        "flutter": .init(id: "flutter", name: "Flutter", logo: "logo-flutter", color: Color(logo: 0x47C5FB)),
+        "php": .init(id: "php", name: "PHP", logo: "logo-php", color: Color(logo: 0x8892BF)),
+        "java": .init(id: "java", name: "Java and Kotlin", logo: "logo-openjdk", color: Color(logo: 0xE76F00)),
+        "android": .init(id: "android", name: "Android", logo: "logo-android", color: Color(logo: 0x34A853)),
+        "dotnet": .init(id: "dotnet", name: ".NET", logo: "logo-dotnet", color: Color(logo: 0x8B6CEF)),
     ]
 
     /// Global caches (`agentclean caches`) by id.
@@ -66,9 +66,9 @@ struct Ecosystem: Hashable, Identifiable {
         default: nil
         }
         if let symbol {
-            return Ecosystem(id: id, name: id, logo: nil, color: Color(hex: symbol.1), symbol: symbol.0)
+            return Ecosystem(id: id, name: id, logo: nil, color: Color(logo: symbol.1), symbol: symbol.0)
         }
-        return Ecosystem(id: id, name: id, logo: logo?.0, color: logo.map { Color(hex: $0.1) } ?? Brand.muted)
+        return Ecosystem(id: id, name: id, logo: logo?.0, color: logo.map { Color(logo: $0.1) } ?? Brand.muted)
     }
 
     /// Dev Stack items whose name starts with a known tool.
@@ -85,7 +85,7 @@ struct Ecosystem: Hashable, Identifiable {
             ("cocoapods", "logo-cocoapods", 0xEE3322), ("dotnet", "logo-dotnet", 0x8B6CEF),
         ]
         guard let hit = table.first(where: { n == $0.0 || n.hasPrefix($0.0 + " ") || n.hasPrefix($0.0 + "@") || n.hasPrefix($0.0 + "-") }) else { return nil }
-        return Ecosystem(id: hit.0, name: name, logo: hit.1, color: Color(hex: hit.2))
+        return Ecosystem(id: hit.0, name: name, logo: hit.1, color: Color(logo: hit.2))
     }
 }
 

@@ -166,7 +166,7 @@ struct AnimatedBackdrop: View {
                     while x < size.width { dots.addEllipse(in: CGRect(x: x - 0.8, y: y - 0.8, width: 1.6, height: 1.6)); x += step }
                     y += step
                 }
-                ctx.fill(dots, with: .color(.white.opacity(0.04)))
+                ctx.fill(dots, with: .color(Brand.text.opacity(0.05)))
             }
         }
         .ignoresSafeArea()

@@ -1,22 +1,47 @@
 import SwiftUI
+import AppKit
 import CleanCore
 import AgentEngine
 
 /// Graphite chrome that stays out of the way: colour comes from the
 /// languages' own logos, status, and one mint accent for the main action.
+/// Graphite in dark mode, paper in light; the app follows the system.
+/// Light text colours keep at least 4.5:1 on white.
 enum Brand {
-    static let canvas = Color(hex: 0x14171C)
-    static let surface = Color(hex: 0x1C2027)
-    static let raised = Color(hex: 0x252A33)
-    static let hairline = Color(hex: 0x323844)
-    static let text = Color(hex: 0xE6E9EE)
-    /// Secondary text: 7.9:1 on the canvas, 7:1 on raised.
-    static let muted = Color(hex: 0xA7AFBC)
-    static let teal = Color(hex: 0x5FE3C8)
-    static let green = Color(hex: 0x4ADE80)
-    static let amber = Color(hex: 0xF5B83D)
-    static let sky = Color(hex: 0x7AB8FF)
-    static let slate = Color(hex: 0xCBD5E1)
+    static let canvas = Color(dark: 0x14171C, light: 0xF4F6F9)
+    static let surface = Color(dark: 0x1C2027, light: 0xFFFFFF)
+    static let raised = Color(dark: 0x252A33, light: 0xEDF0F4)
+    static let hairline = Color(dark: 0x323844, light: 0xD9DEE6)
+    static let text = Color(dark: 0xE6E9EE, light: 0x161A20)
+    /// Secondary text: 7.9:1 on the dark canvas; 7:1 on white.
+    static let muted = Color(dark: 0xA7AFBC, light: 0x4E5766)
+    static let teal = Color(dark: 0x5FE3C8, light: 0x0B7F6B)
+    static let green = Color(dark: 0x4ADE80, light: 0x15803D)
+    static let amber = Color(dark: 0xF5B83D, light: 0xB45309)
+    static let sky = Color(dark: 0x7AB8FF, light: 0x1D6FD6)
+    static let slate = Color(dark: 0xCBD5E1, light: 0x475569)
+    /// Text on a filled accent button.
+    static let onAccent = Color(dark: 0x0B1F1B, light: 0xFFFFFF)
+}
+
+extension Color {
+    /// One colour for dark mode and one for light.
+    init(dark: UInt32, light: UInt32) {
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        })
+    }
+
+    /// A tool's brand colour, darkened in light mode so pale logos stay visible.
+    init(logo hex: UInt32) {
+        let r = Double((hex >> 16) & 0xFF), g = Double((hex >> 8) & 0xFF), b = Double(hex & 0xFF)
+        let luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+        let k = luminance > 0.55 ? 0.45 : 0.8
+        let dim = UInt32(r * k) << 16 | UInt32(g * k) << 8 | UInt32(b * k)
+        self.init(dark: hex, light: dim)
+    }
 }
 
 extension Color {
@@ -79,7 +104,7 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .padding(.horizontal, 18).padding(.vertical, 8)
-            .foregroundStyle(Color(hex: 0x0B1F1B))
+            .foregroundStyle(Brand.onAccent)
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(configuration.isPressed ? 0.8 : 1)))
             .opacity(enabled ? 1 : 0.35)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
