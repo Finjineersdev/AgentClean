@@ -15,6 +15,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audit:
+    # Known vulnerabilities in the engine's dependencies (RustSec). Also
+    # runs weekly from engine-nightly, so a new advisory is seen without a push.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit@0.23.0
+      - name: Audit
+        run: cargo audit --deny warnings
+
   check:
     strategy:
       fail-fast: false

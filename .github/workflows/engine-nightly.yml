@@ -10,6 +10,21 @@ permissions:
   contents: read
 
 jobs:
+  audit:
+    # A new RustSec advisory fails here even when no code changed.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit@0.23.0
+      - name: Audit
+        run: cargo audit --deny warnings
+
   fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 45
