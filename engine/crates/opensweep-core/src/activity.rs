@@ -379,10 +379,12 @@ fn list_processes() -> Option<Vec<Process>> {
 
 #[cfg(not(target_os = "linux"))]
 fn list_processes() -> Option<Vec<Process>> {
-    // A fixed path and fixed arguments: no shell, no PATH lookup.
+    // A fixed path and fixed arguments: no shell, no PATH lookup. -b avoids
+    // kernel calls that block on a stale network mount, which would hang the
+    // scan; process working folders come back the same without them.
     use std::process::{Command, Stdio};
     let out = Command::new("/usr/sbin/lsof")
-        .args(["-n", "-P", "-w", "-d", "cwd", "-F", "pgRcn"])
+        .args(["-b", "-n", "-P", "-w", "-d", "cwd", "-F", "pgRcn"])
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()

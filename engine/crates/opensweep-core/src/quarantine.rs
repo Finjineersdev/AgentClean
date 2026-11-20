@@ -706,7 +706,8 @@ fn device_of(path: &Path) -> std::io::Result<u64> {
     Ok(dev)
 }
 
-fn now_unix() -> u64 {
+/// Seconds since 1970, or 0 if the clock is before it.
+pub fn now_unix() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -727,7 +728,7 @@ pub fn utc_stamp(secs: u64) -> String {
 
 /// Days since 1970-01-01 to a proleptic Gregorian date (Howard Hinnant's
 /// `civil_from_days`), for dates from 1970 on, so no negative era.
-fn civil_from_days(days: u64) -> (u64, u32, u32) {
+pub fn civil_from_days(days: u64) -> (u64, u32, u32) {
     let z = days + 719_468;
     let era = z / 146_097;
     let doe = z - era * 146_097;

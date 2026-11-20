@@ -1298,12 +1298,7 @@ fn print_run(run: &Manifest) {
     }
 }
 
-fn now_unix() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+use opensweep_core::quarantine::now_unix;
 
 fn count(n: usize, noun: &str) -> String {
     if n == 1 {
@@ -1329,17 +1324,9 @@ fn human(bytes: u64) -> String {
     }
 }
 
-/// A Unix time as a UTC date, `YYYY-MM-DD` (Howard Hinnant's civil_from_days).
+/// A Unix time as a UTC date, `YYYY-MM-DD`.
 fn day(unix: u64) -> String {
-    let z = i64::try_from(unix / 86_400).unwrap_or(0) + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    let (y, m, d) = opensweep_core::quarantine::civil_from_days(unix / 86_400);
     format!("{y:04}-{m:02}-{d:02}")
 }
 
