@@ -223,7 +223,7 @@ final class OpenSweepUITests: XCTestCase {
             //   identifier: no description or a parent/child mismatch on what
             //   SwiftUI builds for the split view;
             // - a contrast finding our own pixel measurement disproves. The
-            //   audit misreads text on the gradient (it flagged 6.4:1 and
+            //   audit misreads text on tinted fills (it flagged 6.4:1 and
             //   8.1:1 text), so the element's screenshot is measured instead.
             // Issues are collected so one run reports all of them.
             try app.performAccessibilityAudit { issue in

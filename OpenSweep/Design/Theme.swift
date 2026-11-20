@@ -3,18 +3,19 @@ import AppKit
 import CleanCore
 import AgentEngine
 
-/// Graphite chrome that stays out of the way: colour comes from the
-/// languages' own logos, status, and one mint accent for the main action.
-/// Graphite in dark mode, paper in light; the app follows the system.
-/// Light text colours keep at least 4.5:1 on white.
+/// Neutral chrome on a solid canvas: colour comes only from the languages'
+/// own logos, status, and one mint accent for the main action. Near-black
+/// in dark mode, paper in light; the app follows the system. Depth comes
+/// from three fills (canvas, surface, raised) and a hairline, never a
+/// gradient. Every text colour keeps at least 4.5:1 on every fill.
 enum Brand {
-    static let canvas = Color(dark: 0x14171C, light: 0xF4F6F9)
-    static let surface = Color(dark: 0x1C2027, light: 0xFFFFFF)
-    static let raised = Color(dark: 0x252A33, light: 0xEDF0F4)
-    static let hairline = Color(dark: 0x323844, light: 0xD9DEE6)
-    static let text = Color(dark: 0xE6E9EE, light: 0x161A20)
-    /// Secondary text: 7.9:1 on the dark canvas; 7:1 on white.
-    static let muted = Color(dark: 0xA7AFBC, light: 0x4E5766)
+    static let canvas = Color(dark: 0x0E1013, light: 0xF5F5F7)
+    static let surface = Color(dark: 0x16191E, light: 0xFFFFFF)
+    static let raised = Color(dark: 0x1F232A, light: 0xF0F1F4)
+    static let hairline = Color(dark: 0x2A2F38, light: 0xE1E4E9)
+    static let text = Color(dark: 0xECEEF2, light: 0x14171C)
+    /// Secondary text: 8.6:1 on the dark surface; 6.9:1 on light raised.
+    static let muted = Color(dark: 0xA4ACB9, light: 0x4E5766)
     static let teal = Color(dark: 0x5FE3C8, light: 0x08695A)
     static let green = Color(dark: 0x4ADE80, light: 0x166534)
     static let amber = Color(dark: 0xF5B83D, light: 0x92400E)
@@ -54,11 +55,12 @@ extension Color {
 // MARK: - Surfaces
 
 extension View {
-    /// A flat panel with a hairline edge. Hierarchy comes from the fill
+    /// A solid panel with a hairline edge. Hierarchy comes from the fill
     /// (surface, then raised), not from shadows.
     func glassCard(radius: CGFloat = 12, tint: Color? = nil) -> some View {
-        background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(tint.map { $0.opacity(0.12) } ?? Brand.surface))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Brand.hairline, lineWidth: 1))
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return background(shape.fill(tint.map { $0.opacity(0.10) } ?? Brand.surface))
+            .overlay(shape.strokeBorder(Brand.hairline, lineWidth: 1))
     }
 
     /// The one floating element on a screen (the action bar): Liquid Glass on
@@ -97,30 +99,53 @@ struct StatusChip: View {
 }
 
 /// The one primary action on a screen.
+/// Presses in a little; brightens under the pointer.
 struct PrimaryButtonStyle: ButtonStyle {
     var tint: Color = Brand.teal
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .padding(.horizontal, 18).padding(.vertical, 8)
-            .foregroundStyle(Brand.onAccent)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(configuration.isPressed ? 0.8 : 1)))
-            .opacity(enabled ? 1 : 0.35)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration, tint: tint) }
+
+    private struct Styled: View {
+        let configuration: Configuration
+        let tint: Color
+        @Environment(\.isEnabled) private var enabled
+        @State private var hover = false
+        var body: some View {
+            configuration.label
+                .font(.body.weight(.semibold))
+                .padding(.horizontal, 18).padding(.vertical, 8)
+                .foregroundStyle(Brand.onAccent)
+                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint))
+                .brightness(configuration.isPressed ? -0.06 : hover && enabled ? 0.04 : 0)
+                .scaleEffect(configuration.isPressed ? 0.97 : 1)
+                .opacity(enabled ? 1 : 0.35)
+                .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+                .animation(.easeOut(duration: 0.15), value: hover)
+                .onHover { hover = $0 }
+        }
     }
 }
 
 struct SecondaryButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.callout.weight(.medium))
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .foregroundStyle(Brand.text)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(configuration.isPressed ? Brand.hairline : Brand.raised))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Brand.hairline))
-            .opacity(enabled ? 1 : 0.4)
+    func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration) }
+
+    private struct Styled: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var enabled
+        @State private var hover = false
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            configuration.label
+                .font(.callout.weight(.medium))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .foregroundStyle(Brand.text)
+                .background(shape.fill(configuration.isPressed || (hover && enabled) ? Brand.hairline : Brand.raised))
+                .overlay(shape.strokeBorder(Brand.hairline))
+                .scaleEffect(configuration.isPressed ? 0.97 : 1)
+                .opacity(enabled ? 1 : 0.4)
+                .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+                .animation(.easeOut(duration: 0.15), value: hover)
+                .onHover { hover = $0 }
+        }
     }
 }
 

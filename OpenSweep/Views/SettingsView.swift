@@ -45,7 +45,7 @@ struct SettingsView: View {
                 Text(model.wholeDisk
                      ? "Every folder on this Mac's own disk: your home folder, /Applications, /Library, /opt, /usr/local and /private/tmp. Installed software is noted, never cleaned. Other drives are local drives you plugged in; network drives, disk images and Time Machine backups are never scanned."
                      : "Only these folders and everything inside them.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Brand.muted)
             }
 
             Section {
@@ -75,7 +75,7 @@ struct SettingsView: View {
                 Text("Space and scans")
             } footer: {
                 Text("Cleaned folders wait in quarantine so you can undo; after this long they are deleted for good and the space comes back. The last scan is kept, and refreshed in the background when it is over an hour old. A scheduled clean takes only Safe folders in dormant projects, never pinned ones, and tells you with an Undo button. It runs while OpenSweep is open, including in the menu bar.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Brand.muted)
             }
 
             Section {
@@ -86,7 +86,7 @@ struct SettingsView: View {
             } header: {
                 Text("Activity")
             } footer: {
-                Text("Active projects are only cleaned when you say so in the project.").foregroundStyle(.secondary)
+                Text("Active projects are only cleaned when you say so in the project.").foregroundStyle(Brand.muted)
             }
 
             Section("Never scan") {
@@ -113,18 +113,18 @@ struct SettingsView: View {
                 Text("Rules")
             } footer: {
                 Text("Add TOML rule files to a folder named rules beside config.toml for build output the catalogue does not know. They are checked like the built-in rules. A repository can also carry .opensweep.toml to pin itself or keep folders.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Brand.muted)
             }
 
             Section("Pinned: never cleaned") {
                 if (model.config?.pinned.isEmpty ?? true) && (model.config?.pinnedRemotes ?? []).isEmpty {
-                    Text("Nothing is pinned. Pin a project from its page.").foregroundStyle(.secondary)
+                    Text("Nothing is pinned. Pin a project from its page.").foregroundStyle(Brand.muted)
                 }
                 ForEach(model.config?.pinnedRemotes ?? [], id: \.self) { remote in
                     HStack {
                         Label(remote, systemImage: "arrow.triangle.branch")
                         Spacer()
-                        Text("any folder").foregroundStyle(.secondary)
+                        Text("any folder").foregroundStyle(Brand.muted)
                     }
                 }
                 ForEach(model.config?.pinned ?? [], id: \.self) { folder in
@@ -133,7 +133,7 @@ struct SettingsView: View {
                         if let until = model.config?.pinnedUntil?[folder] {
                             let date = Date(timeIntervalSince1970: TimeInterval(until))
                             Text(date < Date() ? "ended" : "until \(date.formatted(date: .abbreviated, time: .omitted))")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Brand.muted)
                         }
                         Spacer()
                         Button("Unpin") { Task { await model.setPinned(folder, false) } }
