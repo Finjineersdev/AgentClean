@@ -123,6 +123,13 @@ audit test, hardened runtime and notarization in the Release workflow, Sparkle
 updates, and a Homebrew cask template. Signing, the appcast key and the tap
 need the owner's accounts.
 
+Verified on 2026-11-20: engine checks, CleanCore tests, the Release bundle
+(universal, hardened runtime, no update key), the Debug walkthrough (22/22)
+and all 7 UI tests on CI, including the accessibility audit on every screen.
+The audit ignores only framework containers without identifiers, pop-up
+menus' press action, and contrast findings the element's own pixels disprove
+(it misreads text on the gradient); every ignored rule is in the test.
+
 ## 5. Known gaps and risks
 
 | Gap | Where it gets fixed |
