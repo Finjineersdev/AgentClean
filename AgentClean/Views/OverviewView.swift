@@ -19,16 +19,16 @@ struct OverviewView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         if model.scanning {
                             Text("Looking for projects…").font(.title3.weight(.semibold))
-                            Text("\(model.projects.count) found so far").foregroundStyle(.secondary).monospacedDigit()
+                            Text("\(model.projects.count) found so far").foregroundStyle(Brand.muted).monospacedDigit()
                         } else if let s = model.summary {
                             Text(bytes(s.ready.bytes)).font(.system(size: 40, weight: .bold, design: .rounded))
                                 .accessibilityIdentifier("ready.bytes")
                             Text("ready to clean in \(s.ready.folders) Safe folders, across \(s.projects) projects")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Brand.muted)
                         } else {
                             Text("Scan your projects").font(.title3.weight(.semibold))
                             Text("Looks in: " + model.scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", "))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Brand.muted)
                             SettingsLink { Text("Change folders…") }.buttonStyle(SecondaryButtonStyle())
                         }
                     }
@@ -66,12 +66,12 @@ struct OverviewView: View {
                             HStack {
                                 Text((s.path as NSString).abbreviatingWithTildeInPath).lineLimit(1).truncationMode(.middle)
                                 Spacer()
-                                Text(s.detail).foregroundStyle(.secondary)
+                                Text(s.detail).foregroundStyle(Brand.muted)
                             }
                             .font(.caption)
                         }
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Brand.muted)
                 }
             }
             .padding(28)
@@ -82,8 +82,8 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.headline).foregroundStyle(tint)
             Text(bytes(b.bytes)).font(.title2.weight(.bold)).monospacedDigit()
-            Text("\(b.folders) folders").font(.caption).foregroundStyle(.secondary)
-            Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("\(b.folders) folders").font(.caption).foregroundStyle(Brand.muted)
+            Text(note).font(.caption).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -105,7 +105,7 @@ struct ProjectRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(URL(fileURLWithPath: project.root).lastPathComponent).font(.headline)
                 Text((project.root as NSString).abbreviatingWithTildeInPath)
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    .font(.caption).foregroundStyle(Brand.muted).lineLimit(1).truncationMode(.middle)
             }
             Spacer()
             Text(project.pinned ? "Pinned" : project.verdict.label)

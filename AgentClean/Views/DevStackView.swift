@@ -48,7 +48,7 @@ struct DevStackView: View {
                                     Image(systemName: g.systemImage).foregroundStyle(Brand.sky).accessibilityHidden(true)
                                     SectionLabel(text: g.displayName)
                                     Spacer()
-                                    Text(bytes(items.reduce(0) { $0 + $1.bytes })).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                    Text(bytes(items.reduce(0) { $0 + $1.bytes })).font(.caption.monospacedDigit()).foregroundStyle(Brand.muted)
                                 }
                                 .padding(.top, 10)
                                 ForEach(items) { row($0) }
@@ -67,12 +67,12 @@ struct DevStackView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(item.name).font(.headline)
-                    Text(item.status.rawValue).font(.caption).foregroundStyle(item.status == .running ? Brand.green : .secondary)
+                    Text(item.status.rawValue).font(.caption).foregroundStyle(item.status == .running ? Brand.green : Brand.muted)
                 }
-                Text(item.detail).font(.caption).foregroundStyle(.secondary)
+                Text(item.detail).font(.caption).foregroundStyle(Brand.muted)
                 if case .command(let cmd) = item.removal {
                     HStack(spacing: 6) {
-                        Text("Remove with:").font(.caption).foregroundStyle(.secondary)
+                        Text("Remove with:").font(.caption).foregroundStyle(Brand.muted)
                         Text(cmd).font(.caption.monospaced()).textSelection(.enabled)
                         Button {
                             NSPasteboard.general.clearContents()
@@ -82,7 +82,7 @@ struct DevStackView: View {
                             .buttonStyle(.borderless).help("Copy the command")
                     }
                 }
-                if let hint = item.hint { Text(hint).font(.caption).foregroundStyle(.secondary) }
+                if let hint = item.hint { Text(hint).font(.caption).foregroundStyle(Brand.muted) }
             }
             Spacer()
             Text(item.bytes > 0 ? bytes(item.bytes) : "").monospacedDigit()

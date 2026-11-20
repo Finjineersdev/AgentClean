@@ -17,7 +17,7 @@ struct RootView: View {
                 if model.scanning {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("Scanning… \(model.projects.count) projects").font(.caption).foregroundStyle(.secondary)
+                        Text("Scanning… \(model.projects.count) projects").font(.caption).foregroundStyle(Brand.muted)
                     }
                     .padding(10)
                 }

@@ -19,7 +19,7 @@ struct ProjectsView: View {
                 if model.projects.isEmpty {
                     Spacer()
                     Text(model.scanning ? "Scanning…" : "Run a scan from Overview to find projects.")
-                        .foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                        .foregroundStyle(Brand.muted).frame(maxWidth: .infinity)
                     Spacer()
                 } else {
                     ScrollView {
@@ -47,7 +47,7 @@ struct ProjectsView: View {
                 // the open Review sheet (and its Undo).
                 ProjectDetail(project: p).id(p.root)
             } else {
-                Text("Choose a project").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                Text("Choose a project").foregroundStyle(Brand.muted).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -70,7 +70,7 @@ struct ProjectDetail: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(URL(fileURLWithPath: project.root).lastPathComponent)
                             .font(.system(size: 26, weight: .semibold, design: .rounded))
-                        Text((project.root as NSString).abbreviatingWithTildeInPath).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text((project.root as NSString).abbreviatingWithTildeInPath).foregroundStyle(Brand.muted).textSelection(.enabled)
                     }
                     Spacer()
                     Button(project.pinned ? "Unpin" : "Pin") {
@@ -87,7 +87,7 @@ struct ProjectDetail: View {
                     } else {
                         StatusChip(text: project.verdict.label, systemImage: project.verdict.symbol, tint: project.verdict.tint)
                     }
-                    Text(project.reason).foregroundStyle(.secondary)
+                    Text(project.reason).foregroundStyle(Brand.muted)
                 }
 
                 if project.verdict == .active && !project.pinned {
@@ -100,13 +100,13 @@ struct ProjectDetail: View {
                         itemRow(item)
                     }
                     if project.items.isEmpty {
-                        Text("Nothing to clean here.").foregroundStyle(.secondary)
+                        Text("Nothing to clean here.").foregroundStyle(Brand.muted)
                     }
                 }
 
                 HStack {
                     Text("\(picked.count) selected · \(bytes(Selection.bytes(of: picked, in: project)))")
-                        .foregroundStyle(.secondary).monospacedDigit()
+                        .foregroundStyle(Brand.muted).monospacedDigit()
                         .accessibilityIdentifier("selection.summary")
                     Spacer()
                     Button("Review…") {
@@ -148,11 +148,11 @@ struct ProjectDetail: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(item.path).font(.body.monospaced().weight(.semibold))
-                    Text(item.rule).font(.caption).foregroundStyle(.secondary)
+                    Text(item.rule).font(.caption).foregroundStyle(Brand.muted)
                     Text(item.kind.label).font(.caption.weight(.semibold)).foregroundStyle(item.kind.tint)
                 }
                 Text(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Brand.muted)
             }
             Spacer()
             Text(item.bytes.map(bytes) ?? "—").monospacedDigit()
@@ -185,7 +185,7 @@ struct ReviewSheet: View {
             Text(done == nil
                  ? "\(shown.folders) folders, \(bytes(shown.bytes)). They stay restorable until you purge them in History; space comes back when you purge."
                  : "\(done?.run?.entries.filter { $0.state == .moved }.count ?? 0) folders moved. Undo from here or from History.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Brand.muted)
 
             List {
                 ForEach(shown.projects.flatMap(\.items), id: \.path) { item in
@@ -196,7 +196,7 @@ struct ReviewSheet: View {
                         Text(item.path).font(.body.monospaced())
                         Text(item.kind.label).font(.caption).foregroundStyle(item.kind.tint)
                         Spacer()
-                        Text(item.bytes.map(bytes) ?? (item.reason ?? "kept")).foregroundStyle(.secondary)
+                        Text(item.bytes.map(bytes) ?? (item.reason ?? "kept")).foregroundStyle(Brand.muted)
                     }
                 }
                 if let entries = done?.run?.entries.filter({ $0.state != .moved }), !entries.isEmpty {

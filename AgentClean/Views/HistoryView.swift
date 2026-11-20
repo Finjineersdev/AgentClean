@@ -16,7 +16,7 @@ struct HistoryView: View {
                         .font(.headline).monospacedDigit()
                 }
                 if model.runs.isEmpty {
-                    Text("No cleans yet.").foregroundStyle(.secondary).padding(.top, 40).frame(maxWidth: .infinity)
+                    Text("No cleans yet.").foregroundStyle(Brand.muted).padding(.top, 40).frame(maxWidth: .infinity)
                 }
                 ForEach(model.runs) { run in
                     runCard(run)
@@ -42,9 +42,9 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(run.created.formatted(date: .abbreviated, time: .shortened)).font(.headline)
-                Text(run.created.relative).foregroundStyle(.secondary)
+                Text(run.created.relative).foregroundStyle(Brand.muted)
                 Spacer()
-                Text("\(bytes(run.bytesHeld)) held").monospacedDigit().foregroundStyle(.secondary)
+                Text("\(bytes(run.bytesHeld)) held").monospacedDigit().foregroundStyle(Brand.muted)
                 Button("Restore all") { Task { await model.restore(run) } }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(!run.entries.contains { $0.state == .moved })
@@ -69,7 +69,7 @@ struct HistoryView: View {
                         .lineLimit(1).truncationMode(.middle)
                     if let note = e.note { Text(note).font(.caption).foregroundStyle(Brand.amber) }
                     Spacer()
-                    Text(bytes(e.bytes)).monospacedDigit().foregroundStyle(.secondary)
+                    Text(bytes(e.bytes)).monospacedDigit().foregroundStyle(Brand.muted)
                     if e.state == .moved {
                         Button("Restore") { Task { await model.restore(run, item: i) } }
                             .buttonStyle(.borderless)

@@ -32,7 +32,7 @@ struct CachesView: View {
                 }
 
                 if model.caches.isEmpty && !model.cachesLoading {
-                    Text("No known tool caches on this Mac.").foregroundStyle(.secondary).padding(.top, 40).frame(maxWidth: .infinity)
+                    Text("No known tool caches on this Mac.").foregroundStyle(Brand.muted).padding(.top, 40).frame(maxWidth: .infinity)
                 }
 
                 if !results.isEmpty { resultCard }
@@ -42,7 +42,7 @@ struct CachesView: View {
                     ForEach(clearable) { row($0) }
                     HStack {
                         Text("\(picked.count) selected · \(bytes(pickedBytes))")
-                            .foregroundStyle(.secondary).monospacedDigit()
+                            .foregroundStyle(Brand.muted).monospacedDigit()
                             .accessibilityIdentifier("caches.summary")
                         Spacer()
                         Button(running ? "Clearing…" : "Clear…") { confirming = true }
@@ -118,13 +118,13 @@ struct CachesView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(c.name).font(.headline)
-                Text((c.path as NSString).abbreviatingWithTildeInPath).font(.caption).foregroundStyle(.secondary)
+                Text((c.path as NSString).abbreviatingWithTildeInPath).font(.caption).foregroundStyle(Brand.muted)
                     .lineLimit(1).truncationMode(.middle)
                 if let cmd = c.command, !cmd.isEmpty {
                     Text(c.installed ? "Runs: \(cmd.joined(separator: " "))" : "\(c.tool) is not installed, so it cannot be cleared from here.")
-                        .font(.caption.monospaced()).foregroundStyle(.secondary)
+                        .font(.caption.monospaced()).foregroundStyle(Brand.muted)
                 }
-                Text(c.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(c.note).font(.caption).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Text(bytes(c.bytes)).monospacedDigit()

@@ -8,7 +8,9 @@ enum Brand {
     static let green = Color(hex: 0x34D399)
     static let amber = Color(hex: 0xFBBF24)
     static let sky = Color(hex: 0x22D3EE)
-    static let slate = Color(hex: 0x94A3B8)
+    static let slate = Color(hex: 0xCBD5E1)
+    /// Secondary text on the dark gradient: at least 4.5:1 (system .secondary measured 4.5 exactly).
+    static let muted = Color.white.opacity(0.72)
     static let gradient = [Color(hex: 0x0B4458), Color(hex: 0x061B2A)]
 }
 
@@ -141,7 +143,7 @@ struct ScreenHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.system(size: 28, weight: .semibold, design: .rounded))
-            Text(subtitle).foregroundStyle(.secondary)
+            Text(subtitle).foregroundStyle(Brand.muted)
         }
     }
 }

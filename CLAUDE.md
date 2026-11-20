@@ -106,6 +106,9 @@ QA the app against throwaway projects with the Debug walkthrough in
 - Never read the observable `AppModel` from `.commands {}` or a Scene-level
   binding setter without a change guard; it spins the main thread.
 - Docker sizes: use `UniqueSize` from `docker system df -v`.
+- The UI test runner is sandboxed: files it writes are quarantined and
+  macOS will not execute them. A stand-in tool must be a link to `/bin/sh`
+  reading a script file (see the npm fixture).
 - `URL.path(percentEncoded:)` for the home folder ends with `/`.
 - Project discovery must walk below a project (monorepos) but skip bundles
   (`.xcodeproj`, `.app`), tool caches (`~/go/pkg`) and artifact folders.
