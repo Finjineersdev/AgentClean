@@ -16,6 +16,7 @@ every clean reversible. Local only: no account, no telemetry.
 ## Install
 
 ```bash
+brew tap finjineersdev/tap && brew trust finjineersdev/tap   # once: Homebrew asks you to trust a new tap
 brew install --cask finjineersdev/tap/opensweep
 ```
 

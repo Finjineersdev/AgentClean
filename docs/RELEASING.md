@@ -57,6 +57,7 @@ network use. Local and ad-hoc builds carry no key and never check.
 ## Homebrew
 
 ```bash
+brew tap finjineersdev/tap && brew trust finjineersdev/tap   # once: Homebrew asks you to trust a new tap
 brew install --cask finjineersdev/tap/opensweep   # app, plus the opensweep command
 brew upgrade --cask opensweep
 brew uninstall --zap --cask opensweep             # also deletes settings and the quarantine

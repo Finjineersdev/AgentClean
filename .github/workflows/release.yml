@@ -168,6 +168,7 @@ jobs:
           body: |
             ## Install
             ```bash
+            brew tap finjineersdev/tap && brew trust finjineersdev/tap   # once: Homebrew asks you to trust a new tap
             brew install --cask finjineersdev/tap/opensweep
             ```
             or download the `.dmg` below and drag **OpenSweep** to Applications.
