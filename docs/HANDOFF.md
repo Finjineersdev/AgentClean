@@ -43,7 +43,8 @@ in this repository. Keep it that way.
   `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
   the name check and the `SECURITY.md` rewrite.
-- M0, M1, M2 (M2.1 to M2.7) and M3 are committed. Next: M4 (beta).
+- M0 to M3 are done; M4 (beta) is built and waits on the owner's signing keys
+  and testers (`docs/milestones/M4.md`).
 - Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
   owner names a domain they control.
 
@@ -114,11 +115,13 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
   projects, checks the results on disk and saves window snapshots; see
   `QA-CHECKLIST.md`.
 
-### Still inherited
+### M4 (built): beta
 
-- `.github/workflows/release.yml` and `docs/RELEASING.md` are upstream's
-  (DMG, cask bump), renamed only; M4 replaces them with signed, notarized
-  releases.
+See `docs/milestones/M4.md`. Global caches through each tool's own command
+(ADR 0006, I20), a Caches screen, a menu bar item, accessibility labels and an
+audit test, hardened runtime and notarization in the Release workflow, Sparkle
+updates, and a Homebrew cask template. Signing, the appcast key and the tap
+need the owner's accounts.
 
 ## 5. Known gaps and risks
 
@@ -126,9 +129,8 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 | --- | --- |
 | Projects on network drives, and on drives without Unix permissions (exFAT, FAT), are skipped | ADR 0004 |
 | GitHub Actions not pinned to commit SHAs | Before first release |
-| No signing, notarization or updater configured for AgentClean; the engine helper must be signed with the app | M4 |
+| Signing, notarization, Sparkle keys and the Homebrew tap need the owner's Apple and GitHub accounts | Owner, `docs/RELEASING.md` |
 | UI tests need macOS automation mode; on a developer Mac run `sudo automationmodetool enable-automationmode-without-authentication` once (CI runners have it) | Owner's Mac |
-| No menu bar yet (F13) | M4 |
 
 ## 6. Roadmap
 
@@ -143,11 +145,10 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 
 1. Run the engine checks from `CLAUDE.md`, `cd CleanCore && swift test`, and
    `scripts/check-swift-never-deletes.sh`; all should pass.
-2. Build the app (see `CLAUDE.md`) and run the Debug walkthrough in
-   `QA-CHECKLIST.md` against throwaway projects.
-3. Start M4 (beta): menu bar, global caches through each tool's own command,
-   accessibility, signing and notarization (including the embedded engine),
-   Sparkle updates, Homebrew cask.
+2. Build the app and run the Debug walkthrough in `QA-CHECKLIST.md`.
+3. If the owner has added the release secrets, tag `v0.4.0-beta.1` and check
+   the release installs on a clean Mac. Otherwise start M5 (scheduled clean,
+   Docker and AI model stores, review-only).
 
 ## 8. Facts worth keeping
 

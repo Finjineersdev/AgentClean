@@ -1,44 +1,74 @@
 # Releasing AgentClean
 
-1. Bump `MARKETING_VERSION` in `AgentClean.xcodeproj/project.pbxproj` (and `CURRENT_PROJECT_VERSION` if you like).
-2. Commit, then tag and push:
+1. Make sure `main` is green (CI and engine workflows).
+2. Tag and push. The tag sets the version; `MARKETING_VERSION` in the project
+   is only the default for local builds.
    ```bash
-   git tag -a v1.1.0 -m "AgentClean 1.1.0"
-   git push origin main v1.1.0
+   git tag -a v0.4.0 -m "AgentClean 0.4.0"
+   git push origin v0.4.0
    ```
-3. The **Release** workflow builds the app on a macOS 26 runner, packages `AgentClean-<version>.dmg`, writes a sha256, and publishes a GitHub Release with generated notes.
-4. With `TAP_GITHUB_TOKEN` set, it also bumps `Casks/agentclean.rb` in `Finjineersdev/homebrew-tap`, so `brew upgrade --cask agentclean` picks the new version up within the hour.
+   A tag with a suffix (`v0.4.0-beta.1`) is published as a pre-release and
+   does not bump the cask.
+3. The **Release** workflow runs the engine tests and the no-delete check,
+   builds a universal app, signs it with hardened runtime (the bundled engine
+   too), notarizes and staples the DMG, writes a sha256, signs a Sparkle
+   appcast, publishes the GitHub Release, and bumps the Homebrew cask.
 
-## Repository secrets
+Without the Developer ID secrets the workflow still publishes, but as an
+ad-hoc signed **pre-release** with no appcast and no cask bump.
 
-| Secret | Purpose | Required |
-|---|---|---|
-| `TAP_GITHUB_TOKEN` | Fine-grained PAT, repository `Finjineersdev/homebrew-tap`, permission **Contents: read and write**. Lets the workflow bump the cask. | For the cask auto-bump |
-| `MACOS_CERT_P12` | `base64 -i DeveloperID.p12` of your **Developer ID Application** certificate (exported from Keychain Access with its private key) | For notarized builds |
-| `MACOS_CERT_PASSWORD` | Password used when exporting the `.p12` | " |
-| `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` | " |
-| `APPLE_TEAM_ID` | Your 10-character team ID | " |
-| `APPLE_ID` | Apple ID email of the developer account | " |
-| `APPLE_APP_PASSWORD` | An app-specific password from appleid.apple.com, used by `notarytool` | " |
+## One-time setup (owner)
 
-Without the certificate secrets the workflow ships an ad-hoc signed build; users open it with right-click → Open or `xattr -d com.apple.quarantine`. With them, the DMG is signed with hardened runtime, notarized, and stapled, and opens without warnings.
+These need your Apple Developer account and keys, so an agent cannot do
+them.
+
+| Kind | Name | What |
+| --- | --- | --- |
+| Secret | `MACOS_CERT_P12` | `base64 -i DeveloperID.p12` of your **Developer ID Application** certificate, exported with its private key |
+| Secret | `MACOS_CERT_PASSWORD` | The password used for that export |
+| Secret | `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` |
+| Secret | `APPLE_TEAM_ID` | Your 10-character team ID |
+| Secret | `APPLE_ID` | Apple ID of the developer account |
+| Secret | `APPLE_APP_PASSWORD` | An app-specific password from account.apple.com, for `notarytool` |
+| Secret | `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key (see below) |
+| Variable | `SPARKLE_PUBLIC_KEY` | The matching public key; it is built into the app |
+| Secret | `TAP_GITHUB_TOKEN` | Fine-grained token with **Contents: read and write** on `Finjineersdev/homebrew-tap` |
+
+Sparkle keys: build the app once so Xcode fetches Sparkle, then
+
+```bash
+build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys            # stores the key in your login keychain, prints the public key
+build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle.key   # export the private key for the secret, then delete the file
+```
+
+Keep a backup of the private key: without it, installed copies can never be
+updated again.
+
+Homebrew tap: create the public repository `Finjineersdev/homebrew-tap` (an
+empty `README.md` is enough). The workflow writes `Casks/agentclean.rb`
+there from `packaging/homebrew/agentclean.rb`.
+
+## Updates
+
+The app checks `releases/latest/download/appcast.xml` of this repository, so
+the repository must be public. Sparkle asks the user before its first
+automatic check, sends no system profile, and the updater is the app's only
+network use. Local and ad-hoc builds carry no key and never check.
 
 ## Homebrew
 
-Tap: https://github.com/Finjineersdev/homebrew-tap
-
 ```bash
-brew install --cask Finjineersdev/tap/agentclean
+brew install --cask finjineersdev/tap/agentclean   # app, plus the agentclean command
 brew upgrade --cask agentclean
-brew uninstall --zap --cask agentclean   # also removes settings, logs, quarantine
+brew uninstall --zap --cask agentclean             # also deletes settings and the quarantine
 ```
 
-To submit to the official `homebrew-cask` repo later: the app should be notarized and have a few releases behind it; then `brew bump-cask-pr` from a copy of this cask.
+Restore or purge every run before `--zap`: it removes the quarantine with
+whatever is still held there.
 
 ## Local release build
 
 ```bash
-xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release -derivedDataPath build/rel build
-mkdir -p dist/root && cp -R build/rel/Build/Products/Release/AgentClean.app dist/root/ && ln -s /Applications dist/root/Applications
-hdiutil create -volname "AgentClean X.Y.Z" -srcfolder dist/root -ov -format UDZO dist/AgentClean-X.Y.Z.dmg
+xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
+  -derivedDataPath build/dd build CODE_SIGN_IDENTITY=-
 ```

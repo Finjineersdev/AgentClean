@@ -24,7 +24,8 @@ and what to do next. The milestone plan in progress is `docs/milestones/M2.md`.
    pinned projects are never cleaned. Keep it that way in every new command.
    Only `pin`, `unpin` and `config` skip `--execute`: they change AgentClean's
    config, never a project.
-5. **No network code** in the engine, and none in the app beyond the updater.
+5. **No network code** in the engine, and none in the app beyond the Sparkle
+   updater (`AgentClean/App/Updater.swift`).
 6. **Treat scanned repositories as hostile input.** Run git only with the
    hardened flags in `guard::check_untracked`; never build shell strings.
 7. **Clean-room.** AgentClean competes with the closed-source app CleanMyDev
@@ -78,6 +79,7 @@ QA the app against throwaway projects with the Debug walkthrough in
 | `engine/crates/agentclean-core/src/activity.rs` | Active, Idle, Dormant verdicts; config and pins |
 | `engine/crates/agentclean-core/src/size.rs` | Allocated-size measurement |
 | `engine/crates/agentclean-core/src/volumes.rs` | Mount table, drive roots, network drives |
+| `engine/crates/agentclean-core/src/caches.rs` | Global tool caches, cleared by each tool's own command (ADR 0006) |
 | `engine/crates/agentclean-cli/` | `agentclean` binary and end-to-end tests |
 | `engine/rules/*.toml` | Rule catalogue, one file per ecosystem |
 | `CleanCore/Sources/AgentEngine` | Swift client for the engine CLI; selection rules |

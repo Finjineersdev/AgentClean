@@ -5,11 +5,13 @@ shows which rebuildable folders are taking space (`node_modules`, `target`,
 `.venv`, build output), explains why each one is safe to remove, and makes
 every clean reversible. Local only: no account, no telemetry.
 
-> **Status: alpha (milestone M3).** The Rust engine and CLI find projects,
+> **Status: beta (milestone M4).** The Rust engine and CLI find projects,
 > judge whether each is in use, and clean rebuildable folders into a
 > quarantine you can restore from. The Mac app (macOS 14 or later) runs that
-> same engine: scan, pick folders, review the dry run, clean, undo. Builds are
-> not signed or notarized yet (M4).
+> same engine: scan, pick folders, review the dry run, clean, undo; clear
+> global tool caches with each tool's own command; a menu bar item. Signed,
+> notarized releases and the Homebrew cask need the owner's Apple keys
+> (`docs/RELEASING.md`).
 
 Contributors and coding agents: start with [CLAUDE.md](CLAUDE.md) and
 [docs/HANDOFF.md](docs/HANDOFF.md).

@@ -5,9 +5,10 @@ touches, what it needs, and how to report a problem.
 
 ## What it never does
 
-- **Sends anything anywhere.** There is no network code in the engine and none
-  in the app: no analytics, no crash reporter, no update check yet (an updater
-  arrives with signed releases in M4 and will be the only network use).
+- **Sends anything anywhere.** There is no network code in the engine: no
+  analytics, no crash reporter. The app's only network use is the Sparkle
+  update check in signed release builds; it asks before its first automatic
+  check and sends no system profile.
 - **Deletes at clean time.** Cleaning *moves* each folder into a quarantine on
   the same drive, by rename. Space comes back only when you purge a run, and
   purge deletes only inside the quarantine.
@@ -23,6 +24,16 @@ touches, what it needs, and how to report a problem.
 - **Runs programs from your repositories.** Git is run only with hooks,
   fsmonitor, pagers, signature programs and remote fetches turned off, and
   never through a shell.
+
+## Global caches
+
+The Caches screen and `agentclean clean-cache` clear caches shared by all
+projects (npm, pnpm, pip, Go, …) by running **that tool's own command** with
+fixed arguments, from your home folder, never through a shell (ADR 0006).
+This is the one clean that cannot be undone: the tool downloads again what it
+needs. Nothing is ticked for you, the confirmation shows the exact commands,
+and installed toolchains (Homebrew's Cellar, nvm, rustup, global packages)
+never appear as caches.
 
 ## Defaults that protect you
 
