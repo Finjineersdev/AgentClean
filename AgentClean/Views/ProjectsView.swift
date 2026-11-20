@@ -35,6 +35,8 @@ struct ProjectsView: View {
                                 .accessibilityIdentifier("project.\(URL(fileURLWithPath: p.root).lastPathComponent)")
                             }
                         }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Project list")
                     }
                 }
             }

@@ -231,6 +231,9 @@ final class AgentCleanUITests: XCTestCase {
                    issue.auditType == .sufficientElementDescription || issue.auditType == .parentChild {
                     return true
                 }
+                // SwiftUI pop-up menus open with the show-menu action VoiceOver
+                // uses; the audit looks only for a press action.
+                if issue.auditType == .action, e?.elementType == .popUpButton { return true }
                 if issue.auditType == .contrast, let e, Self.contrast(e.screenshot().image) >= 4.5 {
                     return true
                 }
