@@ -27,7 +27,7 @@ xcodebuild -project OpenSweep.xcodeproj -scheme OpenSweep -configuration Debug \
 ```
 
 Xcode 16 or later; macOS 14 or later to run. The app finds its engine at
-`Contents/Helpers/opensweep`; set `OPENSWEEP_BIN` to use another binary
+`Contents/Helpers/opensweep`; in Debug builds, set `OPENSWEEP_BIN` to use another binary
 while developing.
 
 ## Layout

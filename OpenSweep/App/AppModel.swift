@@ -138,11 +138,15 @@ final class AppModel {
         if engine == nil { error = "The engine is missing from the app bundle. Reinstall OpenSweep." }
     }
 
-    /// The bundled binary, or OPENSWEEP_BIN when developing.
+    /// The bundled binary, or OPENSWEEP_BIN in Debug builds. Release builds
+    /// never take the engine path from the environment: the engine runs with
+    /// the app's Full Disk Access.
     static func locateEngine() -> URL? {
+        #if DEBUG
         if let dev = ProcessInfo.processInfo.environment["OPENSWEEP_BIN"] {
             return URL(fileURLWithPath: dev)
         }
+        #endif
         // Contents/Helpers: Contents/MacOS ignores case and holds OpenSweep.
         let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/opensweep")
         return FileManager.default.isExecutableFile(atPath: helper.path) ? helper : nil

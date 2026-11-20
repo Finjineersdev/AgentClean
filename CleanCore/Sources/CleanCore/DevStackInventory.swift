@@ -51,6 +51,16 @@ public struct DevStackItem: Identifiable, Sendable, Hashable {
         case command(String)
         /// Data. Shown for awareness only.
         case never
+
+        /// `tool name` as a copyable command, or `.never` when `name` (a file
+        /// or package name found on disk) holds anything a shell would read
+        /// as more than a word: a hostile name must not become a pasteable
+        /// payload.
+        public static func command(_ tool: String, _ name: String) -> Removal {
+            let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@._/+-")
+            guard !name.isEmpty, !name.hasPrefix("-"), name.unicodeScalars.allSatisfy(plain.contains) else { return .never }
+            return .command("\(tool) \(name)")
+        }
     }
 
     public var formattedSize: String { ByteFormatter.string(bytes) }
@@ -99,7 +109,7 @@ public enum DevStackInventory {
                     detail: "Homebrew formula · \(versions.joined(separator: ", "))" + (svc.map { " · service \($0)" } ?? ""),
                     path: path, bytes: bytes, modified: mtime(path),
                     status: svc == "started" ? .running : (svc != nil ? .stopped : .installed),
-                    removal: .command("brew uninstall \(formula)"),
+                    removal: .command("brew uninstall", formula),
                     hint: isDB && !formula.hasPrefix("sqlite") ? "Engine only. Its data lives under \(prefix)/var." : nil
                 ))
             }
@@ -122,7 +132,7 @@ public enum DevStackInventory {
             }
             for (name, state) in services where !items.contains(where: { $0.name == name }) {
                 items.append(DevStackItem(group: .services, name: name, detail: "brew service", path: "\(prefix)/opt/\(name)", bytes: 0, modified: nil,
-                                          status: state == "started" ? .running : .stopped, removal: .command("brew services stop \(name)"), hint: nil))
+                                          status: state == "started" ? .running : .stopped, removal: .command("brew services stop", name), hint: nil))
             }
         }
         return items
@@ -242,29 +252,29 @@ public enum DevStackInventory {
         for root in nodeRoots where exists(root) {
             for pkg in entries(root) where !["npm", "corepack"].contains(pkg) {
                 if pkg.hasPrefix("@") {
-                    for scoped in entries("\(root)/\(pkg)") { add(&items, "\(pkg)/\(scoped)", "\(root)/\(pkg)/\(scoped)", "npm global", "npm uninstall -g \(pkg)/\(scoped)") }
+                    for scoped in entries("\(root)/\(pkg)") { add(&items, "\(pkg)/\(scoped)", "\(root)/\(pkg)/\(scoped)", "npm global", .command("npm uninstall -g", "\(pkg)/\(scoped)")) }
                 } else {
-                    add(&items, pkg, "\(root)/\(pkg)", "npm global", "npm uninstall -g \(pkg)")
+                    add(&items, pkg, "\(root)/\(pkg)", "npm global", .command("npm uninstall -g", pkg))
                 }
             }
         }
-        for v in entries("\(home)/.local/pipx/venvs") { add(&items, v, "\(home)/.local/pipx/venvs/\(v)", "pipx", "pipx uninstall \(v)") }
-        for v in entries("\(home)/.local/share/uv/tools") { add(&items, v, "\(home)/.local/share/uv/tools/\(v)", "uv tool", "uv tool uninstall \(v)") }
-        for v in entries("\(home)/.bun/install/global/node_modules") where v != ".bin" { add(&items, v, "\(home)/.bun/install/global/node_modules/\(v)", "bun global", "bun remove -g \(v)") }
+        for v in entries("\(home)/.local/pipx/venvs") { add(&items, v, "\(home)/.local/pipx/venvs/\(v)", "pipx", .command("pipx uninstall", v)) }
+        for v in entries("\(home)/.local/share/uv/tools") { add(&items, v, "\(home)/.local/share/uv/tools/\(v)", "uv tool", .command("uv tool uninstall", v)) }
+        for v in entries("\(home)/.bun/install/global/node_modules") where v != ".bin" { add(&items, v, "\(home)/.bun/install/global/node_modules/\(v)", "bun global", .command("bun remove -g", v)) }
         for v in entries("\(home)/.cargo/bin") where !["cargo", "rustc", "rustup", "rustfmt", "clippy-driver", "cargo-clippy", "cargo-fmt", "rust-analyzer", "rust-gdb", "rust-lldb", "rustdoc", "cargo-miri", "rls"].contains(v) {
-            add(&items, v, "\(home)/.cargo/bin/\(v)", "cargo install", "cargo uninstall \(v)")
+            add(&items, v, "\(home)/.cargo/bin/\(v)", "cargo install", .command("cargo uninstall", v))
         }
         for v in entries("\(home)/go/bin") { add(&items, v, "\(home)/go/bin/\(v)", "go install", nil) }
         for v in entries("\(home)/.local/bin") { add(&items, v, "\(home)/.local/bin/\(v)", "~/.local/bin", nil, sizeIt: false) }
         return items
     }
 
-    static func add(_ items: inout [DevStackItem], _ name: String, _ path: String, _ source: String, _ cmd: String?, sizeIt: Bool = true) {
+    static func add(_ items: inout [DevStackItem], _ name: String, _ path: String, _ source: String, _ removal: DevStackItem.Removal?, sizeIt: Bool = true) {
         let bytes = sizeIt ? size(path) : 0
         let m = mtime(path)
         let old = m.map { Date().timeIntervalSince($0) > 180 * 86_400 } ?? false
         items.append(DevStackItem(group: .globalTools, name: name, detail: source, path: path, bytes: bytes, modified: m,
-                                  status: .installed, removal: cmd.map { .command($0) } ?? .quarantinePath,
+                                  status: .installed, removal: removal ?? .quarantinePath,
                                   hint: old ? "Not updated for 6+ months" : nil))
     }
 
