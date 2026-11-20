@@ -16,6 +16,7 @@ struct ProjectsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ScreenHeader(title: "Projects", subtitle: "\(model.projects.count) found")
                 TextField("Search", text: $search).textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Search projects")
                 if model.projects.isEmpty {
                     Spacer()
                     Text(model.scanning ? "Scanning…" : "Run a scan from Overview to find projects.")

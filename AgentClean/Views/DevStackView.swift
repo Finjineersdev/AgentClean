@@ -21,6 +21,7 @@ struct DevStackView: View {
                 ScreenHeader(title: "Dev Stack", subtitle: "Databases, runtimes, global tools, SDKs and VM disks on this Mac. Read-only.")
                 Spacer()
                 TextField("Search", text: $search).textFieldStyle(.roundedBorder).frame(width: 180)
+                    .accessibilityLabel("Search tools")
                 Button { model.loadDevStack() } label: {
                     if model.devStackLoading { ProgressView().controlSize(.small) } else { Label("Refresh", systemImage: "arrow.clockwise") }
                 }

@@ -211,31 +211,34 @@ final class AgentCleanUITests: XCTestCase {
     /// text clipping and contrast.
     func testAccessibilityAudit() throws {
         scan()
+        var problems: [String] = []
         for screen in ["overview", "projects", "caches", "history", "devStack"] {
             app.outlines.cells.containing(.any, identifier: "nav.\(screen)").firstMatch.click()
             if screen == "projects" { app.buttons["project.shop-web"].click() }
             sleep(2)
             // Every issue fails the test except:
-            // - a framework container (Group, AppKit TouchBar) with no identifier: no description or a
-            //   parent/child mismatch on the groups SwiftUI builds for the
-            //   split view (the app's own views set identifiers);
+            // - a framework container (a Group or AppKit's TouchBar) with no
+            //   identifier: no description or a parent/child mismatch on what
+            //   SwiftUI builds for the split view;
             // - a contrast finding our own pixel measurement disproves. The
             //   audit misreads text on the gradient (it flagged 6.4:1 and
             //   8.1:1 text), so the element's screenshot is measured instead.
+            // Issues are collected so one run reports all of them.
             try app.performAccessibilityAudit { issue in
-                if let e = issue.element, [.group, .touchBar].contains(e.elementType), e.identifier.isEmpty,
+                let e = issue.element
+                if let e, [.group, .touchBar].contains(e.elementType), e.identifier.isEmpty,
                    issue.auditType == .sufficientElementDescription || issue.auditType == .parentChild {
-                    print("audit ignored \(issue.compactDescription) on a framework \(e.elementType.rawValue)")
                     return true
                 }
-                if issue.auditType == .contrast, let element = issue.element {
-                    let ratio = Self.contrast(element.screenshot().image)
-                    print("audit contrast \(element.label) \(ratio)")
-                    return ratio >= 4.5
+                if issue.auditType == .contrast, let e, Self.contrast(e.screenshot().image) >= 4.5 {
+                    return true
                 }
-                return false
+                let name = [e?.identifier, e?.label, e?.value as? String].compactMap { $0 }.first { !$0.isEmpty } ?? "?"
+                problems.append("\(screen): \(issue.compactDescription) on \(e?.elementType.rawValue ?? 0) '\(name)'")
+                return true
             }
         }
+        XCTAssert(problems.isEmpty, problems.joined(separator: "\n"))
     }
 
     /// WCAG contrast between the text and background of a screenshot: the
