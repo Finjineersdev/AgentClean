@@ -4,6 +4,7 @@ import AgentEngine
 struct ProjectsView: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
+    @FocusState private var searching: Bool
     @AppStorage("projectsShowAll") private var showAll = false
     @AppStorage("projectsSort") private var sort = Sort.size
 
@@ -47,7 +48,11 @@ struct ProjectsView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Brand.muted).accessibilityHidden(true)
                     TextField("Search", text: $search).textFieldStyle(.plain)
+                        .focused($searching)
                         .accessibilityLabel("Search projects")
+                    Button("Find") { searching = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .hidden().frame(width: 0)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .glassCard(radius: 9)

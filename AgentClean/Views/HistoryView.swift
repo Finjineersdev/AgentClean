@@ -5,16 +5,30 @@ struct HistoryView: View {
     @Environment(AppModel.self) private var model
     @State private var purging: Run?
     @State private var purgeBytes: UInt64 = 0
+    @State private var olderThan: Int?
+    @State private var olderBytes: UInt64 = 0
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                HStack {
+                HStack(alignment: .top) {
                     ScreenHeader(title: "History", subtitle: "Every clean, newest first. Restore puts folders back; purge frees the space for good.")
                     Spacer()
-                    Text("Held: \(bytes(model.runs.reduce(0) { $0 + $1.bytesHeld }))")
-                        .font(.headline).monospacedDigit()
+                    Menu("Free older runs") {
+                        ForEach([1, 7, 30], id: \.self) { days in
+                            Button("Older than \(days) \(days == 1 ? "day" : "days")…") {
+                                Task {
+                                    olderBytes = await model.purge(olderThanDays: days, execute: false) ?? 0
+                                    olderThan = days
+                                }
+                            }
+                        }
+                    }
+                    .fixedSize()
+                    .disabled(model.stats.held == 0)
+                    .accessibilityIdentifier("purgeOlder")
                 }
+                totals
                 if model.runs.isEmpty {
                     Text("No cleans yet.").foregroundStyle(Brand.muted).padding(.top, 40).frame(maxWidth: .infinity)
                 }
@@ -26,6 +40,18 @@ struct HistoryView: View {
         }
         .task { await model.loadHistory() }
         .confirmationDialog(
+            olderBytes == 0 ? "Nothing that old is held" : "Permanently delete \(bytes(olderBytes)) held for \(olderThan ?? 0)+ days?",
+            isPresented: Binding(get: { olderThan != nil }, set: { if !$0 { olderThan = nil } })
+        ) {
+            if olderBytes > 0 {
+                Button("Purge \(bytes(olderBytes))", role: .destructive) {
+                    if let days = olderThan { Task { _ = await model.purge(olderThanDays: days, execute: true) } }
+                }
+            }
+        } message: {
+            Text("This cannot be undone. The projects can still rebuild these folders.")
+        }
+        .confirmationDialog(
             "Permanently delete \(bytes(purgeBytes)) from quarantine?",
             isPresented: Binding(get: { purging != nil }, set: { if !$0 { purging = nil } })
         ) {
@@ -36,6 +62,27 @@ struct HistoryView: View {
         } message: {
             Text("This cannot be undone. The projects can still rebuild these folders.")
         }
+    }
+
+    private var totals: some View {
+        let s = model.stats
+        return HStack(spacing: 12) {
+            total("Held, can undo", s.held, Brand.amber)
+            total("Freed for good", s.freed, Brand.green)
+            total("Freed this month", s.freedThisMonth, Brand.teal)
+        }
+    }
+
+    private func total(_ label: String, _ value: UInt64, _ tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(bytes(value)).font(.figure(26)).foregroundStyle(Brand.text)
+                .contentTransition(.numericText(value: Double(value)))
+            Text(label).font(.callout).foregroundStyle(tint)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+        .accessibilityElement(children: .combine)
     }
 
     private func runCard(_ run: Run) -> some View {

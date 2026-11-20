@@ -152,6 +152,7 @@ final class EngineEndToEndTests: XCTestCase {
         XCTAssertGreaterThan(all.freed, 0)
         let runs = try await engine.history()
         XCTAssertEqual(runs.first?.bytesHeld, 0)
+        XCTAssertEqual(Stats(runs: runs).freed, all.freed, "a purged run keeps its sizes for the stats")
     }
 
     func testEngineErrorsSurface() async throws {
@@ -201,5 +202,29 @@ final class SelectionTests: XCTestCase {
         XCTAssertTrue(Selection.flags(for: ["/w/site/node_modules"], in: p).caution)
         XCTAssertTrue(Selection.flags(for: [], in: project(.active)).active)
         XCTAssertEqual(Selection.bytes(of: ["/w/site/.next", "/w/site/node_modules"], in: p), 30)
+    }
+}
+
+final class StatsTests: XCTestCase {
+    private func entry(_ rule: String, _ bytes: UInt64, _ state: EntryState) -> RunEntry {
+        RunEntry(original: "/p/x", projectRoot: "/p", stored: "0", ruleId: rule, kind: .safe, bytes: bytes, state: state, volume: nil, note: nil)
+    }
+
+    func testStatsAddUpWhatWasHeldFreedAndUndone() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let old = Run(runId: "a", format: 1, createdUnix: 1_700_000_000,
+                      entries: [entry("node", 5, .purged), entry("rust", 7, .restored)])
+        let new = Run(runId: "b", format: 1, createdUnix: 1_799_999_000,
+                      entries: [entry("node", 3, .moved), entry("rust", 11, .purged), entry("go", 2, .failed)])
+        let s = Stats(runs: [old, new], now: now)
+        XCTAssertEqual(s.held, 3)
+        XCTAssertEqual(s.freed, 16)
+        XCTAssertEqual(s.freedThisMonth, 11)
+        XCTAssertEqual(s.cleaned, 19, "restored and failed folders do not count")
+        XCTAssertEqual(s.byRule["node"], 8)
+        XCTAssertEqual(s.byRule["rust"], 11)
+        XCTAssertNil(s.byRule["go"])
+        XCTAssertEqual(Stats.milestone(for: 999_000_000), nil)
+        XCTAssertEqual(Stats.milestone(for: 12_000_000_000), 10_000_000_000)
     }
 }

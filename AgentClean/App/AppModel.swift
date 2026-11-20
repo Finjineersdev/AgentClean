@@ -323,6 +323,21 @@ final class AppModel {
         }
     }
 
+    var stats: Stats { Stats(runs: runs) }
+
+    /// Purges every run at least `days` old; a dry run unless `execute`. Returns the bytes.
+    func purge(olderThanDays days: Int, execute: Bool) async -> UInt64? {
+        guard let engine else { return nil }
+        do {
+            let out = try await engine.purge(olderThanDays: days, execute: execute)
+            if execute { await loadHistory() }
+            return execute ? out.freed : out.bytes
+        } catch {
+            self.error = describe(error)
+            return nil
+        }
+    }
+
     /// What purging would free, without deleting.
     func purgePreview(_ run: Run) async -> UInt64? {
         guard let engine else { return nil }

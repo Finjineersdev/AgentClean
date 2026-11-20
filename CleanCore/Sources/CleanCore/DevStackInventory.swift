@@ -278,12 +278,12 @@ public enum DevStackInventory {
         }
         let known: [(String, String)] = [
             ("Android SDK", "\(home)/Library/Android/sdk"), ("Android Studio data", "\(home)/Library/Application Support/Google/AndroidStudio"),
-            ("iOS DeviceSupport", "\(home)/Library/Developer/Xcode/iOS DeviceSupport"), ("Xcode Archives", "\(home)/Library/Developer/Xcode/Archives"),
-            ("Simulator runtimes", "/Library/Developer/CoreSimulator/Volumes"), ("Simulator devices", "\(home)/Library/Developer/CoreSimulator/Devices"),
+            ("iOS DeviceSupport", "\(home)/Library/Developer/Xcode/iOS DeviceSupport"),
+            ("Simulator runtimes", "/Library/Developer/CoreSimulator/Volumes"),
             ("Unity", "\(home)/Library/Unity"), ("JetBrains", "\(home)/Library/Application Support/JetBrains"), ("Google Cloud SDK", "\(home)/google-cloud-sdk"),
             ("AWS CLI data", "\(home)/.aws"), ("Firebase tools cache", "\(home)/.cache/firebase"), ("Gradle", "\(home)/.gradle"), ("Maven", "\(home)/.m2"),
-            ("CocoaPods repos", "\(home)/.cocoapods"), ("Playwright browsers", "\(home)/Library/Caches/ms-playwright"), ("Hugging Face cache", "\(home)/.cache/huggingface"),
-            ("Ollama models", "\(home)/.ollama"), ("LM Studio models", "\(home)/.lmstudio"),
+            ("CocoaPods repos", "\(home)/.cocoapods"),
+            // Archives, simulators, Playwright, Hugging Face, Ollama and LM Studio are measured in Caches.
         ]
         for (name, p) in known where exists(p) {
             let bytes = size(p)

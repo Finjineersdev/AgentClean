@@ -57,6 +57,14 @@ struct RootView: View {
             model.scanIfStale()
         }
         .sheet(isPresented: $model.onboarding) { Onboarding() }
+        .background {
+            // ⌘1–⌘5 switch screens.
+            ForEach(Array(AppModel.Screen.allCases.enumerated()), id: \.element) { i, screen in
+                Button(screen.title) { model.screen = screen }
+                    .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
+                    .hidden()
+            }
+        }
         .task {
             await model.loadConfig()
             await model.freeExpired()

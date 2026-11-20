@@ -60,3 +60,38 @@ extension ScanSummary {
                   active: Bucket(folders: active.0, bytes: active.1))
     }
 }
+
+/// What AgentClean has done on this Mac, from the quarantine's runs. Local only.
+public struct Stats: Sendable, Equatable {
+    /// Still in quarantine, restorable.
+    public var held: UInt64 = 0
+    /// Purged: the space came back.
+    public var freed: UInt64 = 0
+    /// Purged, in runs created this calendar month.
+    public var freedThisMonth: UInt64 = 0
+    /// Held plus freed, by rule id (language).
+    public var byRule: [String: UInt64] = [:]
+
+    public var cleaned: UInt64 { held + freed }
+
+    public init(runs: [Run], now: Date = Date(), calendar: Calendar = .current) {
+        for run in runs {
+            let thisMonth = calendar.isDate(run.created, equalTo: now, toGranularity: .month)
+            for e in run.entries {
+                switch e.state {
+                case .moved: held += e.bytes
+                case .purged:
+                    freed += e.bytes
+                    if thisMonth { freedThisMonth += e.bytes }
+                default: continue
+                }
+                byRule[e.ruleId, default: 0] += e.bytes
+            }
+        }
+    }
+
+    /// The biggest of 1, 10, 100 and 1000 GB that `bytes` has passed.
+    public static func milestone(for bytes: UInt64) -> UInt64? {
+        [1_000_000_000_000, 100_000_000_000, 10_000_000_000, 1_000_000_000].first { bytes >= $0 }
+    }
+}
