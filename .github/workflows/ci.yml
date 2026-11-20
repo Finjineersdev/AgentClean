@@ -1,39 +1,66 @@
 name: CI
 
+# Minutes: macOS runners bill at 10x Linux. Docs-only pushes run nothing, a new
+# push cancels the run it replaces, the cheap Linux check gates the macOS job,
+# and UI tests run only when app code changed (or on demand).
 on:
   push:
     branches: [main]
+    paths-ignore: ["**/*.md", "docs/**", "LICENSE*", "NOTICE*", "packaging/**"]
   pull_request:
+    paths-ignore: ["**/*.md", "docs/**", "LICENSE*", "NOTICE*", "packaging/**"]
+  workflow_dispatch:
+    inputs:
+      ui-tests:
+        description: Run the UI tests
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  swift-never-deletes:
-    name: No Swift file removal (ADR 0002)
+  checks:
+    name: No Swift file removal (ADR 0002), changed paths
     runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.changed.outputs.app }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - run: scripts/check-swift-never-deletes.sh
+      - name: Did app code change?
+        id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) range="$BASE...HEAD" ;;
+            push) range="$BEFORE..HEAD" ;;
+            *) echo "app=true" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          # A new branch or a force push has no usable base: test everything.
+          base="${range%%.*}"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --name-only "$range" | grep -Eq '^(AgentClean/|AgentCleanUITests/|AgentClean.xcodeproj/|CleanCore/Sources/AgentEngine/|Config/)'; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          fi
 
-  core-tests:
-    name: CleanCore tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.app || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-      - name: Build the engine for the end-to-end tests
-        run: cargo build --manifest-path engine/Cargo.toml --locked -p agentclean-cli
-      - name: Test
-        run: cd CleanCore && swift test
-
-  app-build:
-    name: App build
+  macos:
+    name: CleanCore tests and app build
+    needs: checks
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +70,10 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.app || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
       - name: Rust targets for a universal engine
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: CleanCore tests
+        run: |
+          cargo build --manifest-path engine/Cargo.toml --locked -p agentclean-cli
+          cd CleanCore && swift test
       - name: Build (Release, unsigned)
         run: |
           xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
@@ -65,7 +96,10 @@ jobs:
 
   ui-tests:
     name: UI tests (macOS 15, Xcode 16)
+    needs: [checks, macos]
+    if: (github.event_name == 'workflow_dispatch' && inputs.ui-tests) || (github.event_name != 'workflow_dispatch' && needs.checks.outputs.app == 'true')
     runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,7 +112,7 @@ jobs:
             -derivedDataPath build/dd -resultBundlePath build/ui.xcresult \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=""
       - name: Keep screenshots
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ui-test-results

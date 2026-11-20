@@ -3,7 +3,7 @@ name: engine-nightly
 # Slow checks for the safety code: time-boxed fuzzing and mutation testing.
 on:
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "17 3 * * 0"   # weekly (Sunday): about 100 Linux minutes a run
   workflow_dispatch:
 
 permissions:
