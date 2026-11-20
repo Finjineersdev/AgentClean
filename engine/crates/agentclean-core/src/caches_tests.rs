@@ -156,3 +156,32 @@ fn a_cache_without_a_command_cannot_be_run() {
     assert!(gradle.cache.command.is_empty() && gradle.program.is_none());
     assert!(caches::run(&gradle, &e, Duration::from_secs(1)).is_err());
 }
+
+/// I20: Xcode archives, simulators and Xcode's own caches are measured only.
+/// Archives hold the dSYMs that crash reports from shipped versions need, so
+/// AgentClean never runs anything on them; they are macOS only.
+#[test]
+fn xcode_archives_and_simulators_are_measured_only() {
+    let ids = [
+        "xcode-archives",
+        "simulator-devices",
+        "simulator-caches",
+        "xcode-previews",
+        "xcode-cache",
+    ];
+    let mac = caches::known(&env(Path::new("/Users/dev"), true));
+    for id in ids {
+        let c = mac
+            .iter()
+            .find(|c| c.id == id)
+            .unwrap_or_else(|| panic!("{id} missing"));
+        assert!(c.command.is_empty(), "{id} must be measured only");
+        assert!(
+            c.path.starts_with("/Users/dev/Library"),
+            "{id} at {}",
+            c.path.display()
+        );
+    }
+    let linux = caches::known(&env(Path::new("/home/dev"), false));
+    assert!(linux.iter().all(|c| !ids.contains(&c.id)));
+}

@@ -46,7 +46,7 @@ struct Ecosystem: Hashable, Identifiable {
         case "composer": ("logo-composer", 0xC48B4A)
         case "cocoapods": ("logo-cocoapods", 0xEE3322)
         case "gradle": ("logo-gradle", 0x5BBFAD)
-        case "xcode-derived-data": ("logo-xcode", 0x147EFB)
+        case "xcode-derived-data", "xcode-archives", "simulator-devices", "simulator-caches", "xcode-previews", "xcode-cache": ("logo-xcode", 0x147EFB)
         case "cargo-registry": ("logo-rust", 0xDEA584)
         case "homebrew-downloads": ("logo-homebrew", 0xFBB040)
         default: nil
