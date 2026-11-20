@@ -206,11 +206,13 @@ public struct ToolCache: Codable, Sendable, Hashable, Identifiable {
     public let command: [String]?
     public let installed: Bool
     public let note: String
-    /// After `clean-cache --execute`: exit code (nil if stopped), what is left, freed.
+    /// After `clean-cache --execute`: exit code (nil if stopped or it could
+    /// not start), what is left, freed, and why it could not start.
     public let status: Int?
     public let bytesAfter: UInt64?
     public let freed: UInt64?
     public let stderr: String?
+    public let error: String?
 
     /// Can be cleared from the app: has a command and the tool is installed.
     public var clearable: Bool { installed && !(command ?? []).isEmpty }

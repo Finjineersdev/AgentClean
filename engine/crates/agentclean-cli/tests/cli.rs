@@ -563,3 +563,44 @@ fn caches_are_cleared_by_the_tools_own_command() {
         "unknown or measure-only caches are refused"
     );
 }
+
+/// A tool that cannot start is reported on its own cache; the caches already
+/// cleared in the same command are still reported.
+#[test]
+fn a_tool_that_cannot_start_does_not_hide_the_other_results() {
+    use std::os::unix::fs::PermissionsExt;
+    let e = env();
+    fs::create_dir_all(e.home.join(".npm/_cacache")).unwrap();
+    fs::create_dir_all(e.home.join(".cache/uv")).unwrap();
+    let bin = e.home.parent().unwrap().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    for (name, script) in [
+        ("npm", "#!/bin/sh\nrm -rf \"$HOME/.npm/_cacache\"\n"),
+        ("uv", "#!/no/such/shell\n"),
+    ] {
+        fs::write(bin.join(name), script).unwrap();
+        fs::set_permissions(bin.join(name), fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let out = Command::new(env!("CARGO_BIN_EXE_agentclean"))
+        .args(["--json", "clean-cache", "npm", "uv", "--execute"])
+        .env("HOME", &e.home)
+        .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+        .env_remove("XDG_CACHE_HOME")
+        .env_remove("npm_config_cache")
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(3),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let caches = v["caches"].as_array().unwrap();
+    assert_eq!(caches[0]["id"], "npm");
+    assert_eq!(caches[0]["status"], 0);
+    assert_eq!(caches[1]["id"], "uv");
+    assert!(caches[1]["status"].is_null());
+    assert!(caches[1]["error"].as_str().unwrap().contains("cannot run"));
+    assert!(!e.home.join(".npm/_cacache").exists());
+}

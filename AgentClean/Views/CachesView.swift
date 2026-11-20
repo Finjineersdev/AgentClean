@@ -93,7 +93,7 @@ struct CachesView: View {
                     switch r.status {
                     case 0: Text("\(r.name): freed \(bytes(r.freed ?? 0))")
                     case .some(let code): Text("\(r.name): the command failed (exit \(code)). \(r.stderr ?? "")")
-                    case .none: Text("\(r.name): the command took too long and was stopped.")
+                    case .none: Text(r.error.map { "\(r.name): \($0)" } ?? "\(r.name): the command took too long and was stopped.")
                     }
                 }
             }

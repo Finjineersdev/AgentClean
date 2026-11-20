@@ -986,7 +986,22 @@ fn clean_cache(ids: &[String], execute: bool) -> CliResult {
     for f in picked {
         let mut r = cache_json(f);
         if execute {
-            let ran = caches::run(f, &env, caches::TIME_LIMIT)?;
+            let ran = match caches::run(f, &env, caches::TIME_LIMIT) {
+                Ok(ran) => ran,
+                Err(e) => {
+                    // Keep going: earlier caches are already cleared and must be reported.
+                    failed = true;
+                    if let Value::Object(m) = &mut r {
+                        m.insert("status".into(), Value::Null);
+                        m.insert("error".into(), json!(e));
+                    }
+                    if !json_mode() {
+                        say!("{}: {e}", f.cache.id);
+                    }
+                    results.push(r);
+                    continue;
+                }
+            };
             let after = caches::list(&env)
                 .into_iter()
                 .find(|g| g.cache.id == f.cache.id)
@@ -1039,8 +1054,9 @@ fn clean_cache(ids: &[String], execute: bool) -> CliResult {
     } else if !execute {
         say!("Dry run: nothing was run. Add --execute. Not undoable: tools download again what they need.");
     }
+    // 3, like a partial clean: the JSON is complete, some tools failed.
     Ok(if failed {
-        ExitCode::FAILURE
+        ExitCode::from(3)
     } else {
         ExitCode::SUCCESS
     })
