@@ -106,6 +106,16 @@ enum QAWalkthrough {
         if let run = bulk?.run { await model.restore(run) }
         check(model.summary?.ready.bytes == before, "one Undo restores them all")
 
+        // Scheduled clean (P5): dormant projects' Safe folders only, one run, one Undo.
+        let sched = await model.runSchedule(cap: 1_000_000_000)
+        let schedRoots = Set(sched?.entries.map(\.projectRoot) ?? [])
+        check(sched != nil && !schedRoots.contains { $0.hasSuffix("/live-api") || $0.hasSuffix("/keep-me") }
+              && sched?.entries.allSatisfy { $0.kind == .safe } == true,
+              "scheduled clean took \(sched?.entries.count ?? 0) Safe folders, none active or pinned")
+        check(fm.fileExists(atPath: shop.map { $0.root + "/node_modules" } ?? ""), "scheduled clean left node_modules")
+        if let sched { await model.undoRun(sched.runId) }
+        check(shop.map { fm.fileExists(atPath: $0.root + "/.next") } ?? false, "Undo from the notification restores it")
+
         // Global caches: needs ~/.npm/_cacache and a stand-in npm on PATH
         // (see QA-CHECKLIST.md); never the real npm.
         model.screen = .caches

@@ -59,10 +59,22 @@ struct SettingsView: View {
                 .accessibilityIdentifier("settings.autoFree")
                 Toggle("Rescan when AgentClean opens", isOn: $model.scanOnOpen)
                     .accessibilityIdentifier("settings.scanOnOpen")
+                Picker("Clean automatically", selection: $model.autoClean) {
+                    Text("Never").tag(AutoClean.off)
+                    Text("Every day").tag(AutoClean.daily)
+                    Text("Every week").tag(AutoClean.weekly)
+                }
+                .accessibilityIdentifier("settings.autoClean")
+                if model.autoClean != .off {
+                    Picker("At most", selection: $model.autoCleanCapGB) {
+                        ForEach([5, 10, 20, 50], id: \.self) { Text("\($0) GB").tag($0) }
+                    }
+                    Toggle("Open AgentClean at login", isOn: Binding(get: { Scheduler.opensAtLogin }, set: { Scheduler.opensAtLogin = $0 }))
+                }
             } header: {
                 Text("Space and scans")
             } footer: {
-                Text("Cleaned folders wait in quarantine so you can undo; after this long they are deleted for good and the space comes back. The last scan is kept, and refreshed in the background when it is over an hour old.")
+                Text("Cleaned folders wait in quarantine so you can undo; after this long they are deleted for good and the space comes back. The last scan is kept, and refreshed in the background when it is over an hour old. A scheduled clean takes only Safe folders in dormant projects, never pinned ones, and tells you with an Undo button. It runs while AgentClean is open, including in the menu bar.")
                     .foregroundStyle(.secondary)
             }
 

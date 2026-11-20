@@ -95,3 +95,32 @@ public struct Stats: Sendable, Equatable {
         [1_000_000_000_000, 100_000_000_000, 10_000_000_000, 1_000_000_000].first { bytes >= $0 }
     }
 }
+
+extension Selection {
+    /// One project's share of a scheduled clean.
+    public struct Scheduled: Equatable, Sendable {
+        public let root: String
+        public let paths: [String]
+        public let bytes: UInt64
+    }
+
+    /// P5: what a scheduled clean takes. Safe folders the guard allows, in
+    /// dormant projects that are not pinned; biggest projects first, skipping
+    /// any that would pass `cap` bytes. Never Caution, never idle or active.
+    public static func scheduled(_ projects: [Project], cap: UInt64) -> [Scheduled] {
+        let candidates = projects
+            .filter { $0.verdict == .dormant && !$0.pinned }
+            .compactMap { p -> Scheduled? in
+                let items = p.items.filter { selectable($0) && $0.kind == .safe }
+                let bytes = items.reduce(0) { $0 + ($1.bytes ?? 0) }
+                return items.isEmpty ? nil : Scheduled(root: p.root, paths: items.map { path($0, in: p) }, bytes: bytes)
+            }
+            .sorted { $0.bytes > $1.bytes }
+        var total: UInt64 = 0
+        return candidates.filter { s in
+            guard total + s.bytes <= cap else { return false }
+            total += s.bytes
+            return true
+        }
+    }
+}

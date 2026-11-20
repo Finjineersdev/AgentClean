@@ -89,6 +89,25 @@ final class AppModel {
         didSet { UserDefaults.standard.set(scanOnOpen, forKey: "scanOnOpen") }
     }
 
+    /// Scheduled clean (P5), off by default.
+    var autoClean: AutoClean {
+        didSet {
+            UserDefaults.standard.set(autoClean.rawValue, forKey: "autoClean")
+            if autoClean != .off { Scheduler.askToNotify() }
+        }
+    }
+
+    /// The most a scheduled clean takes, in GB.
+    var autoCleanCapGB: Int {
+        didSet { UserDefaults.standard.set(autoCleanCapGB, forKey: "autoCleanCapGB") }
+    }
+
+    private(set) var lastAutoClean: Date? {
+        didSet { UserDefaults.standard.set(lastAutoClean, forKey: "lastAutoClean") }
+    }
+
+    private var scheduler: Scheduler?
+
     /// Space the last automatic purge gave back, to show once.
     private(set) var autoFreed: UInt64 = 0
 
@@ -109,7 +128,11 @@ final class AppModel {
         autoFreeDays = UserDefaults.standard.object(forKey: "autoFreeDays") as? Int ?? 7
         otherDrives = UserDefaults.standard.bool(forKey: "otherDrives")
         scanOnOpen = UserDefaults.standard.object(forKey: "scanOnOpen") as? Bool ?? true
+        autoClean = AutoClean(rawValue: UserDefaults.standard.string(forKey: "autoClean") ?? "") ?? .off
+        autoCleanCapGB = UserDefaults.standard.object(forKey: "autoCleanCapGB") as? Int ?? 10
+        lastAutoClean = UserDefaults.standard.object(forKey: "lastAutoClean") as? Date
         restoreSavedScan()
+        if !testRun && engine != nil { scheduler = Scheduler(model: self) }
         if engine == nil { error = "The engine is missing from the app bundle. Reinstall AgentClean." }
     }
 
@@ -229,6 +252,40 @@ final class AppModel {
         skipped = saved.skipped
         summary = saved.summary
         lastScan = saved.date
+    }
+
+    // MARK: Scheduled clean
+
+    /// Runs the scheduled clean when it is due: rescan, then one run of what
+    /// `Selection.scheduled` takes. The engine re-checks every folder.
+    func runScheduleIfDue(now: Date = Date()) async {
+        guard !testRun, let interval = autoClean.interval, !scanning else { return }
+        if let last = lastAutoClean, now.timeIntervalSince(last) < interval { return }
+        toggleScan()
+        await scanTask?.value
+        guard error == nil, summary != nil else { return }
+        lastAutoClean = now
+        guard let run = await runSchedule(cap: UInt64(max(autoCleanCapGB, 1)) * 1_000_000_000) else { return }
+        let moved = run.entries.filter { $0.state == .moved }
+        Scheduler.notify(freed: moved.reduce(0) { $0 + $1.bytes },
+                         projects: Set(moved.map(\.projectRoot)).count,
+                         run: run.runId, freesOn: freesOn)
+    }
+
+    /// One scheduled clean over the current scan; nil when nothing moved.
+    func runSchedule(cap: UInt64) async -> Run? {
+        let plan = Selection.scheduled(projects, cap: cap).compactMap { s in
+            project(s.root).map { CleanPick(project: $0, picked: Set(s.paths)) }
+        }
+        guard !plan.isEmpty, let run = await clean(plan, execute: true)?.run,
+              run.entries.contains(where: { $0.state == .moved }) else { return nil }
+        return run
+    }
+
+    /// Undo from a notification.
+    func undoRun(_ id: String) async {
+        await loadHistory()
+        if let run = runs.first(where: { $0.runId == id }) { await restore(run) }
     }
 
     // MARK: Free space

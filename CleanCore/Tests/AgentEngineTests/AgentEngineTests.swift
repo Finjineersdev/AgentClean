@@ -228,3 +228,30 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(Stats.milestone(for: 12_000_000_000), 10_000_000_000)
     }
 }
+
+final class ScheduleTests: XCTestCase {
+    private func p(_ root: String, _ verdict: Verdict, pinned: Bool = false, safe: UInt64) -> Project {
+        Project(root: root, verdict: verdict, pinned: pinned, reason: "", items: [
+            Item(path: "target", rule: "rust", kind: .safe, bytes: safe, refused: nil),
+            Item(path: ".venv", rule: "python", kind: .caution, bytes: 999, refused: nil),
+            Item(path: "out", rule: "rust", kind: .safe, bytes: 5, refused: "the project's .agentclean.toml keeps this folder"),
+        ])
+    }
+
+    /// P5: a scheduled clean takes Safe, allowed folders in dormant, unpinned
+    /// projects only, biggest first, without passing the cap.
+    func testScheduleTakesOnlyDormantSafeFoldersUnderTheCap() {
+        let projects = [
+            p("/w/idle", .idle, safe: 50),
+            p("/w/active", .active, safe: 60),
+            p("/w/pinned", .dormant, pinned: true, safe: 70),
+            p("/w/small", .dormant, safe: 10),
+            p("/w/big", .dormant, safe: 40),
+            p("/w/huge", .dormant, safe: 500),
+        ]
+        let plan = Selection.scheduled(projects, cap: 55)
+        XCTAssertEqual(plan.map(\.root), ["/w/big", "/w/small"])
+        XCTAssertEqual(plan.flatMap(\.paths), ["/w/big/target", "/w/small/target"])
+        XCTAssertTrue(Selection.scheduled(projects, cap: 5).isEmpty)
+    }
+}
