@@ -202,6 +202,13 @@ extension Font {
 
 func bytes(_ n: UInt64) -> String { ByteFormatter.string(n) }
 
+/// A path with the home folder shown as ~. Uses HOME, as the engine does,
+/// so a run with HOME pointed elsewhere (QA, screenshots) abbreviates too.
+func tildePath(_ path: String) -> String {
+    let home = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
+    return path == home || path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
+}
+
 extension Verdict {
     var label: String {
         switch self {

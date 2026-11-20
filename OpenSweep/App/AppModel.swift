@@ -116,7 +116,7 @@ final class AppModel {
 
     /// What the scan covers, for people.
     var scanScope: String {
-        wholeDisk ? (otherDrives ? "your whole Mac and other drives" : "your whole Mac") : scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
+        wholeDisk ? (otherDrives ? "your whole Mac and other drives" : "your whole Mac") : scanRoots.map { tildePath($0) }.joined(separator: ", ")
     }
 
     init() {

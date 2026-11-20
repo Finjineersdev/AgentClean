@@ -213,7 +213,7 @@ struct OverviewView: View {
             DisclosureGroup("\(model.skipped.count) folders were not scanned") {
                 ForEach(model.skipped, id: \.path) { s in
                     HStack {
-                        Text((s.path as NSString).abbreviatingWithTildeInPath).font(.caption.monospaced())
+                        Text(tildePath(s.path)).font(.caption.monospaced())
                             .lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Text(s.detail).font(.caption)
@@ -475,7 +475,7 @@ struct ProjectRow: View {
             EcosystemStack(ecosystems: project.ecosystems.isEmpty ? [Ecosystem.of(rule: "")] : project.ecosystems)
             VStack(alignment: .leading, spacing: 3) {
                 Text(URL(fileURLWithPath: project.root).lastPathComponent).font(.body.weight(.semibold)).foregroundStyle(Brand.text)
-                Text((project.root as NSString).abbreviatingWithTildeInPath)
+                Text(tildePath(project.root))
                     .font(.caption.monospaced()).foregroundStyle(Brand.muted).lineLimit(1).truncationMode(.middle)
             }
             Spacer(minLength: 12)

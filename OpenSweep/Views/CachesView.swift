@@ -119,7 +119,7 @@ struct CachesView: View {
             EcosystemBadge(ecosystem: Ecosystem.of(cache: c.id), size: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(c.name).font(.headline).foregroundStyle(Brand.text)
-                Text((c.path as NSString).abbreviatingWithTildeInPath).font(.caption).foregroundStyle(Brand.muted)
+                Text(tildePath(c.path)).font(.caption).foregroundStyle(Brand.muted)
                     .lineLimit(1).truncationMode(.middle)
                 if let cmd = c.command, !cmd.isEmpty {
                     Text(c.installed ? "Runs: \(cmd.joined(separator: " "))" : "\(c.tool) is not installed, so it cannot be cleared from here.")

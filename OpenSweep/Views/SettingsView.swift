@@ -40,7 +40,7 @@ struct SettingsView: View {
                 } else {
                     ForEach(model.scanRoots, id: \.self) { root in
                         HStack {
-                            Text((root as NSString).abbreviatingWithTildeInPath)
+                            Text(tildePath(root))
                             Spacer()
                             Button("Remove") { model.scanRoots.removeAll { $0 == root } }
                                 .disabled(model.scanRoots.count == 1)
@@ -108,7 +108,7 @@ struct SettingsView: View {
             Section("Never scan") {
                 ForEach(model.config?.exclude ?? [], id: \.self) { folder in
                     HStack {
-                        Text((folder as NSString).abbreviatingWithTildeInPath)
+                        Text(tildePath(folder))
                         Spacer()
                         Button("Remove") { Task { await model.include(folder) } }
                     }
@@ -145,7 +145,7 @@ struct SettingsView: View {
                 }
                 ForEach(model.config?.pinned ?? [], id: \.self) { folder in
                     HStack {
-                        Text((folder as NSString).abbreviatingWithTildeInPath)
+                        Text(tildePath(folder))
                         if let until = model.config?.pinnedUntil?[folder] {
                             let date = Date(timeIntervalSince1970: TimeInterval(until))
                             Text(date < Date() ? "ended" : "until \(date.formatted(date: .abbreviated, time: .omitted))")

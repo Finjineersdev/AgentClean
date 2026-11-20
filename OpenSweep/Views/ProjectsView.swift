@@ -149,7 +149,7 @@ struct ProjectDetail: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(URL(fileURLWithPath: project.root).lastPathComponent)
                             .font(.system(size: 26, weight: .bold)).tracking(-0.4).foregroundStyle(Brand.text)
-                        Text((project.root as NSString).abbreviatingWithTildeInPath).font(.callout.monospaced()).foregroundStyle(Brand.muted)
+                        Text(tildePath(project.root)).font(.callout.monospaced()).foregroundStyle(Brand.muted)
                             .lineLimit(1).truncationMode(.middle).help(project.root)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
