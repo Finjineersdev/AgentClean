@@ -64,12 +64,13 @@ struct OverviewView: View {
                     }
                 }
                 if model.summary != nil && !stats.isEmpty {
+                    SpaceFlow(stats: stats, hovered: $hovered).entrance(3)
                     DiskMap(stats: stats).entrance(3)
                 }
                 skippedFolders
             }
             .padding(.horizontal, 36).padding(.vertical, 30)
-            .frame(maxWidth: 1080, alignment: .leading)
+            .frame(maxWidth: 1440, alignment: .leading)
             .frame(maxWidth: .infinity)
             .animation(.spring(response: 0.5, dampingFraction: 0.85), value: opened)
         }

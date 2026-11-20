@@ -122,6 +122,14 @@ enum QAWalkthrough {
                 .write(to: out.appendingPathComponent("12-disk-map.png"))
         }
         check(map.cgImage != nil, "the disk map renders")
+        let flow = ImageRenderer(content: SpaceFlow(stats: LanguageStat.of(model.projects), hovered: .constant(nil), animate: false)
+            .padding(24).frame(width: 1100).background(Brand.canvas))
+        flow.scale = 2
+        if let cg = flow.cgImage {
+            try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
+                .write(to: out.appendingPathComponent("13-space-flow.png"))
+        }
+        check(flow.cgImage != nil, "the space flow renders")
 
         // Scheduled clean (P5): dormant projects' Safe folders only, one run, one Undo.
         let sched = await model.runSchedule(cap: 1_000_000_000)
