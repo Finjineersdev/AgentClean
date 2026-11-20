@@ -66,11 +66,17 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
         run: |
-          if [ "$HAS_CERT" = true ]; then ID="$SIGN_IDENTITY"; TEAM="$TEAM_ID"; else ID=-; TEAM=""; fi
+          # Hardened runtime only with a real identity: it makes macOS refuse to
+          # load an ad-hoc signed Sparkle.framework, and only notarization needs it.
+          if [ "$HAS_CERT" = true ]; then
+            ID="$SIGN_IDENTITY"; TEAM="$TEAM_ID"; HARDENED=YES; FLAGS="--timestamp --options runtime"
+          else
+            ID=-; TEAM=""; HARDENED=NO; FLAGS=""
+          fi
           xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
             -derivedDataPath build/dd build CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$ID" DEVELOPMENT_TEAM="$TEAM" \
-            OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" \
+            ENABLE_HARDENED_RUNTIME="$HARDENED" OTHER_CODE_SIGN_FLAGS="$FLAGS" \
             MARKETING_VERSION="${VERSION#v}" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             SPARKLE_PUBLIC_KEY="$SPARKLE_PUBLIC_KEY"
 
@@ -80,7 +86,10 @@ jobs:
           lipo -archs "$APP/Contents/Helpers/agentclean" | grep -q "x86_64 arm64"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "${VERSION#v}"
           codesign --verify --deep --strict --verbose=2 "$APP"
+          # It must start: a library macOS refuses to load ends it at once.
+          "$APP/Contents/MacOS/AgentClean" & pid=$!; sleep 5; kill -0 $pid; kill $pid
           if [ "$HAS_CERT" = true ]; then
+            codesign -dv "$APP" 2>&1 | grep -q "flags=.*runtime"
             codesign -dv "$APP/Contents/Helpers/agentclean" 2>&1 | grep -q "flags=.*runtime"
             codesign -dv "$APP/Contents/Helpers/agentclean" 2>&1 | grep -q "Timestamp="
           fi

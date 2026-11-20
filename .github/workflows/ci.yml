@@ -55,6 +55,13 @@ jobs:
           "$app/Contents/Helpers/agentclean" --version
           test "$(/usr/libexec/PlistBuddy -c 'Print LSMinimumSystemVersion' "$app/Contents/Info.plist")" = 14.0
           codesign --verify --deep --strict "$app"
+      - name: The app starts
+        run: |
+          # dyld ends the app at once if macOS refuses a bundled library (Sparkle).
+          build/dd/Build/Products/Release/AgentClean.app/Contents/MacOS/AgentClean & pid=$!
+          sleep 5
+          kill -0 $pid
+          kill $pid
 
   ui-tests:
     name: UI tests (macOS 15, Xcode 16)

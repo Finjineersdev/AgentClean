@@ -106,6 +106,9 @@ QA the app against throwaway projects with the Debug walkthrough in
 - Never read the observable `AppModel` from `.commands {}` or a Scene-level
   binding setter without a change guard; it spins the main thread.
 - Docker sizes: use `UniqueSize` from `docker system df -v`.
+- Hardened runtime is on only for Developer ID builds (the Release workflow
+  sets it). With an ad-hoc signature it makes macOS refuse the bundled
+  Sparkle.framework and the app dies at launch; CI launches the Release app.
 - The UI test runner is sandboxed: files it writes are quarantined and
   macOS will not execute them. A stand-in tool must be a link to `/bin/sh`
   reading a script file (see the npm fixture).
