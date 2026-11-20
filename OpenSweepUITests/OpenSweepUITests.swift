@@ -195,6 +195,13 @@ final class OpenSweepUITests: XCTestCase {
         XCTAssertTrue(box.waitForExistence(timeout: 15))
         XCTAssertFalse(checked("cache.npm"), "caches are never pre-selected")
         XCTAssertFalse(app.buttons["caches.clear"].isEnabled)
+        // The cache map ticks a cache like its checkbox, and unticks it.
+        let block = app.buttons["cachemap.npm"]
+        XCTAssertTrue(block.exists, "the cache map shows npm")
+        block.click()
+        XCTAssertTrue(checked("cache.npm"), "a block ticks its cache")
+        block.click()
+        XCTAssertFalse(checked("cache.npm"))
         box.click()
         app.buttons["caches.clear"].click()
         let confirm = app.buttons["caches.confirm"]
