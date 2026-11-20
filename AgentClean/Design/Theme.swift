@@ -15,9 +15,9 @@ enum Brand {
     static let text = Color(dark: 0xE6E9EE, light: 0x161A20)
     /// Secondary text: 7.9:1 on the dark canvas; 7:1 on white.
     static let muted = Color(dark: 0xA7AFBC, light: 0x4E5766)
-    static let teal = Color(dark: 0x5FE3C8, light: 0x0B7F6B)
-    static let green = Color(dark: 0x4ADE80, light: 0x15803D)
-    static let amber = Color(dark: 0xF5B83D, light: 0xB45309)
+    static let teal = Color(dark: 0x5FE3C8, light: 0x08695A)
+    static let green = Color(dark: 0x4ADE80, light: 0x166534)
+    static let amber = Color(dark: 0xF5B83D, light: 0x92400E)
     static let sky = Color(dark: 0x7AB8FF, light: 0x1D6FD6)
     static let slate = Color(dark: 0xCBD5E1, light: 0x475569)
     /// Text on a filled accent button.
