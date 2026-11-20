@@ -28,6 +28,10 @@ npm is never run.
 The walkthrough expects projects named `shop-web` (dormant Next.js),
 `live-api` (active) and `keep-me` (pinned); see `OpenSweep/App/QAWalkthrough.swift`.
 
+README screenshots (`docs/assets/screens`) come from this walkthrough in
+both appearances, with the projects under `$Q/home/code` so paths show as
+`~/code/...`; resize with `sips -Z 1400`.
+
 ## UI tests
 
 `xcodebuild test -project OpenSweep.xcodeproj -scheme OpenSweep -destination 'platform=macOS'`.
