@@ -91,7 +91,7 @@ moves.
 **`purge RUN | --older-than-days N`**: `command`, `execute`, `bytes` held by
 the selection, `freed`, and `runs` (after purging when `--execute`).
 
-**`pin [FOLDER]`**, **`unpin FOLDER`**: `{"command":"pin","pinned":[…]}`, the
+**`pin [FOLDER] [--days N | --remote]`**, **`unpin FOLDER`**: `{"command":"pin","pinned":[…],"until":{path: unix seconds},"remotes":["host/owner/repo"]}`. `config` also reports `pinned_until` and `pinned_remotes`; the
 list after the change.
 
 **`config [--idle-days N] [--dormant-days N] [--exclude DIR]… [--include DIR]…`**:

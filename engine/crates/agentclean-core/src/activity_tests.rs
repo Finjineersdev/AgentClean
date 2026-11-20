@@ -404,6 +404,10 @@ fn config_is_read_strictly() {
         dormant_days: 30,
         pinned: vec![PathBuf::from("/w/keep")],
         exclude: vec![PathBuf::from("/w/sdk")],
+        pinned_until: [(PathBuf::from("/w/keep"), 1_900_000_000)]
+            .into_iter()
+            .collect(),
+        pinned_remotes: vec!["github.com/me/app".to_owned()],
     };
     cfg.save(&path).unwrap();
     assert_eq!(Config::load(&path).unwrap(), cfg);
@@ -423,4 +427,99 @@ fn config_is_read_strictly() {
     assert!(Config::load(&path).is_ok());
     // A config that exists but cannot be read is an error, not the default.
     assert!(Config::load(tmp.path()).is_err());
+}
+
+/// P9: a pin can end on a date; after it, the project is judged as usual.
+#[test]
+fn a_pin_until_a_date_ends() {
+    let (_t, root) = project();
+    age_all(&root, 200);
+    let now = SystemTime::now();
+    let secs = now
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let with_until = |until: u64| Config {
+        pinned: vec![root.clone()],
+        pinned_until: [(root.clone(), until)].into_iter().collect(),
+        ..Config::default()
+    };
+    assert!(assess(
+        &root,
+        &rules(),
+        &with_until(secs + 86_400),
+        Some(&quiet()),
+        now
+    )
+    .pinned());
+    assert!(!assess(&root, &rules(), &with_until(secs - 1), Some(&quiet()), now).pinned());
+}
+
+/// P9: a pin on a git remote follows the project to any folder, whatever
+/// form the URL takes.
+#[test]
+fn a_pin_on_a_git_remote_follows_the_project() {
+    let (_t, root) = project();
+    fs::create_dir_all(root.join(".git")).unwrap();
+    fs::write(
+        root.join(".git/config"),
+        "[core]\n\tbare = false\n[remote \"upstream\"]\n\turl = https://example.com/other/thing\n[remote \"origin\"]\n\turl = git@GitHub.com:me/app.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n",
+    )
+    .unwrap();
+    assert_eq!(
+        crate::activity::git_remote(&root).as_deref(),
+        Some("github.com/me/app")
+    );
+    let cfg = |remote: &str| Config {
+        pinned_remotes: vec![remote.to_owned()],
+        ..Config::default()
+    };
+    for same in [
+        "https://github.com/me/app",
+        "ssh://git@github.com/me/app.git/",
+        "github.com/me/app",
+    ] {
+        assert!(
+            assess(
+                &root,
+                &rules(),
+                &cfg(same),
+                Some(&quiet()),
+                SystemTime::now()
+            )
+            .pinned(),
+            "{same}"
+        );
+    }
+    assert!(!assess(
+        &root,
+        &rules(),
+        &cfg("github.com/me/other"),
+        Some(&quiet()),
+        SystemTime::now()
+    )
+    .pinned());
+    // No repository, no remote pin.
+    fs::remove_dir_all(root.join(".git")).unwrap();
+    assert!(!assess(
+        &root,
+        &rules(),
+        &cfg("github.com/me/app"),
+        Some(&quiet()),
+        SystemTime::now()
+    )
+    .pinned());
+}
+
+#[test]
+fn old_config_files_still_load() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("config.toml");
+    fs::write(
+        &path,
+        "idle_days = 7\ndormant_days = 60\npinned = [\"/w/keep\"]\nexclude = []\n",
+    )
+    .unwrap();
+    let cfg = Config::load(&path).unwrap();
+    assert!(cfg.pinned_until.is_empty() && cfg.pinned_remotes.is_empty());
 }

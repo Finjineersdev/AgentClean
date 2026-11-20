@@ -89,12 +89,24 @@ struct SettingsView: View {
             }
 
             Section("Pinned: never cleaned") {
-                if model.config?.pinned.isEmpty ?? true {
+                if (model.config?.pinned.isEmpty ?? true) && (model.config?.pinnedRemotes ?? []).isEmpty {
                     Text("Nothing is pinned. Pin a project from its page.").foregroundStyle(.secondary)
+                }
+                ForEach(model.config?.pinnedRemotes ?? [], id: \.self) { remote in
+                    HStack {
+                        Label(remote, systemImage: "arrow.triangle.branch")
+                        Spacer()
+                        Text("any folder").foregroundStyle(.secondary)
+                    }
                 }
                 ForEach(model.config?.pinned ?? [], id: \.self) { folder in
                     HStack {
                         Text((folder as NSString).abbreviatingWithTildeInPath)
+                        if let until = model.config?.pinnedUntil?[folder] {
+                            let date = Date(timeIntervalSince1970: TimeInterval(until))
+                            Text(date < Date() ? "ended" : "until \(date.formatted(date: .abbreviated, time: .omitted))")
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
                         Button("Unpin") { Task { await model.setPinned(folder, false) } }
                     }

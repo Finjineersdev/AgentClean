@@ -376,11 +376,11 @@ final class AppModel {
         do { config = try await engine.config(include: [URL(fileURLWithPath: folder)]) } catch { self.error = describe(error) }
     }
 
-    func setPinned(_ root: String, _ pinned: Bool) async {
+    func setPinned(_ root: String, _ pinned: Bool, days: Int? = nil, remote: Bool = false) async {
         guard let engine else { return }
         do {
             let url = URL(fileURLWithPath: root)
-            _ = pinned ? try await engine.pin(url) : try await engine.unpin(url)
+            _ = pinned ? try await engine.pin(url, days: days, remote: remote) : try await engine.unpin(url)
             await loadConfig()
             await refresh(root)
         } catch {

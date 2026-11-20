@@ -5,7 +5,7 @@
 //! An [`Activity`] can only be made here, and [`crate::guard::Guard::check`]
 //! takes one, so nothing is approved without an activity assessment (I15).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -33,6 +33,11 @@ pub struct Config {
     pub pinned: Vec<PathBuf>,
     /// Folders `scan` does not look in.
     pub exclude: Vec<PathBuf>,
+    /// A pin in `pinned` ends at this time (Unix seconds).
+    pub pinned_until: BTreeMap<PathBuf, u64>,
+    /// Repositories pinned wherever they are cloned: normalised `origin`
+    /// remotes (`host/owner/repo`).
+    pub pinned_remotes: Vec<String>,
 }
 
 impl Default for Config {
@@ -42,6 +47,8 @@ impl Default for Config {
             dormant_days: 90,
             pinned: Vec::new(),
             exclude: Vec::new(),
+            pinned_until: BTreeMap::new(),
+            pinned_remotes: Vec::new(),
         }
     }
 }
@@ -91,12 +98,71 @@ impl Config {
         std::fs::rename(&tmp, path).map_err(err)
     }
 
-    fn pinned(&self, root: &Path) -> bool {
-        self.pinned.iter().any(|p| {
+    fn pinned(&self, root: &Path, now: SystemTime) -> bool {
+        let now = now
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let by_path = self.pinned.iter().any(|p| {
+            let live = self.pinned_until.get(p).map_or(true, |&until| until > now);
             let p = std::fs::canonicalize(p).unwrap_or_else(|_| p.clone());
-            root.starts_with(p)
-        })
+            live && root.starts_with(p)
+        });
+        by_path
+            || (!self.pinned_remotes.is_empty()
+                && git_remote(root).is_some_and(|r| {
+                    self.pinned_remotes
+                        .iter()
+                        .any(|p| normalise_remote(p).as_deref() == Some(r.as_str()))
+                }))
     }
+}
+
+/// The `origin` remote of the repository at `root`, normalised, read from
+/// `.git/config` as text: git is not run, and a repository can only make
+/// itself pinned, never unpin another.
+pub fn git_remote(root: &Path) -> Option<String> {
+    let path = root.join(".git/config");
+    let meta = std::fs::symlink_metadata(&path).ok()?;
+    if !meta.is_file() || meta.len() > 256 * 1024 {
+        return None;
+    }
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut in_origin = false;
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_origin = line.replace(' ', "") == "[remote\"origin\"]";
+        } else if in_origin {
+            if let Some((k, v)) = line.split_once('=') {
+                if k.trim() == "url" {
+                    return normalise_remote(v.trim());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// `git@host:owner/repo.git`, `https://user@host/owner/repo/` and
+/// `ssh://git@host/owner/repo` all become `host/owner/repo` (host lowercased).
+pub fn normalise_remote(url: &str) -> Option<String> {
+    let url = url.trim();
+    let rest = match url.split_once("://") {
+        Some((_, rest)) => rest.to_owned(),
+        // scp-like: user@host:path
+        None => url.replacen(
+            ':',
+            "/",
+            usize::from(url.contains('@') || !url.starts_with('/')),
+        ),
+    };
+    let rest = rest.rsplit_once('@').map_or(rest.as_str(), |(_, r)| r);
+    let rest = rest
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .trim_end_matches('/');
+    let (host, path) = rest.split_once('/')?;
+    let host = host.split(':').next().unwrap_or(host).to_lowercase();
+    (!host.is_empty() && !path.is_empty()).then(|| format!("{host}/{path}"))
 }
 
 /// Where `config.toml` lives by default.
@@ -306,7 +372,7 @@ pub fn assess(
     let busy = processes.map(|p| p.inside(&canon));
     let mut activity = decide(cfg, now, commit, edit, walked, busy);
     activity.root = root.to_path_buf();
-    if cfg.pinned(&canon) {
+    if cfg.pinned(&canon, now) {
         activity.pinned = true;
         activity.reason = format!("pinned; {}", activity.reason);
     }

@@ -86,8 +86,12 @@ public struct Engine: Sendable {
         return out.pinned
     }
 
-    public func pin(_ folder: URL) async throws -> [String] {
-        let out: PinsOutput = try await call(["pin", "--", folder.path])
+    /// Pins a folder (for `days` days, or for good), or with `remote` its git repository wherever it is cloned.
+    public func pin(_ folder: URL, days: Int? = nil, remote: Bool = false) async throws -> [String] {
+        var args = ["pin"]
+        if let days { args += ["--days", String(days)] }
+        if remote { args.append("--remote") }
+        let out: PinsOutput = try await call(args + ["--", folder.path])
         return out.pinned
     }
 

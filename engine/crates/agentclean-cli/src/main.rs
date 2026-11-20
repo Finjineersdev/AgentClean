@@ -109,7 +109,16 @@ enum Cmd {
         projects: Vec<PathBuf>,
     },
     /// Never clean this folder or anything inside it; with no folder, list pins
-    Pin { folder: Option<PathBuf> },
+    Pin {
+        folder: Option<PathBuf>,
+        /// Only for this many days; then the project is judged as usual
+        #[arg(long, value_name = "N", conflicts_with = "remote")]
+        days: Option<u64>,
+        /// Pin the folder's git repository (its origin remote) wherever it
+        /// is cloned, instead of this path
+        #[arg(long)]
+        remote: bool,
+    },
     /// Remove a pin
     Unpin { folder: PathBuf },
     /// Show the settings, or change them. Changes only AgentClean's config.
@@ -248,7 +257,11 @@ fn main() -> ExitCode {
             &only,
             &store,
         ),
-        Cmd::Pin { folder } => pin(folder.as_deref()),
+        Cmd::Pin {
+            folder,
+            days,
+            remote,
+        } => pin(folder.as_deref(), days, remote),
         Cmd::Unpin { folder } => unpin(&folder),
         Cmd::Config {
             idle_days,
@@ -317,20 +330,37 @@ fn lossy(p: &Path) -> String {
 fn print_pins(cfg: &Config) {
     if json_mode() {
         let pins: Vec<String> = cfg.pinned.iter().map(|p| lossy(p)).collect();
-        put("command", "pin", json!({ "pinned": pins }));
+        let until: serde_json::Map<String, Value> = cfg
+            .pinned_until
+            .iter()
+            .map(|(p, t)| (lossy(p), json!(t)))
+            .collect();
+        put(
+            "command",
+            "pin",
+            json!({ "pinned": pins, "until": until, "remotes": cfg.pinned_remotes }),
+        );
     }
 }
 
-fn pin(folder: Option<&Path>) -> CliResult {
+fn pin(folder: Option<&Path>, days: Option<u64>, remote: bool) -> CliResult {
     let path = config_path()?;
     let mut cfg = Config::load(&path)?;
     let Some(folder) = folder else {
         print_pins(&cfg);
         if !json_mode() {
-            if cfg.pinned.is_empty() {
+            if cfg.pinned.is_empty() && cfg.pinned_remotes.is_empty() {
                 say!("Nothing is pinned.");
             }
-            cfg.pinned.iter().for_each(|p| say!("{}", p.display()));
+            for p in &cfg.pinned {
+                match cfg.pinned_until.get(p) {
+                    Some(t) => say!("{}  (until {})", p.display(), day(*t)),
+                    None => say!("{}", p.display()),
+                }
+            }
+            cfg.pinned_remotes
+                .iter()
+                .for_each(|r| say!("{r}  (repository, any folder)"));
         }
         return Ok(ExitCode::SUCCESS);
     };
@@ -338,13 +368,40 @@ fn pin(folder: Option<&Path>) -> CliResult {
     if !folder.is_dir() {
         return Err(format!("{} is not a folder", folder.display()));
     }
+    if remote {
+        let r = activity::git_remote(&folder)
+            .ok_or_else(|| format!("{} has no origin remote to pin", folder.display()))?;
+        if !cfg.pinned_remotes.contains(&r) {
+            cfg.pinned_remotes.push(r.clone());
+        }
+        cfg.save(&path)?;
+        print_pins(&cfg);
+        if !json_mode() {
+            say!("Pinned {r}: no clone of it will be cleaned, wherever it is.");
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
     if !cfg.pinned.contains(&folder) {
         cfg.pinned.push(folder.clone());
-        cfg.save(&path)?;
     }
+    match days {
+        Some(d) => {
+            cfg.pinned_until.insert(
+                folder.clone(),
+                now_unix().saturating_add(d.saturating_mul(86_400)),
+            );
+        }
+        None => {
+            cfg.pinned_until.remove(&folder);
+        }
+    }
+    cfg.save(&path)?;
     print_pins(&cfg);
     if !json_mode() {
-        say!("Pinned {}: it will never be cleaned.", folder.display());
+        match days {
+            Some(d) => say!("Pinned {} for {d} days.", folder.display()),
+            None => say!("Pinned {}: it will never be cleaned.", folder.display()),
+        }
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -353,9 +410,14 @@ fn unpin(folder: &Path) -> CliResult {
     let path = config_path()?;
     let mut cfg = Config::load(&path)?;
     let canon = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
-    let before = cfg.pinned.len();
+    let before = cfg.pinned.len() + cfg.pinned_remotes.len();
     cfg.pinned.retain(|p| p != folder && p != &canon);
-    if cfg.pinned.len() == before {
+    cfg.pinned_until.retain(|p, _| p != folder && p != &canon);
+    if let Some(r) = activity::git_remote(&canon) {
+        cfg.pinned_remotes
+            .retain(|p| activity::normalise_remote(p).as_deref() != Some(r.as_str()));
+    }
+    if cfg.pinned.len() + cfg.pinned_remotes.len() == before {
         return Err(format!("{} is not pinned", folder.display()));
     }
     cfg.save(&path)?;
@@ -408,6 +470,8 @@ fn config(
                 "dormant_days": cfg.dormant_days,
                 "pinned": list(&cfg.pinned),
                 "exclude": list(&cfg.exclude),
+                "pinned_until": cfg.pinned_until.iter().map(|(p, t)| (lossy(p), json!(t))).collect::<serde_json::Map<_, _>>(),
+                "pinned_remotes": cfg.pinned_remotes,
             }),
         );
     } else {
@@ -1241,5 +1305,29 @@ fn human(bytes: u64) -> String {
         format!("{bytes} B")
     } else {
         format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+/// A Unix time as a UTC date, `YYYY-MM-DD` (Howard Hinnant's civil_from_days).
+fn day(unix: u64) -> String {
+    let z = i64::try_from(unix / 86_400).unwrap_or(0) + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+#[cfg(test)]
+mod day_tests {
+    #[test]
+    fn dates_are_utc_calendar_days() {
+        assert_eq!(super::day(0), "1970-01-01");
+        assert_eq!(super::day(951_782_400), "2000-02-29");
+        assert_eq!(super::day(1_795_651_200), "2026-11-26");
     }
 }

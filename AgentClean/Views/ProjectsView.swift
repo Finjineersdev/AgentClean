@@ -122,8 +122,22 @@ struct ProjectDetail: View {
                             .lineLimit(1).truncationMode(.middle).help(project.root)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Button(project.pinned ? "Unpin" : "Pin") {
-                        Task { await model.setPinned(project.root, !project.pinned) }
+                    Group {
+                        if project.pinned {
+                            Button("Unpin") { Task { await model.setPinned(project.root, false) } }
+                        } else {
+                            Menu("Pin") {
+                                Button("Pin for good") { Task { await model.setPinned(project.root, true) } }
+                                Button("Pin for 30 days") { Task { await model.setPinned(project.root, true, days: 30) } }
+                                Button("Pin this repository wherever it is cloned") {
+                                    Task { await model.setPinned(project.root, true, remote: true) }
+                                }
+                                .disabled(!FileManager.default.fileExists(atPath: project.root + "/.git/config"))
+                            } primaryAction: {
+                                Task { await model.setPinned(project.root, true) }
+                            }
+                            .menuStyle(.button).fixedSize()
+                        }
                     }
                     .buttonStyle(SecondaryButtonStyle())
                     .help(project.pinned ? "Allow cleaning this project again" : "Never clean this project")

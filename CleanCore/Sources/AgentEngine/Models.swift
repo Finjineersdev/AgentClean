@@ -194,6 +194,10 @@ public struct ConfigOutput: Codable, Sendable, Hashable {
     public let dormantDays: Int
     public let pinned: [String]
     public let exclude: [String]
+    /// Pin end times (Unix seconds) by path.
+    public let pinnedUntil: [String: UInt64]?
+    /// Repositories pinned wherever they are cloned (`host/owner/repo`).
+    public let pinnedRemotes: [String]?
 }
 
 /// A global tool cache (ADR 0006). `command` is empty when the cache is
