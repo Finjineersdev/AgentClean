@@ -4,17 +4,46 @@ import AgentEngine
 struct ProjectsView: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
+    @AppStorage("projectsShowAll") private var showAll = false
+    @AppStorage("projectsSort") private var sort = Sort.size
+
+    enum Sort: String, CaseIterable { case size, name }
 
     private var rows: [AgentEngine.Project] {
-        model.projects
+        (showAll ? model.projects : model.cleanable)
             .filter { search.isEmpty || $0.root.localizedCaseInsensitiveContains(search) }
-            .sorted { model.total($0) > model.total($1) }
+            .sorted {
+                switch sort {
+                case .size: model.total($0) > model.total($1)
+                case .name: URL(fileURLWithPath: $0.root).lastPathComponent.localizedStandardCompare(URL(fileURLWithPath: $1.root).lastPathComponent) == .orderedAscending
+                }
+            }
+    }
+
+    private var subtitle: String {
+        let shown = rows.count
+        return showAll ? "\(model.projects.count) found" : "\(shown) of \(model.projects.count) have something to clean"
     }
 
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(title: "Projects", subtitle: "\(model.projects.count) found, biggest first")
+                ScreenHeader(title: "Projects", subtitle: subtitle)
+                HStack(spacing: 8) {
+                    Picker("Show", selection: $showAll) {
+                        Text("To clean").tag(false)
+                        Text("All").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .accessibilityIdentifier("projects.filter")
+                    Spacer()
+                    Picker("Sort", selection: $sort) {
+                        Text("Biggest first").tag(Sort.size)
+                        Text("Name").tag(Sort.name)
+                    }
+                    .labelsHidden().fixedSize()
+                    .accessibilityLabel("Sort projects")
+                }
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Brand.muted).accessibilityHidden(true)
                     TextField("Search", text: $search).textFieldStyle(.plain)
@@ -207,9 +236,17 @@ extension CleanOutput: @retroactive Identifiable {
 struct ReviewSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let project: AgentEngine.Project
-    let picked: Set<String>
+    let plan: [CleanPick]
     let dryRun: CleanOutput
+
+    init(plan: [CleanPick], dryRun: CleanOutput) {
+        self.plan = plan
+        self.dryRun = dryRun
+    }
+
+    init(project: AgentEngine.Project, picked: Set<String>, dryRun: CleanOutput) {
+        self.init(plan: [CleanPick(project: project, picked: picked)], dryRun: dryRun)
+    }
     @State private var done: CleanOutput?
     @State private var busy = false
 
@@ -219,13 +256,16 @@ struct ReviewSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             Text(done == nil ? "Move to quarantine?" : "Moved to quarantine")
                 .font(.title2.weight(.semibold))
-            Text(done == nil
-                 ? "\(shown.folders) folders, \(bytes(shown.bytes)). They stay restorable until you purge them in History; space comes back when you purge."
-                 : "\(done?.run?.entries.filter { $0.state == .moved }.count ?? 0) folders moved. Undo from here or from History.")
+            Text(done == nil ? before : after)
                 .foregroundStyle(Brand.muted)
+                .fixedSize(horizontal: false, vertical: true)
 
             List {
-                ForEach(shown.projects.flatMap(\.items), id: \.path) { item in
+                ForEach(shown.projects, id: \.root) { p in
+                    if shown.projects.count > 1 {
+                        Text(URL(fileURLWithPath: p.root).lastPathComponent).font(.headline).foregroundStyle(Brand.text)
+                    }
+                ForEach(p.items, id: \.path) { item in
                     HStack {
                         Image(systemName: item.action == .move ? "arrow.right.circle.fill" : "minus.circle")
                             .foregroundStyle(item.action == .move ? Brand.teal : Brand.slate)
@@ -235,6 +275,7 @@ struct ReviewSheet: View {
                         Spacer()
                         Text(item.bytes.map(bytes) ?? (item.reason ?? "kept")).foregroundStyle(Brand.muted)
                     }
+                }
                 }
                 if let entries = done?.run?.entries.filter({ $0.state != .moved }), !entries.isEmpty {
                     ForEach(entries, id: \.stored) { e in
@@ -259,7 +300,7 @@ struct ReviewSheet: View {
                     Button("Move \(shown.folders) folders") {
                         Task {
                             busy = true
-                            done = await model.clean(picked, in: project, execute: true)
+                            done = await model.clean(plan, execute: true)
                             busy = false
                         }
                     }
@@ -273,7 +314,23 @@ struct ReviewSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 560, height: 460)
+        .frame(width: 560, height: plan.count > 1 ? 560 : 460)
+    }
+
+    private var projectsText: String {
+        plan.count > 1 ? " in \(plan.count) projects" : ""
+    }
+
+    private var before: String {
+        let back = model.freesOn.map { "The space comes back on its own on \($0.formatted(date: .abbreviated, time: .omitted)), or purge sooner in History." }
+            ?? "The space comes back when you purge them in History."
+        return "\(shown.folders) folders\(projectsText), \(bytes(shown.bytes)). They stay restorable until then. \(back)"
+    }
+
+    private var after: String {
+        let moved = done?.run?.entries.filter { $0.state == .moved }.count ?? 0
+        let back = model.freesOn.map { " Space comes back on \($0.formatted(date: .abbreviated, time: .omitted))." } ?? " Purge in History to free the space."
+        return "\(moved) folders moved. Undo from here or from History.\(back)"
     }
 }
 
@@ -306,5 +363,33 @@ struct CompactProjectRow: View {
         .padding(.horizontal, 10).padding(.vertical, 9)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// "Review all ready": one dry run over every project's default ticks
+/// (optionally one language's), then the usual Review sheet with one Undo.
+struct ReviewAllButton: View {
+    @Environment(AppModel.self) private var model
+    var rule: String? = nil
+    var title = "Review all ready"
+    @State private var review: CleanOutput?
+    @State private var plan: [CleanPick] = []
+    @State private var busy = false
+
+    var body: some View {
+        let ready = model.readyPlan(rule: rule)
+        Button(title) {
+            Task {
+                busy = true
+                plan = ready
+                review = await model.clean(plan, execute: false)
+                busy = false
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(ready.isEmpty || busy || model.scanning)
+        .help(ready.isEmpty ? "Nothing is ready: active, pinned and reinstall folders are left for you to pick." : "Safe folders in idle and dormant projects")
+        .accessibilityIdentifier(rule.map { "reviewAll.\($0)" } ?? "reviewAll")
+        .sheet(item: $review) { out in ReviewSheet(plan: plan, dryRun: out) }
     }
 }

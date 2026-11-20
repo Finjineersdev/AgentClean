@@ -40,3 +40,23 @@ public enum Selection {
             .reduce(0) { $0 + ($1.bytes ?? 0) }
     }
 }
+
+extension ScanSummary {
+    /// The engine's scan totals (`Totals::add` in the CLI), recomputed from
+    /// projects after a clean, restore or pin changes them.
+    public init(totalling projects: [Project]) {
+        var ready = (0, UInt64(0)), caution = (0, UInt64(0)), active = (0, UInt64(0))
+        for p in projects {
+            for item in p.items {
+                guard let b = item.bytes else { continue }
+                if p.verdict == .active { active.0 += 1; active.1 += b }
+                else if item.kind == .caution { caution.0 += 1; caution.1 += b }
+                else { ready.0 += 1; ready.1 += b }
+            }
+        }
+        self.init(projects: projects.count,
+                  ready: Bucket(folders: ready.0, bytes: ready.1),
+                  caution: Bucket(folders: caution.0, bytes: caution.1),
+                  active: Bucket(folders: active.0, bytes: active.1))
+    }
+}

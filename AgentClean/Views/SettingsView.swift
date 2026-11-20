@@ -46,6 +46,24 @@ struct SettingsView: View {
             }
 
             Section {
+                @Bindable var model = model
+                Picker("Free quarantined space", selection: $model.autoFreeDays) {
+                    Text("After 1 day").tag(1)
+                    Text("After 7 days").tag(7)
+                    Text("After 30 days").tag(30)
+                    Text("Only when I purge").tag(0)
+                }
+                .accessibilityIdentifier("settings.autoFree")
+                Toggle("Rescan when AgentClean opens", isOn: $model.scanOnOpen)
+                    .accessibilityIdentifier("settings.scanOnOpen")
+            } header: {
+                Text("Space and scans")
+            } footer: {
+                Text("Cleaned folders wait in quarantine so you can undo; after this long they are deleted for good and the space comes back. The last scan is kept, and refreshed in the background when it is over an hour old.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Stepper("Active if changed within \(idle) days", value: $idle, in: 1...dormant)
                 Stepper("Dormant after \(dormant) days", value: $dormant, in: idle...3650)
                 Button("Save") { Task { await model.setDays(idle: idle, dormant: dormant) } }

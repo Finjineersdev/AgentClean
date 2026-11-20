@@ -37,7 +37,7 @@ final class AppModel {
 
     // Scan
     private(set) var projects: [Project] = []
-    private(set) var skipped: [(path: String, detail: String)] = []
+    private(set) var skipped: [SkippedFolder] = []
     private(set) var summary: ScanSummary?
     private(set) var scanning = false
     private(set) var lastScan: Date?
@@ -72,6 +72,22 @@ final class AppModel {
     /// Folders the last scan could not read because of macOS privacy settings.
     var privacyBlocked: Int { skipped.filter { $0.detail.contains("Operation not permitted") }.count }
 
+    /// Quarantined runs are purged after this many days, freeing their space; 0 keeps them until purged by hand.
+    var autoFreeDays: Int {
+        didSet { UserDefaults.standard.set(autoFreeDays, forKey: "autoFreeDays") }
+    }
+
+    /// Rescan in the background when the app opens and the last scan is over an hour old.
+    var scanOnOpen: Bool {
+        didSet { UserDefaults.standard.set(scanOnOpen, forKey: "scanOnOpen") }
+    }
+
+    /// Space the last automatic purge gave back, to show once.
+    private(set) var autoFreed: UInt64 = 0
+
+    /// Tests and the QA walkthrough pass -scanRoots: no scan or purge starts on its own.
+    private let testRun = ProcessInfo.processInfo.arguments.contains("-scanRoots")
+
     /// What the scan covers, for people.
     var scanScope: String {
         wholeDisk ? "your whole Mac" : scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
@@ -83,6 +99,9 @@ final class AppModel {
         // Tests and the QA walkthrough pass -scanRoots: scan only those.
         wholeDisk = UserDefaults.standard.object(forKey: "wholeDisk") as? Bool
             ?? !ProcessInfo.processInfo.arguments.contains("-scanRoots")
+        autoFreeDays = UserDefaults.standard.object(forKey: "autoFreeDays") as? Int ?? 7
+        scanOnOpen = UserDefaults.standard.object(forKey: "scanOnOpen") as? Bool ?? true
+        restoreSavedScan()
         if engine == nil { error = "The engine is missing from the app bundle. Reinstall AgentClean." }
     }
 
@@ -121,11 +140,12 @@ final class AppModel {
                 for try await event in engine.scan(roots: roots, wholeDisk: whole) {
                     switch event {
                     case .project(let p): projects.append(p)
-                    case .skipped(let path, _, let detail): skipped.append((path, detail))
+                    case .skipped(let path, _, let detail): skipped.append(SkippedFolder(path: path, detail: detail))
                     case .summary(let s): summary = s
                     }
                 }
                 lastScan = Date()
+                saveScan()
             } catch is CancellationError {
             } catch {
                 if !Task.isCancelled { self.error = describe(error) }
@@ -135,13 +155,102 @@ final class AppModel {
     }
 
     /// Re-reads one project after a clean, restore or pin.
-    func refresh(_ root: String) async {
+    func refresh(_ root: String, persist: Bool = true) async {
         guard let engine else { return }
         do {
             let fresh = try await engine.plan(project: URL(fileURLWithPath: root)).project
             if let i = projects.firstIndex(where: { $0.root == root }) { projects[i] = fresh }
         } catch {
             projects.removeAll { $0.root == root }
+        }
+        if persist { settle() }
+    }
+
+    /// Totals and the saved scan follow the projects after they change.
+    private func settle() {
+        if summary != nil { summary = ScanSummary(totalling: projects) }
+        saveScan()
+    }
+
+    /// Starts a background rescan when the saved one is over an hour old.
+    /// The first scan is always the person's choice.
+    func scanIfStale() {
+        guard !testRun, scanOnOpen, !scanning, let last = lastScan, last.timeIntervalSinceNow < -3600 else { return }
+        toggleScan()
+    }
+
+    // MARK: Saved scan
+
+    /// The last scan, so the app opens with results instead of an empty screen.
+    private struct SavedScan: Codable {
+        let scope: String
+        let date: Date
+        let projects: [Project]
+        let skipped: [SkippedFolder]
+        let summary: ScanSummary?
+    }
+
+    private var scopeKey: String { wholeDisk ? "whole-disk" : scanRoots.joined(separator: "\n") }
+
+    private static var savedScanURL: URL {
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? CMConstants.homePath
+        return URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/AgentClean/last-scan.json")
+    }
+
+    private func saveScan() {
+        guard lastScan != nil else { return }
+        let saved = SavedScan(scope: scopeKey, date: lastScan ?? Date(), projects: projects, skipped: skipped, summary: summary)
+        do {
+            let url = Self.savedScanURL
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(saved).write(to: url, options: .atomic)
+        } catch {
+            // ponytail: a scan that cannot be saved still works; it is only rescanned next launch.
+        }
+    }
+
+    /// Reads the saved scan if it covered what is chosen now.
+    private func restoreSavedScan() {
+        guard !testRun, let data = try? Data(contentsOf: Self.savedScanURL),
+              let saved = try? JSONDecoder().decode(SavedScan.self, from: data),
+              saved.scope == scopeKey else { return }
+        projects = saved.projects
+        skipped = saved.skipped
+        summary = saved.summary
+        lastScan = saved.date
+    }
+
+    // MARK: Free space
+
+    /// Purges quarantined runs older than `autoFreeDays`, through the engine.
+    func freeExpired() async {
+        guard !testRun, autoFreeDays > 0, let engine else { return }
+        do {
+            let out = try await engine.purge(olderThanDays: autoFreeDays, execute: true)
+            if out.freed > 0 {
+                autoFreed = out.freed
+                await loadHistory()
+            }
+        } catch {
+            self.error = describe(error)
+        }
+    }
+
+    /// When a clean made today gives its space back on its own, if it does.
+    var freesOn: Date? {
+        autoFreeDays > 0 ? Calendar.current.date(byAdding: .day, value: autoFreeDays, to: Date()) : nil
+    }
+
+    /// What "clean everything ready" takes: the folders each project starts
+    /// with ticked (Safe, allowed, not active or pinned), optionally one language's.
+    func readyPlan(rule: String? = nil) -> [CleanPick] {
+        projects.compactMap { p in
+            var picked = Selection.defaults(for: p)
+            if let rule {
+                let ofRule = Set(p.items.filter { $0.rule == rule }.map { Selection.path($0, in: p) })
+                picked.formIntersection(ofRule)
+            }
+            return picked.isEmpty ? nil : CleanPick(project: p, picked: picked)
         }
     }
 
@@ -153,17 +262,25 @@ final class AppModel {
     }
 
     func clean(_ picked: Set<String>, in project: Project, execute: Bool) async -> CleanOutput? {
-        guard let engine, !picked.isEmpty else { return nil }
-        let flags = Selection.flags(for: picked, in: project)
+        await clean([CleanPick(project: project, picked: picked)], execute: execute)
+    }
+
+    /// One engine run over several projects, so a single Undo restores them all.
+    func clean(_ plan: [CleanPick], execute: Bool) async -> CleanOutput? {
+        let plan = plan.filter { !$0.picked.isEmpty }
+        guard let engine, !plan.isEmpty else { return nil }
+        let caution = plan.contains { Selection.flags(for: $0.picked, in: $0.project).caution }
+        let active = plan.contains { $0.project.verdict == .active }
         do {
             let out = try await engine.clean(
-                projects: [URL(fileURLWithPath: project.root)],
-                only: picked.sorted().map { URL(fileURLWithPath: $0) },
-                includeCaution: flags.caution,
-                includeActive: flags.active,
+                projects: plan.map { URL(fileURLWithPath: $0.project.root) },
+                only: plan.flatMap(\.picked).sorted().map { URL(fileURLWithPath: $0) },
+                includeCaution: caution,
+                includeActive: active,
                 execute: execute)
             if execute {
-                await refresh(project.root)
+                for pick in plan { await refresh(pick.project.root, persist: false) }
+                settle()
                 await loadHistory()
             }
             return out
@@ -185,7 +302,8 @@ final class AppModel {
         do {
             let back = try await engine.restore(run: run.runId, item: item)
             await loadHistory()
-            for root in Set(back.entries.map(\.projectRoot)) { await refresh(root) }
+            for root in Set(back.entries.map(\.projectRoot)) { await refresh(root, persist: false) }
+            settle()
             if let stuck = back.entries.first(where: { $0.state == .moved && $0.note != nil }) {
                 error = "Some folders stayed in quarantine: \(stuck.note ?? "")"
             }
@@ -304,4 +422,15 @@ enum FullDiskAccess {
             NSWorkspace.shared.open(url)
         }
     }
+}
+
+struct SkippedFolder: Codable, Hashable {
+    let path: String
+    let detail: String
+}
+
+/// Folders ticked in one project, for a clean.
+struct CleanPick: Hashable {
+    let project: Project
+    let picked: Set<String>
 }

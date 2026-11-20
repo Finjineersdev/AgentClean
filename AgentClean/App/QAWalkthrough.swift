@@ -93,6 +93,18 @@ enum QAWalkthrough {
             snap("08-history-restored")
         }
 
+        // Review all ready: one run across projects, one Undo (gap review P1).
+        let plan = model.readyPlan()
+        check(plan.count >= 2 && !plan.contains { $0.project.verdict == .active || $0.project.pinned },
+              "review all ready spans \(plan.count) projects, none active or pinned")
+        let before = model.summary?.ready.bytes ?? 0
+        let bulk = await model.clean(plan, execute: true)
+        let cleanedRoots = Set(bulk?.run?.entries.filter { $0.state == .moved }.map(\.projectRoot) ?? [])
+        check(cleanedRoots.count == plan.count, "one run cleaned every ready project")
+        check((model.summary?.ready.bytes ?? 0) < before, "totals drop after a bulk clean")
+        if let run = bulk?.run { await model.restore(run) }
+        check(model.summary?.ready.bytes == before, "one Undo restores them all")
+
         // Global caches: needs ~/.npm/_cacache and a stand-in npm on PATH
         // (see QA-CHECKLIST.md); never the real npm.
         model.screen = .caches

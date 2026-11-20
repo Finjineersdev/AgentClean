@@ -157,6 +157,7 @@ struct OverviewView: View {
                     Text("\(s.ready.folders) folders that rebuild on their own, across \(stats.count) \(stats.count == 1 ? "language" : "languages").")
                         .font(.title3).foregroundStyle(Brand.muted)
                     HStack(spacing: 8) {
+                        ReviewAllButton()
                         if s.caution.bytes > 0 { StatusChip(text: "\(bytes(s.caution.bytes)) needs a reinstall", systemImage: "exclamationmark.triangle.fill", tint: Brand.amber) }
                         if s.active.bytes > 0 { StatusChip(text: "\(bytes(s.active.bytes)) in active projects", systemImage: "bolt.fill", tint: Brand.sky) }
                     }
@@ -372,6 +373,7 @@ struct LanguageDrawer: View {
                     Text("Open one to choose what to clean.").font(.callout).foregroundStyle(Brand.muted)
                 }
                 Spacer()
+                ReviewAllButton(rule: stat.id, title: "Review all \(stat.ecosystem.name)")
                 Button(action: close) { Image(systemName: "xmark") }
                     .buttonStyle(SecondaryButtonStyle())
                     .accessibilityLabel("Close \(stat.ecosystem.name)")

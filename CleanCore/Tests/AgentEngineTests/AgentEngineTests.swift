@@ -35,6 +35,14 @@ final class EngineContractTests: XCTestCase {
         XCTAssertEqual(s.ready.folders, 1)
     }
 
+    /// After a clean the app recomputes the scan totals; they must match the engine's.
+    func testTotallingProjectsMatchesTheEngineSummary() throws {
+        let events = try snapshot("scan").map { try Engine.decode(ScanEvent.self, from: $0) }
+        let projects = events.compactMap { if case .project(let p) = $0 { p } else { nil } }
+        guard case .summary(let s) = events.last else { return XCTFail("\(events)") }
+        XCTAssertEqual(ScanSummary(totalling: projects), s)
+    }
+
     func testSkippedLine() throws {
         let line = Data(#"{"schema_version":1,"type":"skipped","path":"/x","reason":"other_volume","detail":"on another volume"}"#.utf8)
         XCTAssertEqual(
@@ -132,6 +140,18 @@ final class EngineEndToEndTests: XCTestCase {
         let back = try await engine.restore(run: run.runId)
         XCTAssertEqual(back.entries.map(\.state), [.restored])
         XCTAssertTrue(FileManager.default.fileExists(atPath: next.appendingPathComponent("cache/a").path))
+    }
+
+    /// Auto-free: purging runs older than N days frees only those.
+    func testPurgeOlderThanDaysKeepsRecentRuns() async throws {
+        let next = project.appendingPathComponent(".next")
+        _ = try await engine.clean(projects: [project], only: [next], execute: true)
+        let keep = try await engine.purge(olderThanDays: 7, execute: true)
+        XCTAssertEqual(keep.freed, 0, "a run from today is kept")
+        let all = try await engine.purge(olderThanDays: 0, execute: true)
+        XCTAssertGreaterThan(all.freed, 0)
+        let runs = try await engine.history()
+        XCTAssertEqual(runs.first?.bytesHeld, 0)
     }
 
     func testEngineErrorsSurface() async throws {

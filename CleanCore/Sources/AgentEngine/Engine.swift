@@ -66,6 +66,13 @@ public struct Engine: Sendable {
         return out.run
     }
 
+    /// Every run created at least `days` days ago; a dry run unless `execute`.
+    public func purge(olderThanDays days: Int, execute: Bool = false) async throws -> PurgeOutput {
+        var args = ["purge"] + storeArgs + ["--older-than-days", String(days)]
+        if execute { args.append("--execute") }
+        return try await call(args)
+    }
+
     /// A dry run unless `execute`.
     public func purge(run: String, execute: Bool = false) async throws -> PurgeOutput {
         var args = ["purge"] + storeArgs

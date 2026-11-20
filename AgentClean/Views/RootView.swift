@@ -54,9 +54,12 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.recheckAccess()
+            model.scanIfStale()
         }
         .task {
             await model.loadConfig()
+            await model.freeExpired()
+            model.scanIfStale()
             #if DEBUG
             await QAWalkthrough.run(model)
             #endif

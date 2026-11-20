@@ -12,6 +12,17 @@ Each gap names where the evidence is. Ordered by what hurts a real user most.
 | **Safety:** a whole-disk scan offered Homebrew's own `npm` and `firebase-tools` `node_modules` (275 MB) for cleaning. The guard had no idea of installed software; anyone adding `/opt` as a scan folder was exposed | I21: the guard refuses any project inside installed software (`node_modules`, `site-packages`, `Cellar`, Homebrew, MacPorts, Nix, `/Applications`, `/Library`, `/usr`, home toolchains). The walk reports those folders as skipped instead of entering them |
 | iOS archives and simulators were not measured | Caches lists Xcode archives, simulators, simulator caches, preview simulators and Xcode's cache, measured only |
 
+## Done since (everyday loop)
+
+| # | What shipped |
+| --- | --- |
+| P1, U2 | "Review all ready" on Home and "Review all <language>" in each language drawer: one dry run, one engine run across projects, one Undo. Takes only what a project starts with ticked (Safe, allowed, not active, not pinned) |
+| P2 | Settings → "Free quarantined space" (default after 7 days): on launch the app runs `purge --older-than-days` through the engine. Review sheets say the date the space comes back |
+| P3 | The last scan is saved in `~/Library/Application Support/AgentClean/last-scan.json` and shown on launch; with "Rescan when AgentClean opens" (default on) a scan over an hour old refreshes in the background. Totals are recomputed after every clean and restore |
+| U1 | Projects shows "To clean" by default (192 of 709 on the test Mac), with "All" and a sort menu |
+
+R1 is still open: GitHub refuses to start jobs until the account's billing is fixed.
+
 ## 1. Product gaps (the idea is not delivered without these)
 
 | # | Gap | Evidence | Proposal |

@@ -47,4 +47,6 @@ CI runs them on macOS 15 with Xcode 16.
 | 9 | Dev Stack | Lists tools; copy a removal command; nothing runs |
 | 10 | Caches | Nothing ticked; Clear… names the exact commands; afterwards each shows freed bytes or the tool's error |
 | 11 | Menu bar | Shows the last scan's total; Open and Review Projects bring the window forward; it has no clean action |
+| 13 | Overview: **Review all ready** | One sheet lists every idle project's Safe folders; Move, then Undo restores all of them in one step |
+| 14 | Quit and reopen | The last scan shows at once; an hour later it rescans in the background (Settings → Rescan when AgentClean opens) |
 | 12 | VoiceOver (⌘F5) on Projects | Each folder checkbox reads its name, class and size |
