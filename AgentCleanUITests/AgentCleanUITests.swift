@@ -21,7 +21,8 @@ final class AgentCleanUITests: XCTestCase {
         app.launchEnvironment["XDG_CONFIG_HOME"] = ""
         app.launchEnvironment["XDG_DATA_HOME"] = ""
         app.launchEnvironment["PATH"] = base.appendingPathComponent("bin").path + ":/usr/bin:/bin"
-        app.launchArguments += ["-scanRoots", "(\"\(work.path)\")"]
+        // Each test starts from the default window, not one an earlier test left behind.
+        app.launchArguments += ["-scanRoots", "(\"\(work.path)\")", "-ApplePersistenceIgnoreState", "YES"]
         app.launch()
     }
 
@@ -234,7 +235,7 @@ final class AgentCleanUITests: XCTestCase {
                     return true
                 }
                 let name = [e?.identifier, e?.label, e?.value as? String].compactMap { $0 }.first { !$0.isEmpty } ?? "?"
-                problems.append("\(screen): \(issue.compactDescription) on \(e?.elementType.rawValue ?? 0) '\(name)'")
+                problems.append("\(screen): \(issue.compactDescription) on \(e?.elementType.rawValue ?? 0) '\(name)' at \(e.map { NSStringFromRect($0.frame) } ?? "?")")
                 return true
             }
         }

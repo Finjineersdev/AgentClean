@@ -28,11 +28,14 @@ struct DevStackView: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .disabled(model.devStackLoading)
             }
-            Picker("Show", selection: $group) {
-                Text("All").tag(DevStackItem.Group?.none)
-                ForEach(DevStackItem.Group.allCases, id: \.self) { Text($0.displayName).tag(Optional($0)) }
+            // A Menu, not a menu Picker: the picker's pop-up has no press action for VoiceOver.
+            Menu(group?.displayName ?? "All") {
+                Button("All") { group = nil }
+                ForEach(DevStackItem.Group.allCases, id: \.self) { g in Button(g.displayName) { group = g } }
             }
-            .pickerStyle(.menu).labelsHidden().fixedSize()
+            .fixedSize()
+            .accessibilityLabel("Show")
+            .accessibilityValue(group?.displayName ?? "All")
             .accessibilityIdentifier("devstack.group")
 
             if model.devStackLoading && model.devStack.isEmpty {
