@@ -16,6 +16,10 @@ struct DevStackView: View {
     }
 
     var body: some View {
+        // One scroll view around the whole screen, like the others: a scroll
+        // view inside a fixed stack let the long list push the window's
+        // content up past the title bar.
+        ScrollView {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 ScreenHeader(title: "Dev Stack", subtitle: "Databases, runtimes, global tools, SDKs and VM disks on this Mac. Read-only.")
@@ -39,11 +43,8 @@ struct DevStackView: View {
             .accessibilityIdentifier("devstack.group")
 
             if model.devStackLoading && model.devStack.isEmpty {
-                Spacer()
-                ProgressView("Looking at what's installed…").frame(maxWidth: .infinity)
-                Spacer()
+                ProgressView("Looking at what's installed…").frame(maxWidth: .infinity).padding(.top, 120)
             } else {
-                ScrollView {
                     LazyVStack(spacing: 6) {
                         ForEach(DevStackItem.Group.allCases, id: \.self) { g in
                             let items = rows.filter { $0.group == g }
@@ -54,10 +55,10 @@ struct DevStackView: View {
                             }
                         }
                     }
-                }
             }
         }
         .padding(28)
+        }
         .task { if model.devStack.isEmpty { model.loadDevStack() } }
     }
 

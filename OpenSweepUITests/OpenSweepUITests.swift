@@ -320,6 +320,33 @@ final class OpenSweepUITests: XCTestCase {
         filter.radioButtons["To clean"].click() // the choice is remembered
     }
 
+    /// No screen may push the window's content up under the title bar.
+    func testSidebarStaysPutOnTheLastScreen() {
+        // The real Mac's inventory is long; Dev Stack only reads it. The
+        // scan roots stay the throwaway folder, which also turns off
+        // auto-free and the schedule.
+        app.terminate()
+        for key in ["HOME", "PATH", "XDG_CONFIG_HOME", "XDG_DATA_HOME"] { app.launchEnvironment[key] = nil }
+        app.launch()
+        let overview = app.outlines.cells.containing(.any, identifier: "nav.overview").firstMatch
+        XCTAssertTrue(overview.waitForExistence(timeout: 10))
+        // The default window size (1180 x 760), as people use it.
+        let window = app.windows.firstMatch
+        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
+        corner.press(forDuration: 0.2, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 1180, dy: 760)))
+        sleep(1)
+        let top = overview.frame.minY
+        let size = window.frame.size
+        for screen in ["projects", "caches", "history", "devStack", "overview"] {
+            app.outlines.cells.containing(.any, identifier: "nav.\(screen)").firstMatch.click()
+            sleep(3)
+            if screen == "devStack" { shot("sidebar-dev-stack") }
+            XCTAssertEqual(overview.frame.minY, top, accuracy: 2, "\(screen) pushed the sidebar up")
+            XCTAssertEqual(window.frame.size, size, "\(screen) resized the window")
+        }
+    }
+
     /// U7: ⌘1–⌘5 switch screens.
     func testScreenShortcuts() {
         app.typeKey("4", modifierFlags: .command)

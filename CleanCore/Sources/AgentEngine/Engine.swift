@@ -201,6 +201,9 @@ public struct Engine: Sendable {
             if process.isRunning { process.terminate() }
         }
         let status = await Self.status(exit)
+        // A cancelled caller (a screen that went away) stopped the engine;
+        // that is not an engine failure.
+        try Task.checkCancellation()
         if let failure = try? JSONDecoder().decode(ErrorOutput.self, from: stdout) {
             throw EngineError.failed(failure.error)
         }

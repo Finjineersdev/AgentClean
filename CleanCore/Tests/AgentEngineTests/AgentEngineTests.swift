@@ -274,3 +274,27 @@ final class TreemapTests: XCTestCase {
         XCTAssertTrue(Treemap.squarify([], in: bounds).isEmpty)
     }
 }
+
+/// A screen that goes away cancels its engine call; that must not read as a
+/// failure ("exit -1" in an alert).
+final class CancelTests: XCTestCase {
+    func testACancelledCallThrowsCancellation() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let slow = dir.appendingPathComponent("engine")
+        try Data("#!/bin/sh\nexec sleep 5\n".utf8).write(to: slow)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: slow.path)
+        let engine = Engine(binary: slow)
+        let task = Task { try await engine.history() }
+        try await Task.sleep(for: .milliseconds(300))
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled call returned")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("cancellation surfaced as \(error)")
+        }
+    }
+}

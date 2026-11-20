@@ -28,15 +28,16 @@ same workflow signs, notarizes and staples instead.
 | Variable | `SPARKLE_PUBLIC_KEY` | The matching public key; it is built into the app |
 | Optional secrets | `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `MACOS_SIGN_IDENTITY`, `APPLE_TEAM_ID`, `APPLE_ID`, `APPLE_APP_PASSWORD` | Developer ID signing and notarization, only if you join the Apple Developer Program |
 
-Sparkle keys: build the app once so Xcode fetches Sparkle, then run, from the
-repository root:
+Sparkle keys: run, once, as yourself (not with sudo):
 
 ```bash
-B=build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin A=com.finjineers.opensweep
-$B/generate_keys --account $A                  # creates the key in your login keychain
-gh variable set SPARKLE_PUBLIC_KEY --body "$($B/generate_keys --account $A -p)"
-$B/generate_keys --account $A -x /tmp/sp.key && gh secret set SPARKLE_PRIVATE_KEY < /tmp/sp.key && rm -P /tmp/sp.key
+scripts/setup-sparkle-key.sh
 ```
+
+It fetches Sparkle's tools if needed, creates the key in your login keychain
+under `com.finjineers.opensweep`, and stores the public key as the
+`SPARKLE_PUBLIC_KEY` variable and the private key as the
+`SPARKLE_PRIVATE_KEY` secret.
 
 The login keychain is the backup: without the private key, installed copies
 can never be updated again, so keep your keychain backed up (Time Machine).

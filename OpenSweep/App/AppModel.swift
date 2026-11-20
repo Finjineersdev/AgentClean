@@ -182,7 +182,7 @@ final class AppModel {
                 saveScan()
             } catch is CancellationError {
             } catch {
-                if !Task.isCancelled { self.error = describe(error) }
+                if !Task.isCancelled { fail(error) }
             }
             scanning = false
         }
@@ -302,7 +302,7 @@ final class AppModel {
                 await loadHistory()
             }
         } catch {
-            self.error = describe(error)
+            fail(error)
         }
     }
 
@@ -355,7 +355,7 @@ final class AppModel {
             }
             return out
         } catch {
-            self.error = describe(error)
+            fail(error)
             return nil
         }
     }
@@ -364,7 +364,7 @@ final class AppModel {
 
     func loadHistory() async {
         guard let engine else { return }
-        do { runs = try await engine.history() } catch { self.error = describe(error) }
+        do { runs = try await engine.history() } catch { fail(error) }
     }
 
     func restore(_ run: Run, item: Int? = nil) async {
@@ -378,7 +378,7 @@ final class AppModel {
                 error = "Some folders stayed in quarantine: \(stuck.note ?? "")"
             }
         } catch {
-            self.error = describe(error)
+            fail(error)
         }
     }
 
@@ -392,7 +392,7 @@ final class AppModel {
             if execute { await loadHistory() }
             return execute ? out.freed : out.bytes
         } catch {
-            self.error = describe(error)
+            fail(error)
             return nil
         }
     }
@@ -409,7 +409,7 @@ final class AppModel {
             _ = try await engine.purge(run: run.runId, execute: true)
             await loadHistory()
         } catch {
-            self.error = describe(error)
+            fail(error)
         }
     }
 
@@ -417,22 +417,22 @@ final class AppModel {
 
     func loadConfig() async {
         guard let engine else { return }
-        do { config = try await engine.config() } catch { self.error = describe(error) }
+        do { config = try await engine.config() } catch { fail(error) }
     }
 
     func setDays(idle: Int, dormant: Int) async {
         guard let engine else { return }
-        do { config = try await engine.config(idleDays: idle, dormantDays: dormant) } catch { self.error = describe(error) }
+        do { config = try await engine.config(idleDays: idle, dormantDays: dormant) } catch { fail(error) }
     }
 
     func exclude(_ folder: URL) async {
         guard let engine else { return }
-        do { config = try await engine.config(exclude: [folder]) } catch { self.error = describe(error) }
+        do { config = try await engine.config(exclude: [folder]) } catch { fail(error) }
     }
 
     func include(_ folder: String) async {
         guard let engine else { return }
-        do { config = try await engine.config(include: [URL(fileURLWithPath: folder)]) } catch { self.error = describe(error) }
+        do { config = try await engine.config(include: [URL(fileURLWithPath: folder)]) } catch { fail(error) }
     }
 
     func setPinned(_ root: String, _ pinned: Bool, days: Int? = nil, remote: Bool = false) async {
@@ -443,7 +443,7 @@ final class AppModel {
             await loadConfig()
             await refresh(root)
         } catch {
-            self.error = describe(error)
+            fail(error)
         }
     }
 
@@ -453,7 +453,7 @@ final class AppModel {
         guard let engine, !cachesLoading else { return }
         cachesLoading = true
         defer { cachesLoading = false }
-        do { caches = try await engine.caches() } catch { self.error = describe(error) }
+        do { caches = try await engine.caches() } catch { fail(error) }
     }
 
     /// Runs each tool's own command. Not undoable; the caller has asked first.
@@ -464,7 +464,7 @@ final class AppModel {
             await loadCaches()
             return out.caches
         } catch {
-            self.error = describe(error)
+            fail(error)
             return []
         }
     }
@@ -478,6 +478,12 @@ final class AppModel {
             devStack = await DevStackInventory.collect()
             devStackLoading = false
         }
+    }
+
+    /// Shows an engine error, unless the work was only cancelled.
+    private func fail(_ error: Error) {
+        if error is CancellationError || Task.isCancelled { return }
+        self.error = describe(error)
     }
 
     private func describe(_ error: Error) -> String {
