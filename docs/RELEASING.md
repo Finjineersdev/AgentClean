@@ -9,7 +9,9 @@
    ```
    A tag with a suffix (`v0.4.0-beta.1`) is published as a pre-release, which
    the update feed and the cask skip.
-3. The **Release** workflow runs the engine tests and the no-delete check,
+3. Approve the run: the release job waits in the `release` environment
+   until you approve it under Actions (one click).
+4. The **Release** workflow runs the engine tests and the no-delete check,
    builds a universal app, signs it (Developer ID and notarization when those
    secrets exist), writes a sha256, an SBOM and build provenance, signs a
    Sparkle appcast, and publishes the GitHub Release. The tap follows it.
@@ -24,20 +26,28 @@ same workflow signs, notarizes and staples instead.
 
 | Kind | Name | What |
 | --- | --- | --- |
-| Secret | `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key (see below) |
+| Environment secret (`release`) | `SPARKLE_PRIVATE_KEY` | Sparkle EdDSA private key (see below) |
 | Variable | `SPARKLE_PUBLIC_KEY` | The matching public key; it is built into the app |
-| Optional secrets | `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `MACOS_SIGN_IDENTITY`, `APPLE_TEAM_ID`, `APPLE_ID`, `APPLE_APP_PASSWORD` | Developer ID signing and notarization, only if you join the Apple Developer Program |
+| Optional environment secrets (`release`) | `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `MACOS_SIGN_IDENTITY`, `APPLE_TEAM_ID`, `APPLE_ID`, `APPLE_APP_PASSWORD` | Developer ID signing and notarization, only if you join the Apple Developer Program |
 
-Sparkle keys: run, once, as yourself (not with sudo):
+Protect releases and set the Sparkle key: run, once, as yourself (not with
+sudo):
 
 ```bash
-scripts/setup-sparkle-key.sh
+scripts/protect-releases.sh
 ```
 
-It fetches Sparkle's tools if needed, creates the key in your login keychain
-under `com.finjineers.opensweep`, and stores the public key as the
-`SPARKLE_PUBLIC_KEY` variable and the private key as the
-`SPARKLE_PRIVATE_KEY` secret.
+It makes the `release` environment (your approval, `v*` tags only), adds a
+tag rule so only an admin can create, move or delete `v*` tags, and runs
+`scripts/setup-sparkle-key.sh`. Secrets for signing go in the `release`
+environment, never at repository level, so no other workflow or branch can
+read them.
+
+The key script fetches Sparkle's tools if needed, creates the key in your
+login keychain under `com.finjineers.opensweep` (or reuses the one there),
+stores the public key as the `SPARKLE_PUBLIC_KEY` variable and the private key
+as the `release` environment's `SPARKLE_PRIVATE_KEY` secret, and removes any
+repository-level copy.
 
 The login keychain is the backup: without the private key, installed copies
 can never be updated again, so keep your keychain backed up (Time Machine).

@@ -16,6 +16,9 @@ jobs:
   dmg:
     name: Build, sign, notarize and publish
     runs-on: macos-26
+    # Waits for the owner's approval; the signing secrets live only in this
+    # environment, so no other workflow or branch can read them.
+    environment: release
     env:
       VERSION: ${{ github.ref_name }}
       HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' }}
