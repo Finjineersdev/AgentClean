@@ -48,13 +48,8 @@ struct DevStackView: View {
                         ForEach(DevStackItem.Group.allCases, id: \.self) { g in
                             let items = rows.filter { $0.group == g }
                             if !items.isEmpty {
-                                HStack {
-                                    Image(systemName: g.systemImage).foregroundStyle(Brand.sky).accessibilityHidden(true)
-                                    SectionLabel(text: g.displayName)
-                                    Spacer()
-                                    Text(bytes(items.reduce(0) { $0 + $1.bytes })).font(.caption.monospacedDigit()).foregroundStyle(Brand.muted)
-                                }
-                                .padding(.top, 10)
+                                SectionLabel(text: g.displayName, trailing: bytes(items.reduce(0) { $0 + $1.bytes }))
+                                    .padding(.top, 14).padding(.bottom, 2)
                                 ForEach(items) { row($0) }
                             }
                         }
@@ -68,9 +63,11 @@ struct DevStackView: View {
 
     private func row(_ item: DevStackItem) -> some View {
         HStack(alignment: .top, spacing: 12) {
+            EcosystemBadge(ecosystem: Ecosystem.of(tool: item.name)
+                ?? Ecosystem(id: item.name, name: item.group.displayName, logo: nil, color: Brand.sky, symbol: item.group.systemImage), size: 30)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Text(item.name).font(.headline)
+                    Text(item.name).font(.headline).foregroundStyle(Brand.text)
                     Text(item.status.rawValue).font(.caption).foregroundStyle(item.status == .running ? Brand.green : Brand.muted)
                 }
                 Text(item.detail).font(.caption).foregroundStyle(Brand.muted)
@@ -98,7 +95,7 @@ struct DevStackView: View {
                     .buttonStyle(.borderless).help("Show in Finder")
             }
         }
-        .padding(12)
-        .glassCard(radius: 12)
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .glassCard()
     }
 }

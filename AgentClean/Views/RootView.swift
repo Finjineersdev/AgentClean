@@ -9,6 +9,7 @@ struct RootView: View {
         NavigationSplitView {
             List(AppModel.Screen.allCases, selection: Binding(get: { model.screen }, set: { if let s = $0 { model.screen = s } })) { screen in
                 Label(screen.title, systemImage: screen.symbol)
+                    .badge(badge(screen))
                     .tag(screen)
                     .accessibilityIdentifier("nav.\(screen.rawValue)")
             }
@@ -34,6 +35,7 @@ struct RootView: View {
                 }
             }
         }
+        .tint(Brand.teal)
         .alert("Something went wrong", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: {
@@ -44,6 +46,15 @@ struct RootView: View {
             #if DEBUG
             await QAWalkthrough.run(model)
             #endif
+        }
+    }
+
+    /// Counts the sidebar shows next to a screen, when there is something to count.
+    private func badge(_ screen: AppModel.Screen) -> Int {
+        switch screen {
+        case .projects: model.projects.count
+        case .history: model.runs.count
+        default: 0
         }
     }
 }

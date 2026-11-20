@@ -2,16 +2,21 @@ import SwiftUI
 import CleanCore
 import AgentEngine
 
-/// One brand: teal on a deep gradient.
+/// Graphite chrome that stays out of the way: colour comes from the
+/// languages' own logos, status, and one mint accent for the main action.
 enum Brand {
-    static let teal = Color(hex: 0x2DD4BF)
-    static let green = Color(hex: 0x34D399)
-    static let amber = Color(hex: 0xFBBF24)
-    static let sky = Color(hex: 0x22D3EE)
+    static let canvas = Color(hex: 0x14171C)
+    static let surface = Color(hex: 0x1C2027)
+    static let raised = Color(hex: 0x252A33)
+    static let hairline = Color(hex: 0x323844)
+    static let text = Color(hex: 0xE6E9EE)
+    /// Secondary text: 7.9:1 on the canvas, 7:1 on raised.
+    static let muted = Color(hex: 0xA7AFBC)
+    static let teal = Color(hex: 0x5FE3C8)
+    static let green = Color(hex: 0x4ADE80)
+    static let amber = Color(hex: 0xF5B83D)
+    static let sky = Color(hex: 0x7AB8FF)
     static let slate = Color(hex: 0xCBD5E1)
-    /// Secondary text on the dark gradient: at least 4.5:1 (system .secondary measured 4.5 exactly).
-    static let muted = Color.white.opacity(0.72)
-    static let gradient = [Color(hex: 0x0B4458), Color(hex: 0x061B2A)]
 }
 
 extension Color {
@@ -22,57 +27,52 @@ extension Color {
 
 struct ThemeBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(colors: Brand.gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
-            RadialGradient(colors: [Brand.teal.opacity(0.22), .clear], center: .init(x: 0.75, y: 0.25), startRadius: 0, endRadius: 640)
-            RadialGradient(colors: [Color(hex: 0x14B8A6).opacity(0.12), .clear], center: .init(x: 0.1, y: 0.9), startRadius: 0, endRadius: 560)
-        }
-        .ignoresSafeArea()
+        Brand.canvas.ignoresSafeArea()
     }
 }
 
-// MARK: - Glass, with a material fallback before macOS 26
+// MARK: - Surfaces
 
 extension View {
+    /// A flat panel with a hairline edge. Hierarchy comes from the fill
+    /// (surface, then raised), not from shadows.
+    func glassCard(radius: CGFloat = 12, tint: Color? = nil) -> some View {
+        background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(tint.map { $0.opacity(0.12) } ?? Brand.surface))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Brand.hairline, lineWidth: 1))
+    }
+
+    /// The one floating element on a screen (the action bar): Liquid Glass on
+    /// macOS 26, a material before that.
     @ViewBuilder
-    func glass<S: Shape>(tint: Color? = nil, interactive: Bool = false, in shape: S) -> some View {
+    func floatingBar<S: Shape>(in shape: S) -> some View {
         #if compiler(>=6.2)
         if #available(macOS 26, *) {
-            let base = Glass.regular.tint(tint)
-            self.glassEffect(interactive ? base.interactive() : base, in: shape)
+            self.glassEffect(.regular, in: shape)
         } else {
-            fallback(tint: tint, in: shape)
+            self.background(shape.fill(.regularMaterial)).overlay(shape.stroke(Brand.hairline))
         }
         #else
-        fallback(tint: tint, in: shape)
+        self.background(shape.fill(.regularMaterial)).overlay(shape.stroke(Brand.hairline))
         #endif
-    }
-
-    /// Material for macOS 14 and 15, and for SDKs without Liquid Glass.
-    @ViewBuilder
-    private func fallback<S: Shape>(tint: Color?, in shape: S) -> some View {
-        self.background(shape.fill(.ultraThinMaterial))
-            .background(shape.fill((tint ?? .clear).opacity(0.5)))
-            .overlay(shape.stroke(.white.opacity(0.08)))
-    }
-
-    func glassCard(radius: CGFloat = 18, tint: Color? = nil) -> some View {
-        glass(tint: (tint ?? .black).opacity(tint == nil ? 0.16 : 0.22), in: RoundedRectangle(cornerRadius: radius))
     }
 }
 
 // MARK: - Components
 
+/// A status pill: a coloured dot and the word, so colour is never the only cue.
 struct StatusChip: View {
     let text: String
     let systemImage: String
     let tint: Color
     var body: some View {
-        Label(text, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 9).padding(.vertical, 4)
-            .foregroundStyle(tint)
-            .glass(tint: tint.opacity(0.25), in: Capsule())
+        HStack(spacing: 6) {
+            Image(systemName: systemImage).font(.system(size: 10, weight: .bold)).accessibilityHidden(true)
+            Text(text)
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 9).padding(.vertical, 4)
+        .foregroundStyle(tint)
+        .background(Capsule().fill(tint.opacity(0.14)))
     }
 }
 
@@ -82,12 +82,12 @@ struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .padding(.horizontal, 22).padding(.vertical, 10)
-            .foregroundStyle(.black.opacity(0.85))
-            .background(Capsule().fill(tint.opacity(configuration.isPressed ? 0.75 : 0.95)))
-            .opacity(enabled ? 1 : 0.4)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .font(.body.weight(.semibold))
+            .padding(.horizontal, 18).padding(.vertical, 8)
+            .foregroundStyle(Color(hex: 0x0B1F1B))
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(configuration.isPressed ? 0.8 : 1)))
+            .opacity(enabled ? 1 : 0.35)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -95,45 +95,27 @@ struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 14).padding(.vertical, 7)
-            .foregroundStyle(.white)
-            .glass(interactive: true, in: Capsule())
+            .font(.callout.weight(.medium))
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .foregroundStyle(Brand.text)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(configuration.isPressed ? Brand.hairline : Brand.raised))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Brand.hairline))
             .opacity(enabled ? 1 : 0.4)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
     }
 }
 
-/// The scan button: a breathing teal orb.
-struct BigScanButton: View {
-    let title: String
-    let isBusy: Bool
-    let action: () -> Void
-    @State private var breathe = false
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle().stroke(Brand.teal.opacity(0.22), lineWidth: 1.5).frame(width: 176, height: 176)
-                    .scaleEffect(breathe ? 1.08 : 0.96).opacity(breathe ? 0.3 : 0.9)
-                Circle()
-                    .fill(RadialGradient(colors: [Brand.teal.opacity(0.95), Brand.teal.opacity(0.45)], center: .topLeading, startRadius: 0, endRadius: 150))
-                    .frame(width: 124, height: 124)
-                    .shadow(color: Brand.teal.opacity(0.6), radius: breathe ? 30 : 20, y: 8)
-                Text(isBusy ? "Stop" : title).font(.title3.weight(.bold)).foregroundStyle(.black.opacity(0.85))
-            }
-        }
-        .buttonStyle(.plain)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { breathe = true }
-        }
-    }
-}
-
+/// A heading inside a screen, in sentence case.
 struct SectionLabel: View {
     let text: String
+    var trailing: String? = nil
     var body: some View {
-        Text(text.uppercased()).font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(Brand.muted)
+        HStack(alignment: .firstTextBaseline) {
+            Text(text).font(.headline).foregroundStyle(Brand.text)
+            Spacer()
+            if let trailing { Text(trailing).font(.callout).foregroundStyle(Brand.muted).monospacedDigit() }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -141,11 +123,35 @@ struct ScreenHeader: View {
     let title: String
     let subtitle: String
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.system(size: 28, weight: .semibold, design: .rounded))
-            Text(subtitle).foregroundStyle(Brand.muted)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: 30, weight: .bold)).tracking(-0.6).foregroundStyle(Brand.text)
+                .accessibilityAddTraits(.isHeader)
+            Text(subtitle).font(.callout).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
         }
     }
+}
+
+/// A thin share-of-total bar behind a size.
+struct ShareBar: View {
+    let share: Double
+    var tint: Color = Brand.teal
+    var body: some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Brand.hairline)
+                if share > 0 {
+                    Capsule().fill(tint).frame(width: max(3, g.size.width * min(share, 1)))
+                }
+            }
+        }
+        .frame(height: 4)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Large figures: rounded, fixed-width digits.
+extension Font {
+    static func figure(_ size: CGFloat) -> Font { .system(size: size, weight: .bold, design: .rounded).monospacedDigit() }
 }
 
 func bytes(_ n: UInt64) -> String { ByteFormatter.string(n) }
@@ -188,6 +194,7 @@ extension FolderClass {
 
 extension Date {
     var relative: String {
+        if abs(timeIntervalSinceNow) < 60 { return "just now" }
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
         return f.localizedString(for: self, relativeTo: Date())

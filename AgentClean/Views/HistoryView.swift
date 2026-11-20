@@ -41,7 +41,7 @@ struct HistoryView: View {
     private func runCard(_ run: Run) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(run.created.formatted(date: .abbreviated, time: .shortened)).font(.headline)
+                Text(run.created.formatted(date: .abbreviated, time: .shortened)).font(.headline).foregroundStyle(Brand.text)
                 Text(run.created.relative).foregroundStyle(Brand.muted)
                 Spacer()
                 Text("\(bytes(run.bytesHeld)) held").monospacedDigit().foregroundStyle(Brand.muted)
@@ -66,6 +66,7 @@ struct HistoryView: View {
                         .foregroundStyle(e.state == .moved ? Brand.teal : Brand.slate)
                         .frame(width: 70, alignment: .leading)
                     Text((e.original as NSString).abbreviatingWithTildeInPath)
+                        .font(.callout.monospaced()).foregroundStyle(Brand.text)
                         .lineLimit(1).truncationMode(.middle)
                     if let note = e.note { Text(note).font(.caption).foregroundStyle(Brand.amber) }
                     Spacer()

@@ -13,10 +13,15 @@ struct ProjectsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                ScreenHeader(title: "Projects", subtitle: "\(model.projects.count) found")
-                TextField("Search", text: $search).textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Search projects")
+            VStack(alignment: .leading, spacing: 14) {
+                ScreenHeader(title: "Projects", subtitle: "\(model.projects.count) found, biggest first")
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Brand.muted).accessibilityHidden(true)
+                    TextField("Search", text: $search).textFieldStyle(.plain)
+                        .accessibilityLabel("Search projects")
+                }
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .glassCard(radius: 9)
                 if model.projects.isEmpty {
                     Spacer()
                     Text(model.scanning ? "Scanning…" : "Run a scan from Overview to find projects.")
@@ -24,14 +29,13 @@ struct ProjectsView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 6) {
+                        let biggest = rows.map(model.total).max() ?? 1
+                        LazyVStack(spacing: 2) {
                             ForEach(rows, id: \.root) { p in
                                 Button { model.selectedProject = p.root } label: {
-                                    ProjectRow(project: p, total: model.total(p))
-                                        .overlay(RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Brand.teal, lineWidth: model.selectedProject == p.root ? 1.5 : 0))
+                                    CompactProjectRow(project: p, total: model.total(p), share: Double(model.total(p)) / Double(max(biggest, 1)))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(RowButtonStyle(selected: model.selectedProject == p.root))
                                 .accessibilityIdentifier("project.\(URL(fileURLWithPath: p.root).lastPathComponent)")
                             }
                         }
@@ -40,17 +44,22 @@ struct ProjectsView: View {
                     }
                 }
             }
-            .padding(24)
-            .frame(width: 400)
+            .padding(.horizontal, 20).padding(.vertical, 24)
+            .frame(width: 360)
+            .background(Brand.canvas)
 
-            Divider().opacity(0.3)
+            Divider().overlay(Brand.hairline)
 
             if let p = model.project(model.selectedProject) {
                 // Keyed by path, not value: a refresh after a clean must not tear down
                 // the open Review sheet (and its Undo).
                 ProjectDetail(project: p).id(p.root)
             } else {
-                Text("Choose a project").foregroundStyle(Brand.muted).frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 8) {
+                    Image(systemName: "sidebar.left").font(.largeTitle).foregroundStyle(Brand.hairline).accessibilityHidden(true)
+                    Text("Choose a project to see its folders").foregroundStyle(Brand.muted)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -69,11 +78,12 @@ struct ProjectDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
+                HStack(alignment: .center, spacing: 14) {
+                    EcosystemBadge(ecosystem: project.ecosystems.first ?? Ecosystem.of(rule: ""), size: 44)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(URL(fileURLWithPath: project.root).lastPathComponent)
-                            .font(.system(size: 26, weight: .semibold, design: .rounded))
-                        Text((project.root as NSString).abbreviatingWithTildeInPath).foregroundStyle(Brand.muted)
+                            .font(.system(size: 26, weight: .bold)).tracking(-0.4).foregroundStyle(Brand.text)
+                        Text((project.root as NSString).abbreviatingWithTildeInPath).font(.callout.monospaced()).foregroundStyle(Brand.muted)
                             .lineLimit(1).truncationMode(.middle).help(project.root)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,6 +102,10 @@ struct ProjectDetail: View {
                         StatusChip(text: project.verdict.label, systemImage: project.verdict.symbol, tint: project.verdict.tint)
                     }
                     Text(project.reason).foregroundStyle(Brand.muted)
+                    Spacer()
+                    if project.ecosystems.count > 1 {
+                        Text(project.ecosystems.map(\.name).joined(separator: ", ")).font(.callout).foregroundStyle(Brand.muted)
+                    }
                 }
 
                 if project.verdict == .active && !project.pinned {
@@ -99,33 +113,45 @@ struct ProjectDetail: View {
                         .accessibilityIdentifier("allowActive")
                 }
 
-                VStack(spacing: 6) {
-                    ForEach(project.items, id: \.path) { item in
-                        itemRow(item)
-                    }
-                    if project.items.isEmpty {
-                        Text("Nothing to clean here.").foregroundStyle(Brand.muted)
-                    }
-                }
-
-                HStack {
-                    Text("\(picked.count) selected · \(bytes(Selection.bytes(of: picked, in: project)))")
-                        .foregroundStyle(Brand.muted).monospacedDigit()
-                        .accessibilityIdentifier("selection.summary")
-                    Spacer()
-                    Button("Review…") {
-                        Task {
-                            busy = true
-                            review = await model.review(picked, in: project)
-                            busy = false
+                if project.items.isEmpty {
+                    Text("Nothing to clean here.").foregroundStyle(Brand.muted)
+                } else {
+                    let biggest = project.items.compactMap(\.bytes).max() ?? 1
+                    VStack(spacing: 0) {
+                        ForEach(Array(project.items.enumerated()), id: \.element.path) { i, item in
+                            itemRow(item, share: Double(item.bytes ?? 0) / Double(max(biggest, 1)))
+                            if i < project.items.count - 1 { Divider().overlay(Brand.hairline).padding(.leading, 76) }
                         }
                     }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(picked.isEmpty || busy || (project.verdict == .active && !allowActive))
-                    .accessibilityIdentifier("review")
+                    .glassCard()
                 }
             }
-            .padding(24)
+            .padding(.horizontal, 28).padding(.top, 26).padding(.bottom, 90)
+        }
+        .overlay(alignment: .bottom) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bytes(Selection.bytes(of: picked, in: project))).font(.figure(20)).foregroundStyle(Brand.text)
+                    Text(picked.count == 1 ? "1 folder selected" : "\(picked.count) folders selected").font(.caption).foregroundStyle(Brand.muted)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("selection.summary")
+                Spacer()
+                Button("Review…") {
+                    Task {
+                        busy = true
+                        review = await model.review(picked, in: project)
+                        busy = false
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .keyboardShortcut(.defaultAction)
+                .disabled(picked.isEmpty || busy || (project.verdict == .active && !allowActive))
+                .accessibilityIdentifier("review")
+            }
+            .padding(.horizontal, 18).padding(.vertical, 12)
+            .floatingBar(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 24).padding(.bottom, 18)
         }
         .onAppear { picked = Selection.defaults(for: project) }
         .onChange(of: project) { _, fresh in
@@ -138,7 +164,7 @@ struct ProjectDetail: View {
         }
     }
 
-    private func itemRow(_ item: Item) -> some View {
+    private func itemRow(_ item: Item, share: Double) -> some View {
         let path = Selection.path(item, in: project)
         let on = Binding(
             get: { picked.contains(path) },
@@ -149,20 +175,25 @@ struct ProjectDetail: View {
                 .accessibilityIdentifier("item.\(item.path)")
                 .accessibilityLabel("\(item.path), \(item.kind.label), \(item.bytes.map(bytes) ?? "size unknown")")
                 .accessibilityHint(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
-            VStack(alignment: .leading, spacing: 3) {
+            .padding(.top, 5)
+            EcosystemBadge(ecosystem: Ecosystem.of(rule: item.rule), size: 26)
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(item.path).font(.body.monospaced().weight(.semibold))
-                    Text(item.rule).font(.caption).foregroundStyle(Brand.muted)
-                    Text(item.kind.label).font(.caption.weight(.semibold)).foregroundStyle(item.kind.tint)
+                    Text(item.path).font(.body.monospaced().weight(.semibold)).foregroundStyle(Brand.text)
+                    StatusChip(text: item.kind.label, systemImage: item.kind == .safe ? "checkmark.shield.fill" : "exclamationmark.triangle.fill", tint: item.kind.tint)
                 }
                 Text(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
-                    .font(.caption).foregroundStyle(Brand.muted)
+                    .font(.callout).foregroundStyle(Brand.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
-            Text(item.bytes.map(bytes) ?? "—").monospacedDigit()
+            Spacer(minLength: 12)
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(item.bytes.map(bytes) ?? "—").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
+                ShareBar(share: share, tint: Ecosystem.of(rule: item.rule).color).frame(width: 72)
+            }
         }
-        .padding(12)
-        .glassCard(radius: 12)
+        .padding(.horizontal, 16).padding(.vertical, 13)
+        .opacity(item.refused == nil ? 1 : 0.6)
     }
 }
 
@@ -241,5 +272,37 @@ struct ReviewSheet: View {
         }
         .padding(24)
         .frame(width: 560, height: 460)
+    }
+}
+
+/// A list row in the Projects column: narrower than ProjectRow.
+struct CompactProjectRow: View {
+    let project: AgentEngine.Project
+    let total: UInt64
+    var share: Double = 0
+
+    var body: some View {
+        HStack(spacing: 12) {
+            EcosystemStack(ecosystems: project.ecosystems.isEmpty ? [Ecosystem.of(rule: "")] : project.ecosystems, size: 24)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(URL(fileURLWithPath: project.root).lastPathComponent).font(.body.weight(.semibold)).foregroundStyle(Brand.text)
+                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Image(systemName: project.pinned ? "pin.fill" : project.verdict.symbol).font(.system(size: 9, weight: .bold))
+                        .accessibilityHidden(true)
+                    Text(project.pinned ? "Pinned" : project.verdict.label)
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(project.pinned ? Brand.slate : project.verdict.tint)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(total == 0 ? "—" : bytes(total)).font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
+                ShareBar(share: share, tint: project.ecosystems.first?.color ?? Brand.teal).frame(width: 56)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 9)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }

@@ -116,8 +116,9 @@ struct CachesView: View {
                     .accessibilityIdentifier("cache.\(c.id)")
                     .disabled(running)
             }
+            EcosystemBadge(ecosystem: Ecosystem.of(cache: c.id), size: 30)
             VStack(alignment: .leading, spacing: 3) {
-                Text(c.name).font(.headline)
+                Text(c.name).font(.headline).foregroundStyle(Brand.text)
                 Text((c.path as NSString).abbreviatingWithTildeInPath).font(.caption).foregroundStyle(Brand.muted)
                     .lineLimit(1).truncationMode(.middle)
                 if let cmd = c.command, !cmd.isEmpty {
