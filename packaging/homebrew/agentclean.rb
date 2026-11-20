@@ -23,7 +23,7 @@ cask "agentclean" do
   # Zap also removes the quarantine: restore or purge every run first.
   zap trash: [
     "~/Library/Application Support/AgentClean",
-    "~/Library/Caches/app.agentclean.AgentClean",
-    "~/Library/Preferences/app.agentclean.AgentClean.plist",
+    "~/Library/Caches/com.finjineers.agentclean",
+    "~/Library/Preferences/com.finjineers.agentclean.plist",
   ]
 end

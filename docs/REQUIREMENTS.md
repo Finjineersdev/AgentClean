@@ -64,7 +64,6 @@ permanent deletion as a default.
 
 ## Open items
 
-- Bundle identifier: currently `app.agentclean.AgentClean`; change it to a
-  domain the owner controls.
+- Bundle identifier: `com.finjineers.agentclean` (done).
 - New app icon and character art; the inherited icon stays until then.
 - Trademark and name check for "AgentClean" before launch.

@@ -45,8 +45,8 @@ in this repository. Keep it that way.
   the name check and the `SECURITY.md` rewrite.
 - M0 to M3 are done; M4 (beta) is built and waits on the owner's signing keys
   and testers (`docs/milestones/M4.md`).
-- Bundle identifier is `app.agentclean.AgentClean`, a placeholder until the
-  owner names a domain they control.
+- Bundle identifier is `com.finjineers.agentclean` (owner's domain, set
+  20 Nov 2026).
 
 ## 4. What exists
 

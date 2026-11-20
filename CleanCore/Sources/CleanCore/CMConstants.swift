@@ -6,7 +6,7 @@ import Foundation
 /// Path tables adapted from Mac Sai (BSD-3-Clause, © iliyami contributors).
 public enum CMConstants {
     public static let appName = "AgentClean"
-    public static let bundleIdentifier = "app.agentclean.AgentClean"
+    public static let bundleIdentifier = "com.finjineers.agentclean"
 
     // MARK: - Safety limits
 
