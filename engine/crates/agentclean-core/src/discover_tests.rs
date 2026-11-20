@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::discover::{discover, Event, Options, Skip};
+use crate::discover::{self, discover, Event, Options, Skip};
 use crate::rules::{load_dir, RuleFile};
 
 fn rules() -> Vec<RuleFile> {
@@ -317,4 +317,86 @@ fn exclusions_and_limits_are_reported() {
     );
     opts.max_entries = 4;
     assert_eq!(projects(&base, &run(&opts)), ["a/b/c"]);
+}
+
+/// I18: "the whole disk" is the top folders on the data volume, each walked
+/// on its own volume. System, Volumes (other drives), hidden folders, links
+/// and files are not roots; usr/local and private/tmp are.
+#[test]
+fn whole_disk_roots_are_the_top_folders_on_the_data_volume() {
+    let t = tempfile::tempdir().unwrap();
+    let top = t.path();
+    for d in [
+        "Users",
+        "Library",
+        "System",
+        "Volumes",
+        "private/tmp",
+        "usr/local",
+        ".vol",
+    ] {
+        std::fs::create_dir_all(top.join(d)).unwrap();
+    }
+    std::fs::write(top.join("file"), "").unwrap();
+    std::os::unix::fs::symlink(top.join("Users"), top.join("home")).unwrap();
+    let roots = discover::whole_disk_roots_in(top, top);
+    let names: Vec<_> = roots
+        .iter()
+        .map(|p| p.strip_prefix(top).unwrap().to_path_buf())
+        .collect();
+    assert_eq!(
+        names,
+        ["Library", "Users", "usr/local", "private/tmp"].map(PathBuf::from)
+    );
+    // No separate data volume (Linux, old macOS): the whole disk is the top.
+    assert_eq!(
+        discover::whole_disk_roots_in(top, &top.join("missing")),
+        vec![top.to_path_buf()]
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn on_this_mac_the_whole_disk_includes_users_but_not_system() {
+    let roots = discover::whole_disk_roots();
+    assert!(roots.contains(&PathBuf::from("/Users")), "{roots:?}");
+    assert!(
+        roots
+            .iter()
+            .all(|r| !r.starts_with("/System") && !r.starts_with("/Volumes")),
+        "{roots:?}"
+    );
+}
+
+/// I18, I21: the walk does not enter installed software. A package installed
+/// into some lib/node_modules is not reported as a project, and a root that
+/// is installed software is reported once as skipped.
+#[test]
+fn installed_software_is_not_walked() {
+    let t = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(t.path()).unwrap();
+    tree(
+        &base,
+        &[
+            "work/app/package.json",
+            "work/tools/lib/node_modules/cli/package.json",
+            "work/tools/lib/node_modules/cli/node_modules/dep/",
+            "home/Library/Caches/tool/package.json",
+        ],
+    );
+    let mut opts = Options::new(vec![base.join("work"), base.join("home/Library/Caches")]);
+    opts.home = Some(base.join("home"));
+    let events = run(&opts);
+    assert_eq!(projects(&base, &events), ["work/app"]);
+    let skipped: Vec<_> = events
+        .iter()
+        .filter_map(|e| match e {
+            Event::Skipped {
+                path,
+                reason: Skip::Installed(_),
+            } => Some(rel(&base, path)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(skipped, ["home/Library/Caches"]);
 }

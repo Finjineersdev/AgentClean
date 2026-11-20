@@ -38,12 +38,18 @@ struct OverviewView: View {
     @Environment(AppModel.self) private var model
     @State private var hovered: String?
     @State private var opened: String?
+    @AppStorage("accessBannerDismissed") private var accessDismissed = false
 
     var body: some View {
         let stats = LanguageStat.of(model.projects)
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
                 host(stats).entrance(0, from: .top)
+                if model.wholeDisk && !model.fullDiskAccess && (!accessDismissed || model.privacyBlocked > 0) {
+                    AccessBanner(blocked: model.privacyBlocked) { accessDismissed = true }
+                        .entrance(1)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 if model.summary == nil && !model.scanning {
                     welcome.entrance(1)
                 } else {
@@ -89,7 +95,7 @@ struct OverviewView: View {
     }
 
     private func line(_ stats: [LanguageStat]) -> String {
-        let roots = model.scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
+        let roots = model.scanScope
         if model.scanning { return "Digging through \(roots)…" }
         guard let s = model.summary else {
             return "Hi! Scan your projects and I'll show where your disk went, language by language."
@@ -111,7 +117,7 @@ struct OverviewView: View {
                     .font(.title3).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
                     SettingsLink { Text("Choose folders…") }.buttonStyle(SecondaryButtonStyle())
-                    Text("Scanning \((model.scanRoots.first.map { ($0 as NSString).abbreviatingWithTildeInPath }) ?? "your folders")")
+                    Text("Scans \(model.scanScope)")
                         .font(.callout).foregroundStyle(Brand.muted).lineLimit(1).truncationMode(.middle)
                 }
             }
@@ -498,5 +504,35 @@ struct ProjectRow: View {
         .padding(.horizontal, 14).padding(.vertical, 11)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Asks once for Full Disk Access, so a whole-Mac scan needs no other prompt.
+struct AccessBanner: View {
+    let blocked: Int
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Peep(crew: 4, size: 52, backdrop: Brand.amber)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Let one scan reach every folder").font(.headline).foregroundStyle(Brand.text)
+                Text(blocked > 0
+                     ? "macOS kept \(blocked) \(blocked == 1 ? "folder" : "folders") private in the last scan. Give AgentClean Full Disk Access once and it never needs to ask again. It only reads; cleaning still asks you first."
+                     : "macOS asks separately for Desktop, Documents, Downloads and other drives. Give AgentClean Full Disk Access once and it never needs to ask again. It only reads; cleaning still asks you first.")
+                    .font(.callout).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            Button("Open Privacy Settings") { FullDiskAccess.openSettings() }
+                .buttonStyle(PrimaryButtonStyle(tint: Brand.amber))
+                .accessibilityIdentifier("access.open")
+            if blocked == 0 {
+                Button("Not now", action: dismiss).buttonStyle(SecondaryButtonStyle())
+                    .accessibilityIdentifier("access.later")
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Brand.amber.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Brand.amber.opacity(0.35)))
     }
 }

@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::guard::file_id;
+use crate::guard::{file_id, installed_software};
 use crate::rules::{Candidate, RuleFile};
 
 /// Folders directly in the home folder that are never scanned.
@@ -28,6 +28,50 @@ const BUNDLES: &[&str] = &[".app", ".xcodeproj", ".xcworkspace"];
 /// Hidden folders and bundles: never walked into.
 pub(crate) fn not_walked(name: &str) -> bool {
     name.starts_with('.') || BUNDLES.iter().any(|b| name.ends_with(b))
+}
+
+/// Top folders of the system disk that are never whole-disk roots: the
+/// sealed system, other drives (`/Volumes`) and OS folders (only `usr/local` and `private/tmp`
+/// are taken from `usr` and `private`).
+const SYSTEM_TOP: &[&str] = &["System", "Volumes", "private", "usr", "cores", "dev"];
+
+/// Every folder on this computer's own disk where projects can live, so one
+/// scan covers the whole disk. Each is walked on its own volume, so I18 holds:
+/// on macOS `/` is a sealed system volume and your files sit on a separate data
+/// volume reached through `/Users`, `/Applications`, `/opt` and the like; those
+/// top folders are the roots. With no separate data volume the root is `/`.
+pub fn whole_disk_roots() -> Vec<PathBuf> {
+    whole_disk_roots_in(Path::new("/"), Path::new("/System/Volumes/Data"))
+}
+
+pub(crate) fn whole_disk_roots_in(top: &Path, data: &Path) -> Vec<PathBuf> {
+    let Ok(data) = std::fs::metadata(data) else {
+        return vec![top.to_path_buf()];
+    };
+    let dev = file_id(&data).dev;
+    // symlink_metadata: a link is never a root.
+    let on_data =
+        |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir() && file_id(&m).dev == dev);
+    let mut names: Vec<PathBuf> = std::fs::read_dir(top)
+        .map(|rd| rd.filter_map(Result::ok).map(|e| e.path()).collect())
+        .unwrap_or_default();
+    names.sort();
+    let mut roots: Vec<PathBuf> = names
+        .into_iter()
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| !n.starts_with('.') && !SYSTEM_TOP.contains(&n))
+        })
+        .filter(|p| on_data(p))
+        .collect();
+    roots.extend(
+        ["usr/local", "private/tmp"]
+            .map(|r| top.join(r))
+            .into_iter()
+            .filter(|p| on_data(p)),
+    );
+    roots
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +109,8 @@ pub enum Skip {
     DepthLimit,
     EntryLimit,
     Excluded,
+    /// Installed software (I21): nothing in it is ever cleaned.
+    Installed(&'static str),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,7 +136,8 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
     let canon = |p: &PathBuf| std::fs::canonicalize(p).unwrap_or_else(|_| p.clone());
     let excluded: HashSet<PathBuf> = opts.exclude.iter().map(canon).collect();
     let mut silent: HashSet<PathBuf> = opts.store.iter().map(canon).collect();
-    if let Some(home) = opts.home.as_ref().map(canon) {
+    let home = opts.home.as_ref().map(canon);
+    if let Some(home) = &home {
         silent.extend(HOME_SKIPS.iter().map(|s| home.join(s)));
     }
     let mut visited = HashSet::new();
@@ -112,6 +159,13 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
             };
         let id = file_id(&meta);
         if !visited.insert((id.dev, id.ino)) {
+            continue;
+        }
+        if let Some(what) = installed_software(&root, home.as_deref()) {
+            on(Event::Skipped {
+                path: root,
+                reason: Skip::Installed(what),
+            });
             continue;
         }
         let mut stack = vec![(root, 0usize)];
@@ -150,6 +204,18 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
                 }
                 let path = entry.path();
                 if claimed.contains(&path) || silent.contains(&path) {
+                    continue;
+                }
+                if let Some(what) = installed_software(&path, home.as_deref()) {
+                    // Only where it starts: a stray node_modules is not news.
+                    if installed_software(&dir, home.as_deref()).is_none()
+                        && !matches!(name, "node_modules" | "site-packages" | "dist-packages")
+                    {
+                        on(Event::Skipped {
+                            path,
+                            reason: Skip::Installed(what),
+                        });
+                    }
                     continue;
                 }
                 if excluded.contains(&path) {

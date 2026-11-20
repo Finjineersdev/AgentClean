@@ -59,6 +59,7 @@ public enum SkipReason: String, Codable, Sendable {
     case depthLimit = "depth_limit"
     case entryLimit = "entry_limit"
     case excluded
+    case installed
 }
 
 /// One line of `scan --json`.

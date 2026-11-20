@@ -120,8 +120,9 @@ public struct Engine: Sendable {
 
     /// Projects as they are found, then skipped folders and a summary last.
     /// Cancelling the consuming task stops the engine.
-    public func scan(roots: [URL]) -> AsyncThrowingStream<ScanEvent, Error> {
-        let args = ["--json", "scan"] + storeArgs + ["--"] + roots.map(\.path)
+    /// `wholeDisk` adds every folder on the Mac's own disk where projects can live.
+    public func scan(roots: [URL], wholeDisk: Bool = false) -> AsyncThrowingStream<ScanEvent, Error> {
+        let args = ["--json", "scan"] + (wholeDisk ? ["--whole-disk"] : []) + storeArgs + ["--"] + roots.map(\.path)
         return AsyncThrowingStream { continuation in
             let process: Process
             let exit: AsyncStream<Int32>

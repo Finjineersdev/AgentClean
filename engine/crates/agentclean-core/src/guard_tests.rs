@@ -321,3 +321,63 @@ fn active_and_pinned_projects_are_refused() {
         assert_eq!(f.guard.check(&pinned, &c), Err(Refusal::Pinned));
     }
 }
+
+/// I21: a "project" inside installed software is a package someone installed,
+/// not a project: removing its folders breaks the tool, it does not rebuild.
+#[test]
+fn installed_packages_are_never_cleaned() {
+    let f = fixture();
+    // A globally installed npm package: <prefix>/lib/node_modules/<pkg>.
+    let pkg = f.base.join("prefix/lib/node_modules/firebase-tools");
+    fs::create_dir_all(pkg.join("node_modules/dep")).unwrap();
+    // A pip package with its bytecode cache.
+    let py = f.base.join("venv/lib/python3.12/site-packages/yaml");
+    fs::create_dir_all(py.join("__pycache__")).unwrap();
+    for (root, rel) in [(&pkg, "node_modules"), (&py, "__pycache__")] {
+        let got = f.guard.check(&idle(root), &Candidate::unchecked(rel));
+        assert!(
+            matches!(got, Err(Refusal::InstalledSoftware(_))),
+            "{root:?}: {got:?}"
+        );
+    }
+    // The ordinary project in the same tree is still approved.
+    assert!(f.check("node_modules").is_ok());
+}
+
+#[test]
+fn package_manager_and_toolchain_folders_are_installed_software() {
+    use crate::guard::installed_software;
+    let home = Path::new("/Users/dev");
+    for p in [
+        "/opt/homebrew/Cellar/node/26.7.0/libexec/lib/node_modules/npm",
+        "/opt/homebrew/share/google-cloud-sdk/bin/bootstrapping",
+        "/usr/local/lib/python3.12/site-packages/x",
+        "/opt/local/var/macports/x",
+        "/nix/store/abc-hello",
+        "/Applications/Some.app/Contents/Resources/app",
+        "/Library/Developer/CommandLineTools/x",
+        "/home/linuxbrew/.linuxbrew/lib/x",
+        "/Users/dev/.nvm/versions/node/v22/lib/x",
+        "/Users/dev/.cargo/registry/src/x",
+        "/Users/dev/go/pkg/mod/x",
+        "/Users/dev/.pub-cache/hosted/x",
+        "/Users/dev/Library/pnpm/global/5/x",
+    ] {
+        assert!(
+            installed_software(Path::new(p), Some(home)).is_some(),
+            "{p}"
+        );
+    }
+    for p in [
+        "/Users/dev/code/shop-web",
+        "/Users/dev/go/src/app",
+        "/private/tmp/work/proj",
+        "/Volumes/Work/projects/api",
+        "/Users/dev/Library/Mobile Documents/com~apple~CloudDocs/site",
+    ] {
+        assert!(
+            installed_software(Path::new(p), Some(home)).is_none(),
+            "{p}"
+        );
+    }
+}

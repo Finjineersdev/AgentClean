@@ -54,8 +54,11 @@ optional `volume`: the quarantine on another drive that holds the item.
 
 ## Commands
 
-**`scan [ROOTS…]`**: JSON Lines, in walk order, with every project (the text
-`--all` filter does not apply):
+**`scan [ROOTS…] [--whole-disk]`**: JSON Lines, in walk order, with every
+project (the text `--all` filter does not apply). `--whole-disk` adds every
+top folder of this computer's own disk where projects can live (on macOS the
+folders on the data volume: `/Users`, `/Applications`, `/Library`, `/opt`,
+`/usr/local`, `/private/tmp`; elsewhere `/`):
 
 ```json
 {"schema_version":1,"type":"project", …Project}
@@ -64,7 +67,8 @@ optional `volume`: the quarantine on another drive that holds the item.
 ```
 
 `reason` for a skipped folder is one of `unreadable`, `other_volume`,
-`depth_limit`, `entry_limit`, `excluded`. The summary is always last: `ready`
+`depth_limit`, `entry_limit`, `excluded`, `installed` (installed software such
+as Homebrew or `/Applications`, never walked or cleaned). The summary is always last: `ready`
 is what `clean` takes with no flags, `caution` what `--include-caution` adds,
 `active` what is held in active projects (`--include-active`).
 

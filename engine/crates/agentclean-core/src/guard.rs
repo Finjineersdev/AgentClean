@@ -39,6 +39,8 @@ pub enum Refusal {
     ProjectRootTooBroad,
     #[error("component {0:?} is protected: {1}")]
     Protected(String, &'static str),
+    #[error("the project is inside installed software ({0}): reinstalling it is not a rebuild")]
+    InstalledSoftware(&'static str),
     #[error("path is on a different volume from the project root")]
     CrossDevice,
     #[error("path contains its own repository")]
@@ -206,6 +208,9 @@ impl Guard {
                 return Err(Refusal::ProjectRootTooBroad);
             }
         }
+        if let Some(what) = installed_software(&root, self.home.as_deref()) {
+            return Err(Refusal::InstalledSoftware(what));
+        }
 
         let meta = fs::symlink_metadata(target).map_err(|_| Refusal::NotFound)?;
         if meta.file_type().is_symlink() {
@@ -279,6 +284,73 @@ fn is_normalized(path: &Path) -> bool {
 }
 
 /// True for `/` and top-level folders such as `/Users`.
+/// Folders that only ever hold software someone installed.
+const INSTALLED_PREFIXES: &[(&str, &str)] = &[
+    ("/opt/homebrew", "Homebrew"),
+    ("/usr/local", "Homebrew or a system install"),
+    ("/home/linuxbrew", "Homebrew"),
+    ("/opt/local", "MacPorts"),
+    ("/nix", "Nix"),
+    ("/Applications", "an installed app"),
+    ("/Library", "the system library"),
+    ("/System", "the operating system"),
+    ("/usr", "the operating system"),
+];
+
+/// The same, relative to the home folder.
+const INSTALLED_IN_HOME: &[(&str, &str)] = &[
+    (".nvm", "nvm"),
+    (".volta", "Volta"),
+    (".asdf", "asdf"),
+    (".local/share/mise", "mise"),
+    (".pyenv", "pyenv"),
+    (".rustup", "rustup"),
+    (".cargo", "Cargo"),
+    (".sdkman", "SDKMAN"),
+    (".bun", "Bun"),
+    (".deno", "Deno"),
+    (".pub-cache", "the Dart package cache"),
+    (".gradle", "Gradle"),
+    (".m2", "Maven"),
+    ("go/pkg", "the Go module cache"),
+    ("Library/pnpm", "pnpm"),
+    ("Library/Developer", "Xcode"),
+    ("Library/Application Support", "an app's data"),
+    ("Library/Caches", "a cache"),
+    ("Library/Containers", "an app's data"),
+    ("Library/Group Containers", "an app's data"),
+];
+
+/// Folder names that mean "an installed package lives below here".
+const INSTALLED_COMPONENTS: &[(&str, &str)] = &[
+    ("node_modules", "an npm package"),
+    ("site-packages", "a Python package"),
+    ("dist-packages", "a Python package"),
+    ("Cellar", "Homebrew"),
+];
+
+/// I21: what installed software `root` is part of, if any. Such a "project"
+/// is a package someone installed: removing its folders breaks it.
+pub fn installed_software(root: &Path, home: Option<&Path>) -> Option<&'static str> {
+    for c in root.components() {
+        if let Component::Normal(name) = c {
+            if let Some((_, what)) = INSTALLED_COMPONENTS.iter().find(|(n, _)| name == *n) {
+                return Some(what);
+            }
+        }
+    }
+    let prefixes = INSTALLED_PREFIXES
+        .iter()
+        .map(|(p, w)| (PathBuf::from(p), *w));
+    let in_home = home
+        .into_iter()
+        .flat_map(|h| INSTALLED_IN_HOME.iter().map(move |(p, w)| (h.join(p), *w)));
+    prefixes
+        .chain(in_home)
+        .find(|(p, _)| root.starts_with(p))
+        .map(|(_, w)| w)
+}
+
 fn too_shallow(root: &Path) -> bool {
     let depth = root
         .components()

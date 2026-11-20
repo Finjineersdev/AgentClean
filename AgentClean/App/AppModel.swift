@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Observation
 import CleanCore
 import AgentEngine
@@ -54,14 +55,34 @@ final class AppModel {
 
     let engine: Engine?
 
-    /// Folders the scan starts from (the app's own preference).
+    /// Folders the scan starts from when it is not scanning the whole Mac.
     var scanRoots: [String] {
         didSet { UserDefaults.standard.set(scanRoots, forKey: "scanRoots") }
+    }
+
+    /// Scan every folder on this Mac's own disk (the default), not only `scanRoots`.
+    var wholeDisk: Bool {
+        didSet { UserDefaults.standard.set(wholeDisk, forKey: "wholeDisk") }
+    }
+
+    /// Whether macOS gave the app Full Disk Access; checked again on activation.
+    private(set) var fullDiskAccess = FullDiskAccess.granted
+    func recheckAccess() { fullDiskAccess = FullDiskAccess.granted }
+
+    /// Folders the last scan could not read because of macOS privacy settings.
+    var privacyBlocked: Int { skipped.filter { $0.detail.contains("Operation not permitted") }.count }
+
+    /// What the scan covers, for people.
+    var scanScope: String {
+        wholeDisk ? "your whole Mac" : scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
     }
 
     init() {
         engine = Self.locateEngine().map { Engine(binary: $0) }
         scanRoots = UserDefaults.standard.stringArray(forKey: "scanRoots") ?? [CMConstants.homePath]
+        // Tests and the QA walkthrough pass -scanRoots: scan only those.
+        wholeDisk = UserDefaults.standard.object(forKey: "wholeDisk") as? Bool
+            ?? !ProcessInfo.processInfo.arguments.contains("-scanRoots")
         if engine == nil { error = "The engine is missing from the app bundle. Reinstall AgentClean." }
     }
 
@@ -93,10 +114,11 @@ final class AppModel {
         projects = []
         skipped = []
         summary = nil
-        let roots = scanRoots.map { URL(fileURLWithPath: $0) }
+        let roots = wholeDisk ? [] : scanRoots.map { URL(fileURLWithPath: $0) }
+        let whole = wholeDisk
         scanTask = Task {
             do {
-                for try await event in engine.scan(roots: roots) {
+                for try await event in engine.scan(roots: roots, wholeDisk: whole) {
                     switch event {
                     case .project(let p): projects.append(p)
                     case .skipped(let path, _, let detail): skipped.append((path, detail))
@@ -261,6 +283,25 @@ final class AppModel {
         case EngineError.badOutput(let m): "Unexpected output from the engine: \(m)"
         case EngineError.launch(let m): "The engine could not start: \(m)"
         default: error.localizedDescription
+        }
+    }
+}
+
+/// Full Disk Access lets one scan read every folder without macOS asking
+/// separately for Desktop, Documents, Downloads and other drives. Only the
+/// person can grant it, in System Settings.
+enum FullDiskAccess {
+    /// macOS lets only apps with Full Disk Access open the privacy database.
+    static var granted: Bool {
+        let db = CMConstants.homePath + "/Library/Application Support/com.apple.TCC/TCC.db"
+        guard let handle = FileHandle(forReadingAtPath: db) else { return false }
+        try? handle.close()
+        return true
+    }
+
+    static func openSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
         }
     }
 }

@@ -14,16 +14,35 @@ struct SettingsView: View {
                 Toggle("Show AgentClean in the menu bar", isOn: $showMenuBar)
                     .accessibilityIdentifier("settings.menuBar")
             }
-            Section("Scan these folders") {
-                ForEach(model.scanRoots, id: \.self) { root in
-                    HStack {
-                        Text((root as NSString).abbreviatingWithTildeInPath)
-                        Spacer()
-                        Button("Remove") { model.scanRoots.removeAll { $0 == root } }
-                            .disabled(model.scanRoots.count == 1)
+            Section {
+                @Bindable var model = model
+                Toggle("Scan the whole Mac", isOn: $model.wholeDisk)
+                    .accessibilityIdentifier("settings.wholeDisk")
+                if !model.wholeDisk {
+                    ForEach(model.scanRoots, id: \.self) { root in
+                        HStack {
+                            Text((root as NSString).abbreviatingWithTildeInPath)
+                            Spacer()
+                            Button("Remove") { model.scanRoots.removeAll { $0 == root } }
+                                .disabled(model.scanRoots.count == 1)
+                        }
+                    }
+                    Button("Add Folder…") { if let url = pickFolder() { model.scanRoots.append(url.path) } }
+                }
+                LabeledContent("Full Disk Access") {
+                    if model.fullDiskAccess {
+                        Label("On", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        Button("Open Privacy Settings…") { FullDiskAccess.openSettings() }
                     }
                 }
-                Button("Add Folder…") { if let url = pickFolder() { model.scanRoots.append(url.path) } }
+            } header: {
+                Text("What to scan")
+            } footer: {
+                Text(model.wholeDisk
+                     ? "Every folder on this Mac's own disk: your home folder, /Applications, /Library, /opt, /usr/local and /private/tmp. Installed software is noted, never cleaned. Other drives: add them as folders."
+                     : "Only these folders and everything inside them.")
+                    .foregroundStyle(.secondary)
             }
 
             Section {

@@ -63,6 +63,11 @@ enum Cmd {
         /// Also list projects with nothing to clean (always on with --json)
         #[arg(long)]
         all: bool,
+        /// Scan every folder on this computer's own disk where projects can
+        /// live (on macOS: /Users, /Applications, /Library, /opt, /usr/local,
+        /// /private/tmp), plus any folders given
+        #[arg(long)]
+        whole_disk: bool,
         #[command(flatten)]
         store: StoreArg,
     },
@@ -208,8 +213,9 @@ fn main() -> ExitCode {
             roots,
             rules,
             all,
+            whole_disk,
             store,
-        } => scan(roots, rules.as_deref(), all, &store),
+        } => scan(roots, rules.as_deref(), all, whole_disk, &store),
         Cmd::Plan { rules, project } => plan(rules.as_deref(), &project),
         Cmd::Clean {
             rules,
@@ -584,15 +590,29 @@ impl Totals {
     }
 }
 
-fn scan(roots: Vec<PathBuf>, rules: Option<&Path>, all: bool, store: &StoreArg) -> CliResult {
+fn scan(
+    mut roots: Vec<PathBuf>,
+    rules: Option<&Path>,
+    all: bool,
+    whole_disk: bool,
+    store: &StoreArg,
+) -> CliResult {
     let ctx = Context::load(rules)?;
     let home = std::env::var_os("HOME").map(PathBuf::from);
+    if whole_disk {
+        roots.extend(discover::whole_disk_roots());
+    }
     let roots = match (roots.is_empty(), &home) {
         (false, _) => roots,
         (true, Some(h)) => vec![h.clone()],
         (true, None) => return Err("no home folder: give the folders to scan".to_owned()),
     };
     let mut opts = Options::new(roots);
+    if whole_disk {
+        // A whole disk is deeper and larger than a home folder.
+        opts.max_depth = 24;
+        opts.max_entries = 20_000_000;
+    }
     opts.home = home;
     opts.exclude = ctx.config.exclude.clone();
     opts.store = store.store.clone().or_else(quarantine::default_location);
@@ -687,6 +707,7 @@ fn skip_names(skip: &Skip) -> (&'static str, String) {
         Skip::DepthLimit => "depth_limit",
         Skip::EntryLimit => "entry_limit",
         Skip::Excluded => "excluded",
+        Skip::Installed(_) => "installed",
     };
     (name, describe(skip))
 }
@@ -700,6 +721,7 @@ fn describe(skip: &Skip) -> String {
             "entry limit reached; the rest of this folder was not scanned".to_owned()
         }
         Skip::Excluded => "excluded".to_owned(),
+        Skip::Installed(what) => format!("installed software ({what}), never cleaned"),
     }
 }
 

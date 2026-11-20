@@ -52,6 +52,9 @@ struct RootView: View {
         } message: {
             Text(model.error ?? "")
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.recheckAccess()
+        }
         .task {
             await model.loadConfig()
             #if DEBUG

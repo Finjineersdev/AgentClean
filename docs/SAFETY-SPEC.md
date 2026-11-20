@@ -90,7 +90,7 @@ Discovery only reads; what it finds still passes I1–I12 before anything moves.
 
 | # | Invariant | Enforced by | Test |
 | --- | --- | --- | --- |
-| I18 | The project walk never follows a link, never enters another volume, the quarantine store, a bundle, a hidden folder, an artifact folder of a project it found, or a folder that belongs to its parent's project (Flutter's `android/`). A candidate is reported once, by the outermost project that claims it | `discover::discover` | `links_are_never_followed`, `other_volumes_are_not_entered`, `the_quarantine_store_is_not_entered`, `bundles_and_hidden_folders_are_not_entered`, `finds_every_project_in_a_layout_like_the_owners` |
+| I18 | The project walk never follows a link, never enters another volume, the quarantine store, a bundle, a hidden folder, an artifact folder of a project it found, installed software (I21), or a folder that belongs to its parent's project (Flutter's `android/`). A candidate is reported once, by the outermost project that claims it. A whole-disk scan is one walk per top folder of the data volume, so it never crosses a volume either | `discover::discover`, `discover::whole_disk_roots` | `links_are_never_followed`, `other_volumes_are_not_entered`, `the_quarantine_store_is_not_entered`, `bundles_and_hidden_folders_are_not_entered`, `finds_every_project_in_a_layout_like_the_owners`, `installed_software_is_not_walked`, `whole_disk_roots_are_the_top_folders_on_the_data_volume` |
 
 ## Activity and pins (M2.5)
 
@@ -112,6 +112,7 @@ the seconds between the plan and the move is not seen.
 | # | Invariant | Enforced in | Tests |
 | --- | --- | --- | --- |
 | I20 | A global cache is cleared only by its tool's own command, with a fixed argument list, no shell, stdin closed, the home folder as working folder and a time limit, and only with `--execute`. No cache path is inside or above a toolchain folder or the home folder | `caches::known`, `caches::allowed`, `caches::run` | `toolchains_never_appear_as_caches`, `the_home_folder_and_its_parents_are_never_a_cache`, `cleaning_runs_the_tools_own_command`, `a_failing_or_hanging_tool_is_reported`, `caches_are_cleared_by_the_tools_own_command`, `xcode_archives_and_simulators_are_measured_only` |
+| I21 | A project inside installed software is never cleaned: its root has a `node_modules`, `site-packages`, `dist-packages` or `Cellar` folder above it, or lies under Homebrew, MacPorts, Nix, `/Applications`, `/Library`, `/System`, `/usr`, or a toolchain folder in the home folder (`.nvm`, `.rustup`, `.cargo`, `go/pkg`, `Library/Caches` and the like). Removing its folders breaks the tool; it does not rebuild | `guard::installed_software`, `Guard::check` | `installed_packages_are_never_cleaned`, `package_manager_and_toolchain_folders_are_installed_software` |
 
 ## Specified, not implemented
 
