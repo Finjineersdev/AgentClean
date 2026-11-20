@@ -1,0 +1,29 @@
+[
+  {
+    "caches": [
+      {
+        "bytes": 0,
+        "bytes_after": 0,
+        "command": [
+          "npm",
+          "cache",
+          "clean",
+          "--force"
+        ],
+        "freed": 0,
+        "id": "npm",
+        "installed": true,
+        "name": "npm package cache",
+        "note": "Packages download again on the next install.",
+        "path": "$TMP/home/.npm/_cacache",
+        "status": 0,
+        "stderr": "",
+        "tool": "npm",
+        "unreadable": 0
+      }
+    ],
+    "command": "clean-cache",
+    "execute": true,
+    "schema_version": 1
+  }
+]

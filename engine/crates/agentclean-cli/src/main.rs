@@ -14,6 +14,7 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use agentclean_core::activity::{self, Activity, Config, Processes, Verdict as Busy};
+use agentclean_core::caches::{self, Found};
 use agentclean_core::discover::{self, Event, Options, Skip};
 use agentclean_core::guard::Guard;
 use agentclean_core::quarantine::{self, Manifest, State, Store};
@@ -116,6 +117,18 @@ enum Cmd {
         /// Stop skipping a folder (repeatable)
         #[arg(long, value_name = "FOLDER")]
         include: Vec<PathBuf>,
+    },
+    /// List global tool caches and their sizes (read-only)
+    Caches,
+    /// Clear global caches with each tool's own command (dry run unless --execute).
+    /// Not undoable: the tool downloads again what it needs.
+    CleanCache {
+        /// Cache ids, as shown by `caches`
+        #[arg(required = true)]
+        ids: Vec<String>,
+        /// Actually run the tools' commands
+        #[arg(long)]
+        execute: bool,
     },
     /// List clean runs, newest first
     History {
@@ -225,6 +238,8 @@ fn main() -> ExitCode {
             exclude,
             include,
         } => config(idle_days, dormant_days, &exclude, &include),
+        Cmd::Caches => caches(),
+        Cmd::CleanCache { ids, execute } => clean_cache(&ids, execute),
         Cmd::History { store } => history(&store),
         Cmd::Restore { run, item, store } => restore(&run, item, &store),
         Cmd::Purge {
@@ -901,6 +916,131 @@ fn clean(
     }
     Ok(if failed {
         ExitCode::from(3)
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+fn cache_env() -> Result<caches::Env, String> {
+    caches::Env::current().ok_or_else(|| "cannot find a home folder".to_owned())
+}
+
+fn cache_json(f: &Found) -> Value {
+    json!({
+        "id": f.cache.id,
+        "tool": f.cache.tool,
+        "name": f.cache.name,
+        "path": lossy(&f.cache.path),
+        "bytes": f.bytes,
+        "unreadable": f.unreadable,
+        "command": (!f.cache.command.is_empty()).then_some(f.cache.command),
+        "installed": f.program.is_some(),
+        "note": f.cache.note,
+    })
+}
+
+fn caches() -> CliResult {
+    let found = caches::list(&cache_env()?);
+    if json_mode() {
+        let all: Vec<Value> = found.iter().map(cache_json).collect();
+        put("command", "caches", json!({ "caches": all }));
+        return Ok(ExitCode::SUCCESS);
+    }
+    if found.is_empty() {
+        say!("No known tool caches found.");
+    }
+    for f in &found {
+        let how = match (f.cache.command.is_empty(), f.program.is_some()) {
+            (true, _) => "measure only".to_owned(),
+            (false, true) => f.cache.command.join(" "),
+            (false, false) => format!("{} not found", f.cache.tool),
+        };
+        say!(
+            "{:<20} {:>10}  {}  [{how}]",
+            f.cache.id,
+            human(f.bytes),
+            f.cache.path.display()
+        );
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn clean_cache(ids: &[String], execute: bool) -> CliResult {
+    let env = cache_env()?;
+    let found = caches::list(&env);
+    let mut picked = Vec::new();
+    for id in ids {
+        let f = found.iter().find(|f| f.cache.id == id).ok_or_else(|| {
+            format!("no cache named {id} on this computer (see `agentclean caches`)")
+        })?;
+        if f.cache.command.is_empty() {
+            return Err(format!("{id} has no command to clear it: {}", f.cache.note));
+        }
+        if f.program.is_none() {
+            return Err(format!("{id}: {} is not installed", f.cache.tool));
+        }
+        picked.push(f);
+    }
+    let mut results = Vec::new();
+    let mut failed = false;
+    for f in picked {
+        let mut r = cache_json(f);
+        if execute {
+            let ran = caches::run(f, &env, caches::TIME_LIMIT)?;
+            let after = caches::list(&env)
+                .into_iter()
+                .find(|g| g.cache.id == f.cache.id)
+                .map_or(0, |g| g.bytes);
+            let freed = f.bytes.saturating_sub(after);
+            failed |= ran.status != Some(0);
+            if let Value::Object(m) = &mut r {
+                m.insert("status".into(), json!(ran.status));
+                m.insert("bytes_after".into(), json!(after));
+                m.insert("freed".into(), json!(freed));
+                m.insert("stderr".into(), json!(ran.stderr));
+            }
+            if !json_mode() {
+                match ran.status {
+                    Some(0) => say!(
+                        "{}: ran `{}`, freed {}",
+                        f.cache.id,
+                        f.cache.command.join(" "),
+                        human(freed)
+                    ),
+                    Some(code) => say!(
+                        "{}: `{}` failed (exit {code}): {}",
+                        f.cache.id,
+                        f.cache.command.join(" "),
+                        ran.stderr
+                    ),
+                    None => say!(
+                        "{}: `{}` was stopped",
+                        f.cache.id,
+                        f.cache.command.join(" ")
+                    ),
+                }
+            }
+        } else if !json_mode() {
+            say!(
+                "would run `{}` to clear {} ({})",
+                f.cache.command.join(" "),
+                f.cache.name,
+                human(f.bytes)
+            );
+        }
+        results.push(r);
+    }
+    if json_mode() {
+        put(
+            "command",
+            "clean-cache",
+            json!({ "execute": execute, "caches": results }),
+        );
+    } else if !execute {
+        say!("Dry run: nothing was run. Add --execute. Not undoable: tools download again what they need.");
+    }
+    Ok(if failed {
+        ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
     })

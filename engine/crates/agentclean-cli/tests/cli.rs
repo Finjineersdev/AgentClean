@@ -350,7 +350,9 @@ fn normalized(e: &Env, out: &str) -> serde_json::Value {
             Value::Object(m) => {
                 for (k, v) in m.iter_mut() {
                     match k.as_str() {
-                        "bytes" | "freed" | "created_unix" if v.is_u64() => *v = 0.into(),
+                        "bytes" | "bytes_after" | "freed" | "created_unix" if v.is_u64() => {
+                            *v = 0.into()
+                        }
                         "run_id" => *v = "RUN".into(),
                         // The config file's place differs between macOS and Linux.
                         "path" if v.as_str().is_some_and(|p| p.ends_with("config.toml")) => {
@@ -497,4 +499,67 @@ fn config_changes_only_the_settings() {
     e.ok(&["config", "--include", &work]);
     assert!(!fs::read_to_string(config_file(&e)).unwrap().contains(&work));
     assert!(exists(&e.project, ".next/cache/build.bin"));
+}
+
+/// F15: a global cache is cleared only by the tool's own command, and only
+/// with --execute.
+#[test]
+fn caches_are_cleared_by_the_tools_own_command() {
+    use std::os::unix::fs::PermissionsExt;
+    let e = env();
+    let cache = e.home.join(".npm/_cacache");
+    fs::create_dir_all(&cache).unwrap();
+    fs::write(cache.join("blob"), vec![1u8; 40_000]).unwrap();
+    let bin = e.home.parent().unwrap().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    let npm = bin.join("npm");
+    fs::write(
+        &npm,
+        "#!/bin/sh\necho \"$*\" >> \"$HOME/npm-ran\"\nrm -rf \"$HOME/.npm/_cacache\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&npm, fs::Permissions::from_mode(0o755)).unwrap();
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_agentclean"))
+            .args(args)
+            .env("HOME", &e.home)
+            .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+            .env_remove("XDG_CACHE_HOME")
+            .env_remove("XDG_DATA_HOME")
+            .env_remove("npm_config_cache")
+            .env_remove("CARGO_HOME")
+            .env_remove("GOPATH")
+            .env_remove("GOMODCACHE")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        normalized(&e, &String::from_utf8(out.stdout).unwrap())
+    };
+
+    snapshot("caches", &run(&["--json", "caches"]));
+    snapshot(
+        "clean-cache-dry-run",
+        &run(&["--json", "clean-cache", "npm"]),
+    );
+    assert!(
+        cache.exists() && !e.home.join("npm-ran").exists(),
+        "dry run runs nothing"
+    );
+    let done = run(&["--json", "clean-cache", "npm", "--execute"]);
+    snapshot("clean-cache-execute", &done);
+    assert!(!cache.exists());
+    assert_eq!(
+        fs::read_to_string(e.home.join("npm-ran")).unwrap(),
+        "cache clean --force\n"
+    );
+
+    let out = e.run(&["clean-cache", "gradle"]);
+    assert!(
+        !out.status.success(),
+        "unknown or measure-only caches are refused"
+    );
 }

@@ -107,6 +107,12 @@ nothing is approved without an activity assessment.
 Known limit: activity is assessed once, before approval. A tool started in
 the seconds between the plan and the move is not seen.
 
+## Global caches (M4, ADR 0006)
+
+| # | Invariant | Enforced in | Tests |
+| --- | --- | --- | --- |
+| I20 | A global cache is cleared only by its tool's own command, with a fixed argument list, no shell, stdin closed, the home folder as working folder and a time limit, and only with `--execute`. No cache path is inside or above a toolchain folder or the home folder | `caches::known`, `caches::allowed`, `caches::run` | `toolchains_never_appear_as_caches`, `the_home_folder_and_its_parents_are_never_a_cache`, `cleaning_runs_the_tools_own_command`, `a_failing_or_hanging_tool_is_reported`, `caches_are_cleared_by_the_tools_own_command` |
+
 ## Specified, not implemented
 
 | # | Invariant |

@@ -91,4 +91,14 @@ list after the change.
 `command`, `path` (the config file), `idle_days`, `dormant_days`, `pinned`,
 `exclude`, after any change. Like `pin`, it changes only AgentClean's config.
 
+**`caches`**: `caches`, one object per cache found on disk: `id`, `tool`,
+`name`, `path`, `bytes`, `unreadable`, `command` (the tool's own command as
+an array, or `null` when the cache is measured only), `installed` (the tool
+was found), `note`.
+
+**`clean-cache ID… [--execute]`**: `execute` and `caches`, the same objects;
+with `--execute` each also has `status` (exit code, `null` if stopped),
+`bytes_after`, `freed` and `stderr` (its last lines). Exits non-zero if any
+tool failed. Not undoable (ADR 0006).
+
 **`rules-check DIR`**: `command`, `rule_files`, `artifacts`.

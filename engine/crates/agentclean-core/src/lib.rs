@@ -10,6 +10,7 @@
 //! The invariants the guard enforces are specified in `docs/SAFETY-SPEC.md`.
 
 pub mod activity;
+pub mod caches;
 pub mod deny;
 pub mod discover;
 pub mod guard;
@@ -20,6 +21,8 @@ pub mod volumes;
 
 #[cfg(test)]
 mod activity_tests;
+#[cfg(test)]
+mod caches_tests;
 #[cfg(test)]
 mod discover_tests;
 #[cfg(test)]
