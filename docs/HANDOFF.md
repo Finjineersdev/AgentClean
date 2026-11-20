@@ -150,6 +150,9 @@ menus' press action, and contrast findings the element's own pixels disprove
 
 ## 7. Next session
 
+The gap review of 20 Nov 2026 (`docs/GAP-REVIEW.md`) lists what is still
+missing against the idea, with a suggested order; start there.
+
 1. Run the engine checks from `CLAUDE.md`, `cd CleanCore && swift test`, and
    `scripts/check-swift-never-deletes.sh`; all should pass.
 2. Build the app and run the Debug walkthrough in `QA-CHECKLIST.md`.
