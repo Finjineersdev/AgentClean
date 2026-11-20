@@ -25,11 +25,6 @@ extension Color {
     }
 }
 
-struct ThemeBackground: View {
-    var body: some View {
-        Brand.canvas.ignoresSafeArea()
-    }
-}
 
 // MARK: - Surfaces
 
@@ -128,6 +123,7 @@ struct ScreenHeader: View {
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle).font(.callout).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
         }
+        .entrance(0, from: .leading)
     }
 }
 

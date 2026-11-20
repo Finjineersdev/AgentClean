@@ -50,7 +50,7 @@ struct DevStackView: View {
                             if !items.isEmpty {
                                 SectionLabel(text: g.displayName, trailing: bytes(items.reduce(0) { $0 + $1.bytes }))
                                     .padding(.top, 14).padding(.bottom, 2)
-                                ForEach(items) { row($0) }
+                                ForEach(Array(items.enumerated()), id: \.element.id) { i, item in row(item).entrance(i + 1) }
                             }
                         }
                     }

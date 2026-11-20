@@ -31,12 +31,13 @@ struct ProjectsView: View {
                     ScrollView {
                         let biggest = rows.map(model.total).max() ?? 1
                         LazyVStack(spacing: 2) {
-                            ForEach(rows, id: \.root) { p in
+                            ForEach(Array(rows.enumerated()), id: \.element.root) { i, p in
                                 Button { model.selectedProject = p.root } label: {
                                     CompactProjectRow(project: p, total: model.total(p), share: Double(model.total(p)) / Double(max(biggest, 1)))
                                 }
                                 .buttonStyle(RowButtonStyle(selected: model.selectedProject == p.root))
                                 .accessibilityIdentifier("project.\(URL(fileURLWithPath: p.root).lastPathComponent)")
+                                .entrance(i, from: .leading)
                             }
                         }
                         .accessibilityElement(children: .contain)
@@ -53,10 +54,10 @@ struct ProjectsView: View {
             if let p = model.project(model.selectedProject) {
                 // Keyed by path, not value: a refresh after a clean must not tear down
                 // the open Review sheet (and its Undo).
-                ProjectDetail(project: p).id(p.root)
+                ProjectDetail(project: p).id(p.root).entrance(0, from: .trailing)
             } else {
                 VStack(spacing: 8) {
-                    Image(systemName: "sidebar.left").font(.largeTitle).foregroundStyle(Brand.hairline).accessibilityHidden(true)
+                    Peep(crew: 2, size: 96)
                     Text("Choose a project to see its folders").foregroundStyle(Brand.muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -120,6 +121,7 @@ struct ProjectDetail: View {
                     VStack(spacing: 0) {
                         ForEach(Array(project.items.enumerated()), id: \.element.path) { i, item in
                             itemRow(item, share: Double(item.bytes ?? 0) / Double(max(biggest, 1)))
+                                .entrance(i + 1)
                             if i < project.items.count - 1 { Divider().overlay(Brand.hairline).padding(.leading, 76) }
                         }
                     }

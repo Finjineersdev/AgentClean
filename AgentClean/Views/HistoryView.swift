@@ -18,8 +18,8 @@ struct HistoryView: View {
                 if model.runs.isEmpty {
                     Text("No cleans yet.").foregroundStyle(Brand.muted).padding(.top, 40).frame(maxWidth: .infinity)
                 }
-                ForEach(model.runs) { run in
-                    runCard(run)
+                ForEach(Array(model.runs.enumerated()), id: \.element.id) { i, run in
+                    runCard(run).entrance(i + 1)
                 }
             }
             .padding(28)

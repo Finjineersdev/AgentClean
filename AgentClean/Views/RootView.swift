@@ -3,12 +3,18 @@ import AgentEngine
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         @Bindable var model = model
         NavigationSplitView {
             List(AppModel.Screen.allCases, selection: Binding(get: { model.screen }, set: { if let s = $0 { model.screen = s } })) { screen in
-                Label(screen.title, systemImage: screen.symbol)
+                Label {
+                    Text(screen.title)
+                } icon: {
+                    Image(systemName: screen.symbol)
+                        .symbolEffect(.bounce, value: model.screen == screen)
+                }
                     .badge(badge(screen))
                     .tag(screen)
                     .accessibilityIdentifier("nav.\(screen.rawValue)")
@@ -17,7 +23,7 @@ struct RootView: View {
             .safeAreaInset(edge: .bottom) {
                 if model.scanning {
                     HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
+                        Peep(mood: .talk, size: 28)
                         Text("Scanning… \(model.projects.count) projects").font(.caption).foregroundStyle(Brand.muted)
                     }
                     .padding(10)
@@ -25,15 +31,20 @@ struct RootView: View {
             }
         } detail: {
             ZStack {
-                ThemeBackground()
-                switch model.screen {
-                case .overview: OverviewView()
-                case .projects: ProjectsView()
-                case .caches: CachesView()
-                case .history: HistoryView()
-                case .devStack: DevStackView()
+                AnimatedBackdrop(colors: backdrop)
+                Group {
+                    switch model.screen {
+                    case .overview: OverviewView()
+                    case .projects: ProjectsView()
+                    case .caches: CachesView()
+                    case .history: HistoryView()
+                    case .devStack: DevStackView()
+                    }
                 }
+                .id(model.screen)
+                .transition(.page(reduce: reduce))
             }
+            .animation(.spring(response: 0.5, dampingFraction: 0.86), value: model.screen)
         }
         .tint(Brand.teal)
         .alert("Something went wrong", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
@@ -47,6 +58,12 @@ struct RootView: View {
             await QAWalkthrough.run(model)
             #endif
         }
+    }
+
+    /// The backdrop glows in the colours of the biggest languages found.
+    private var backdrop: [Color] {
+        let top = LanguageStat.of(model.projects).prefix(3).map(\.ecosystem.color)
+        return top.count >= 2 ? Array(top) : [Brand.teal, Color(hex: 0x8B6CEF), Brand.sky]
     }
 
     /// Counts the sidebar shows next to a screen, when there is something to count.

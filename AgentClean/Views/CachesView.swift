@@ -39,7 +39,7 @@ struct CachesView: View {
 
                 if !clearable.isEmpty {
                     SectionLabel(text: "Can be cleared")
-                    ForEach(clearable) { row($0) }
+                    ForEach(Array(clearable.enumerated()), id: \.element.id) { i, c in row(c).entrance(i + 1) }
                     HStack {
                         Text("\(picked.count) selected · \(bytes(pickedBytes))")
                             .foregroundStyle(Brand.muted).monospacedDigit()
@@ -54,7 +54,7 @@ struct CachesView: View {
 
                 if !measured.isEmpty {
                     SectionLabel(text: "Measured only").padding(.top, 8)
-                    ForEach(measured) { row($0) }
+                    ForEach(Array(measured.enumerated()), id: \.element.id) { i, c in row(c).entrance(i + 2) }
                 }
             }
             .padding(28)

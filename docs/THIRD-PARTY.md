@@ -15,3 +15,12 @@ To add one: download `icons/<slug>.svg` from the same pinned version, check it
 is a single `<path>` with no scripts or links, and add a template imageset
 named `logo-<slug>`. Colours live in `AgentClean/Design/Ecosystem.swift`;
 brand colours too dark for the graphite UI are lightened there.
+
+## Characters
+
+`AgentClean/Assets.xcassets/Peeps/` holds characters from
+[Open Peeps](https://www.openpeeps.com) by Pablo Stanley, released under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), generated with
+the DiceBear `open-peeps` style (9.x) and saved as static SVGs. The app makes
+no network request for them. The doodles in `AgentClean/Design/Motion.swift`
+are drawn in code.
