@@ -88,6 +88,22 @@ struct SettingsView: View {
                 Button("Add Folder…") { if let url = pickFolder() { Task { await model.exclude(url) } } }
             }
 
+            Section {
+                LabeledContent("Your own rules") {
+                    Button("Show Folder") {
+                        if let path = model.config?.path {
+                            let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
+                            NSWorkspace.shared.activateFileViewerSelecting([dir.appendingPathComponent("rules")])
+                        }
+                    }
+                }
+            } header: {
+                Text("Rules")
+            } footer: {
+                Text("Add TOML rule files to a folder named rules beside config.toml for build output the catalogue does not know. They are checked like the built-in rules. A repository can also carry .agentclean.toml to pin itself or keep folders.")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Pinned: never cleaned") {
                 if (model.config?.pinned.isEmpty ?? true) && (model.config?.pinnedRemotes ?? []).isEmpty {
                     Text("Nothing is pinned. Pin a project from its page.").foregroundStyle(.secondary)

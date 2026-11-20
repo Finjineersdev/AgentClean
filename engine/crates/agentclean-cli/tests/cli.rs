@@ -604,3 +604,43 @@ fn a_tool_that_cannot_start_does_not_hide_the_other_results() {
     assert!(caches[1]["error"].as_str().unwrap().contains("cannot run"));
     assert!(!e.home.join(".npm/_cacache").exists());
 }
+
+/// P8: rule files beside config.toml add to the catalogue; a repository's
+/// `.agentclean.toml` only keeps folders.
+#[test]
+fn user_rules_and_repository_files() {
+    let e = env();
+    let project = e.project.to_str().unwrap();
+    fs::create_dir_all(e.project.join("out/x")).unwrap();
+    fs::write(e.project.join("out/x/a.bin"), vec![0u8; 9000]).unwrap();
+    fs::write(e.project.join("site.json"), "{}").unwrap();
+    age(&e.project);
+    assert!(!e.ok(&["plan", project]).contains("out"));
+
+    let rules = config_file(&e).parent().unwrap().join("rules");
+    fs::create_dir_all(&rules).unwrap();
+    fs::write(
+        rules.join("mine.toml"),
+        "schema = 1\nid = \"mine\"\nname = \"My generator\"\n[detect]\nany_files = [\"site.json\"]\n\
+         [[artifact]]\npath = \"out\"\nclass = \"safe\"\nreason = \"My generator writes it\"\nrestore = \"Run the generator\"\n",
+    )
+    .unwrap();
+    let plan = e.ok(&["plan", project]);
+    assert!(plan.contains("out"), "{plan}");
+
+    fs::write(
+        e.project.join(".agentclean.toml"),
+        "exclude = [\"out\", \".next\"]\n",
+    )
+    .unwrap();
+    age(&e.project);
+    let plan = e.ok(&["plan", project]);
+    assert!(
+        plan.contains(".agentclean.toml keeps this folder"),
+        "{plan}"
+    );
+
+    // A built-in id cannot be replaced: the command stops.
+    fs::write(rules.join("mine.toml"), "schema = 1\nid = \"node\"\nname = \"N\"\n[detect]\nany_files = [\"x\"]\n[[artifact]]\npath = \"o\"\nclass = \"safe\"\nreason = \"r\"\nrestore = \"s\"\n").unwrap();
+    assert!(!e.run(&["plan", project]).status.success());
+}

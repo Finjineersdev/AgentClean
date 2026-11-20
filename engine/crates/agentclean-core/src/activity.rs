@@ -117,6 +117,55 @@ impl Config {
     }
 }
 
+/// A repository's own `.agentclean.toml`. It may only take folders away
+/// from cleaning: pin the project, or keep folders.
+struct RepoFile {
+    pin: bool,
+    exclude: Vec<PathBuf>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RepoToml {
+    #[serde(default)]
+    pin: bool,
+    #[serde(default)]
+    exclude: Vec<String>,
+}
+
+/// Reads `<root>/.agentclean.toml`: Ok(None) when there is none, Err when it
+/// says anything but a plain pin or relative folders (the caller pins).
+fn repo_file(root: &Path) -> Result<Option<RepoFile>, String> {
+    let path = root.join(".agentclean.toml");
+    let meta = match std::fs::symlink_metadata(&path) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err("cannot be read".to_owned()),
+    };
+    if !meta.is_file() || meta.len() > 64 * 1024 {
+        return Err("is not a small plain file".to_owned());
+    }
+    let text = std::fs::read_to_string(&path).map_err(|_| "cannot be read".to_owned())?;
+    let raw: RepoToml = toml::from_str(&text).map_err(|_| "is not pin or exclude".to_owned())?;
+    let mut exclude = Vec::new();
+    for e in raw.exclude {
+        let p = PathBuf::from(e.trim_end_matches('/'));
+        let plain = p.components().count() > 0
+            && p.components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)));
+        if !plain {
+            return Err(format!(
+                "excludes {e:?}, which is not a folder inside the project"
+            ));
+        }
+        exclude.push(p);
+    }
+    Ok(Some(RepoFile {
+        pin: raw.pin,
+        exclude,
+    }))
+}
+
 /// The `origin` remote of the repository at `root`, normalised, read from
 /// `.git/config` as text: git is not run, and a repository can only make
 /// itself pinned, never unpin another.
@@ -198,6 +247,8 @@ pub struct Activity {
     verdict: Verdict,
     pinned: bool,
     reason: String,
+    /// Folders the repository's `.agentclean.toml` keeps, relative.
+    kept: Vec<PathBuf>,
 }
 
 impl Activity {
@@ -214,6 +265,17 @@ impl Activity {
         self.pinned
     }
 
+    /// Folders, relative to the root, that the repository asks never to clean.
+    pub fn kept(&self) -> &[PathBuf] {
+        &self.kept
+    }
+
+    #[cfg(test)]
+    pub(crate) fn keeping(mut self, kept: Vec<PathBuf>) -> Self {
+        self.kept = kept;
+        self
+    }
+
     /// One plain-English line saying why.
     pub fn reason(&self) -> &str {
         &self.reason
@@ -226,6 +288,7 @@ impl Activity {
             verdict,
             pinned,
             reason: "test".to_owned(),
+            kept: Vec::new(),
         }
     }
 }
@@ -375,6 +438,20 @@ pub fn assess(
     if cfg.pinned(&canon, now) {
         activity.pinned = true;
         activity.reason = format!("pinned; {}", activity.reason);
+    } else {
+        match repo_file(&canon) {
+            Ok(None) => {}
+            Ok(Some(f)) if f.pin => {
+                activity.pinned = true;
+                activity.reason = format!("pinned by its .agentclean.toml; {}", activity.reason);
+            }
+            Ok(Some(f)) => activity.kept = f.exclude,
+            Err(why) => {
+                activity.pinned = true;
+                activity.reason =
+                    format!("pinned: its .agentclean.toml {why}; {}", activity.reason);
+            }
+        }
     }
     activity
 }
@@ -395,6 +472,7 @@ fn decide(
         verdict,
         pinned: false,
         reason,
+        kept: Vec::new(),
     };
     if let Some(Some(p)) = busy {
         return make(

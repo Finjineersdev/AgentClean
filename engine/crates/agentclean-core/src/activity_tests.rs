@@ -523,3 +523,51 @@ fn old_config_files_still_load() {
     let cfg = Config::load(&path).unwrap();
     assert!(cfg.pinned_until.is_empty() && cfg.pinned_remotes.is_empty());
 }
+
+/// P8: a repository's `.agentclean.toml` can pin it or keep folders, nothing
+/// else; anything it cannot say plainly pins the project (hostile input).
+#[test]
+fn a_repository_file_can_only_take_folders_away() {
+    let (_t, root) = project();
+    age_all(&root, 200);
+    let run = || {
+        assess(
+            &root,
+            &rules(),
+            &Config::default(),
+            Some(&quiet()),
+            SystemTime::now(),
+        )
+    };
+    assert!(!run().pinned() && run().kept().is_empty());
+
+    fs::write(
+        root.join(".agentclean.toml"),
+        "exclude = [\"dist\", \"data/cache/\"]\n",
+    )
+    .unwrap();
+    assert!(!run().pinned());
+    assert_eq!(
+        run().kept(),
+        [PathBuf::from("dist"), PathBuf::from("data/cache")]
+    );
+
+    fs::write(root.join(".agentclean.toml"), "pin = true\n").unwrap();
+    assert!(run().pinned());
+    assert!(
+        run().reason().contains(".agentclean.toml"),
+        "{}",
+        run().reason()
+    );
+
+    for bad in [
+        "[[artifact]]\npath = \"src\"\n",
+        "exclude = [\"/etc\"]\n",
+        "exclude = [\"../other\"]\n",
+        "pin = \"yes\"\n",
+        "not toml",
+    ] {
+        fs::write(root.join(".agentclean.toml"), bad).unwrap();
+        assert!(run().pinned(), "{bad}");
+    }
+}

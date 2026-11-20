@@ -112,3 +112,26 @@ rules.
 
 Tool-native cleanup commands (`go clean`, `dotnet clean`) belong to global
 caches in M4, not to this schema.
+
+## Your own rules
+
+Put rule files in `rules/` beside `config.toml`
+(`~/Library/Application Support/AgentClean/rules` on macOS,
+`~/.config/agentclean/rules` elsewhere). They are linted exactly like the
+catalogue and may add rules but not reuse a built-in `id`; a file that fails
+the linter stops `scan`, `plan` and `clean` with the reason. Check them with
+`agentclean rules-check <that folder>`. The safety guard still decides every
+folder.
+
+## A repository's own file
+
+A project may carry `.agentclean.toml`, which can only take folders away:
+
+```toml
+pin = true                      # never clean this project
+exclude = ["dist", "data/cache"] # never clean these folders (relative)
+```
+
+Scanned repositories are hostile input, so it cannot add folders, and a file
+with any other key, an absolute or `..` path, or that is not a small plain
+file pins the whole project.

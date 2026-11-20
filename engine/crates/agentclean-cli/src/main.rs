@@ -296,9 +296,18 @@ fn main() -> ExitCode {
 fn load_rules(dir: Option<&Path>) -> Result<Vec<RuleFile>, String> {
     match dir {
         Some(d) => rules::load_dir(d),
-        None => rules::bundled(),
+        // The catalogue plus the user's own rules beside config.toml (P8).
+        None => rules::bundled().and_then(|base| match user_rules_dir() {
+            Some(u) => rules::with_user(base, &u),
+            None => Ok(base),
+        }),
     }
     .map_err(|e| e.to_string())
+}
+
+/// `rules/` beside `config.toml`.
+fn user_rules_dir() -> Option<PathBuf> {
+    activity::default_config_path().and_then(|p| p.parent().map(|d| d.join("rules")))
 }
 
 fn open_store(arg: &StoreArg) -> Result<Store, String> {

@@ -588,6 +588,29 @@ const BUNDLED: &[(&str, &str)] = &[
     ("xcode.toml", include_str!("../../../rules/xcode.toml")),
 ];
 
+/// The catalogue plus the user's own rule files in `dir` (P8), linted the
+/// same way. A missing folder adds nothing; a user rule may not reuse a
+/// built-in id, so it can add to the catalogue but never change it.
+pub fn with_user(mut base: Vec<RuleFile>, dir: &Path) -> Result<Vec<RuleFile>, RuleError> {
+    if !dir.is_dir() {
+        return Ok(base);
+    }
+    let user = load_dir(dir)?;
+    for rule in user {
+        if base.iter().any(|b| b.id == rule.id) {
+            return Err(lint_err(
+                &dir.display().to_string(),
+                format!(
+                    "rule id {:?} is built in; give your rule another id",
+                    rule.id
+                ),
+            ));
+        }
+        base.push(rule);
+    }
+    Ok(base)
+}
+
 /// The built-in catalogue, linted like any rule folder.
 pub fn bundled() -> Result<Vec<RuleFile>, RuleError> {
     load_texts(BUNDLED.iter().copied())
@@ -728,6 +751,34 @@ mod tests {
              [[artifact]]\npath = \"out\"\nclass = \"safe\"\nreason = \"r\"\nrestore = \"s\"\n\
              {extra_art}\n"
         )
+    }
+
+    /// P8: user rule files load beside the catalogue and are linted, but
+    /// cannot replace a built-in rule.
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn user_rules_add_to_the_catalogue() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = bundled().unwrap();
+        let n = base.len();
+        assert_eq!(
+            with_user(base.clone(), &tmp.path().join("missing"))
+                .unwrap()
+                .len(),
+            n
+        );
+        std::fs::write(tmp.path().join("x.toml"), rule_with("out")).unwrap();
+        let all = with_user(base.clone(), tmp.path()).unwrap();
+        assert_eq!(all.len(), n + 1);
+        assert_eq!(all.last().map(|r| r.id.as_str()), Some("x"));
+        std::fs::write(tmp.path().join("x.toml"), rule_with("../up")).unwrap();
+        assert!(with_user(base.clone(), tmp.path()).is_err(), "linted");
+        std::fs::write(
+            tmp.path().join("x.toml"),
+            rule_with("out").replace("id = \"x\"", "id = \"node\""),
+        )
+        .unwrap();
+        assert!(with_user(base, tmp.path()).is_err(), "built-in id reused");
     }
 
     fn lint_fails(text: &str) -> bool {

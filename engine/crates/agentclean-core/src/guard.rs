@@ -19,6 +19,8 @@ use crate::rules::{Candidate, Class};
 /// Why a path was refused. Each variant maps to an invariant in the spec.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Refusal {
+    #[error("the project's .agentclean.toml keeps this folder")]
+    KeptByRepository,
     #[error("path is not absolute")]
     NotAbsolute,
     #[error("path contains '.' or '..'")]
@@ -177,6 +179,13 @@ impl Guard {
     pub fn check(&self, activity: &Activity, candidate: &Candidate) -> Result<Approved, Refusal> {
         if activity.pinned() {
             return Err(Refusal::Pinned);
+        }
+        if activity
+            .kept()
+            .iter()
+            .any(|k| candidate.rel().starts_with(k))
+        {
+            return Err(Refusal::KeptByRepository);
         }
         if activity.verdict() == Verdict::Active && !self.allow_active {
             return Err(Refusal::ActiveProject(activity.reason().to_owned()));

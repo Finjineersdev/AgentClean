@@ -381,3 +381,19 @@ fn package_manager_and_toolchain_folders_are_installed_software() {
         );
     }
 }
+
+/// P8: folders a repository's own `.agentclean.toml` keeps are refused.
+#[test]
+fn folders_kept_by_the_repository_are_refused() {
+    let f = fixture();
+    let a = Activity::unchecked(&f.root, Verdict::Dormant, false)
+        .keeping(vec![PathBuf::from("target")]);
+    assert_eq!(
+        f.guard.check(&a, &Candidate::unchecked("target")),
+        Err(Refusal::KeptByRepository)
+    );
+    assert_eq!(
+        f.guard.check(&a, &Candidate::unchecked("target/debug")),
+        Err(Refusal::KeptByRepository)
+    );
+}
