@@ -30,6 +30,15 @@ C2 (DeviceSupport as a measured cache) is left: it is a toolchain under I20 and 
 
 R1 is still open: GitHub refuses to start jobs until the account's billing is fixed.
 
+## M5 (see `docs/milestones/M5.md`)
+
+Shipped: U5, U6, U7 (history totals, free older runs, shortcuts), P9 (pins
+until a date and by git remote), P8 (user rules, repository file), P6
+(cleaned-so-far stats and milestones), P5 (scheduled clean), C5 (disk map),
+U8 (light appearance), R2 (UI tests, accessibility audit passing again), R4
+(Actions pinned, SBOM, build provenance), R6 (timing recorded). Left for the
+owner: R1, R3, R5, P7; C2 stays a toolchain.
+
 ## 1. Product gaps (the idea is not delivered without these)
 
 | # | Gap | Evidence | Proposal |

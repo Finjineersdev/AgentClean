@@ -6,6 +6,9 @@ on:
 
 permissions:
   contents: write
+  # Build provenance (N7): a signed statement of which workflow built the DMG.
+  id-token: write
+  attestations: write
 
 # Secrets and variables are listed in docs/RELEASING.md. Without the Developer
 # ID secrets this publishes an ad-hoc signed build marked as a pre-release.
@@ -19,7 +22,7 @@ jobs:
       HAS_SPARKLE: ${{ secrets.SPARKLE_PRIVATE_KEY != '' && vars.SPARKLE_PUBLIC_KEY != '' }}
       HAS_TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
@@ -122,6 +125,20 @@ jobs:
       - name: Checksum
         run: cd dist && V="${VERSION#v}" && shasum -a 256 "AgentClean-$V.dmg" > "AgentClean-$V.dmg.sha256"
 
+      - name: SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/AgentClean-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: dist/AgentClean-*.dmg
+
       - name: Sparkle appcast
         if: env.HAS_SPARKLE == 'true' && env.HAS_CERT == 'true'
         env:
@@ -135,12 +152,13 @@ jobs:
             -o dist/appcast.xml updates
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           prerelease: ${{ env.HAS_CERT != 'true' || contains(github.ref_name, '-') }}
           files: |
             dist/AgentClean-*.dmg
             dist/AgentClean-*.dmg.sha256
+            dist/AgentClean-sbom.spdx.json
             dist/appcast.xml
           fail_on_unmatched_files: false
           generate_release_notes: true
