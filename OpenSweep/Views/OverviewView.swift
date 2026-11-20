@@ -39,6 +39,7 @@ struct OverviewView: View {
     @State private var hovered: String?
     @State private var opened: String?
     @AppStorage("accessBannerDismissed") private var accessDismissed = false
+    @AppStorage(Peep.showKey) private var showCharacter = true
 
     var body: some View {
         let stats = LanguageStat.of(model.projects)
@@ -54,7 +55,7 @@ struct OverviewView: View {
                     welcome.entrance(1)
                 } else {
                     hero(stats).entrance(1)
-                    if model.stats.cleaned > 0 { CleanedSoFar(stats: model.stats).entrance(2) }
+                    if showCharacter && model.stats.cleaned > 0 { CleanedSoFar(stats: model.stats).entrance(2) }
                     languages(stats)
                     if let id = opened, let s = stats.first(where: { $0.id == id }) {
                         LanguageDrawer(stat: s) { opened = nil }
@@ -105,7 +106,7 @@ struct OverviewView: View {
             return "Hi! Scan your projects and I'll show where your disk went, language by language."
         }
         guard let top = stats.first else { return "All tidy. Nothing to clean right now." }
-        let milestone = Stats.milestone(for: model.stats.cleaned).map { " We have cleared over \(bytes($0)) together." } ?? ""
+        let milestone = (showCharacter ? Stats.milestone(for: model.stats.cleaned) : nil).map { " We have cleared over \(bytes($0)) together." } ?? ""
         if s.ready.bytes == 0 { return "\(top.ecosystem.name) holds the most, but nothing can go without a reinstall.\(milestone)" }
         return "\(bytes(s.ready.bytes)) can go right now. \(top.ecosystem.name) is the hungriest, at \(bytes(top.total)).\(milestone)"
     }

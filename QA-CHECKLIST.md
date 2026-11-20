@@ -17,6 +17,9 @@ cat $Q/out/report.txt      # every line must start with PASS
 open $Q/out                # window snapshots of every screen
 ```
 
+Run it twice, with `OPENSWEEP_QA_APPEARANCE=light` and `=dark`, to check both
+palettes whatever the system uses.
+
 For the Caches steps, also create `$Q/home/.npm/_cacache/blob`,
 `$Q/home/.gradle/caches/x`, and a stand-in `$Q/bin/npm` that removes
 `$HOME/.npm/_cacache`, and launch with `PATH=$Q/bin:/usr/bin:/bin` so the real

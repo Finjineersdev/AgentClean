@@ -35,6 +35,12 @@ enum QAWalkthrough {
         }
         let fm = FileManager.default
         try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+        // OPENSWEEP_QA_APPEARANCE=light|dark checks one palette whatever the system uses.
+        switch ProcessInfo.processInfo.environment["OPENSWEEP_QA_APPEARANCE"] {
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        default: break
+        }
 
         await pause(2)
         check(model.engine != nil, "the bundled engine was found")

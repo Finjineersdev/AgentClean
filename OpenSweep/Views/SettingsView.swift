@@ -7,12 +7,28 @@ struct SettingsView: View {
     @State private var idle = 14
     @State private var dormant = 90
     @AppStorage("showMenuBar") private var showMenuBar = true
+    @AppStorage(Peep.showKey) private var showCharacter = true
+    @State private var autoUpdate = Updater.automaticChecks
 
     var body: some View {
         Form {
             Section {
                 Toggle("Show OpenSweep in the menu bar", isOn: $showMenuBar)
                     .accessibilityIdentifier("settings.menuBar")
+                Toggle("Show the character and cleaning stats", isOn: $showCharacter)
+                    .accessibilityIdentifier("settings.character")
+                if let autoUpdate {
+                    Toggle("Check for updates automatically", isOn: Binding(get: { autoUpdate }, set: {
+                        Updater.automaticChecks = $0
+                        self.autoUpdate = $0
+                    }))
+                    .accessibilityIdentifier("settings.autoUpdate")
+                }
+            } footer: {
+                Text(autoUpdate == nil
+                     ? "This build has no update feed, so OpenSweep never goes online."
+                     : "The update check is the only time OpenSweep goes online. Stats are counted on this Mac from History.")
+                    .foregroundStyle(Brand.muted)
             }
             Section {
                 @Bindable var model = model

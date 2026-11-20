@@ -139,6 +139,8 @@ struct Blob: Shape {
 /// One of the Open Peeps cast on a lumpy coloured blob. Still at rest; the
 /// face swaps with a small spring when the mood changes.
 struct Peep: View {
+    /// Settings switch for the character and the cleaning stats (F19).
+    static let showKey = "showCharacter"
     enum Mood: String { case happy, talk, calm, wow, lol }
     let asset: String
     var size: CGFloat = 96
@@ -153,7 +155,13 @@ struct Peep: View {
         asset = "peep-crew-\(crew)"; self.size = size; self.backdrop = backdrop; self.phase = phase
     }
 
+    @AppStorage(Peep.showKey) private var show = true
+
     var body: some View {
+        if show { shown }
+    }
+
+    private var shown: some View {
         figure
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: asset)
         .accessibilityHidden(true)

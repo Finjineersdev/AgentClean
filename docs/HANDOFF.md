@@ -134,7 +134,9 @@ Verified on 2026-11-20: engine checks, CleanCore tests, the Release bundle
 and all 7 UI tests on CI, including the accessibility audit on every screen.
 The audit ignores only framework containers without identifiers, pop-up
 menus' press action, and contrast findings the element's own pixels disprove
-(it misreads text on the gradient); every ignored rule is in the test.
+(it misreads text on tinted fills); every ignored rule is in the test.
+- 20 Nov 2026: the drifting gradient backdrop was replaced by a solid canvas
+  (owner's call: "premium, not cheap"); motion is calmer, see `Motion.swift`.
 
 ## 5. Known gaps and risks
 
