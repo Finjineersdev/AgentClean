@@ -53,3 +53,4 @@ CI runs them on macOS 15 with Xcode 16.
 | 13 | Overview: **Review all ready** | One sheet lists every idle project's Safe folders; Move, then Undo restores all of them in one step |
 | 14 | Quit and reopen | The last scan shows at once; an hour later it rescans in the background (Settings → Rescan when OpenSweep opens) |
 | 12 | VoiceOver (⌘F5) on Projects | Each folder checkbox reads its name, class and size |
+| 15 | Projects, keyboard only | ↑/↓ choose a project; → enters its folders; ↑/↓ and Space tick them; ← goes back |

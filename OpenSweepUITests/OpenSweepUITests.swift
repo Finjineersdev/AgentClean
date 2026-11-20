@@ -306,6 +306,31 @@ final class OpenSweepUITests: XCTestCase {
     }
 
     /// U1: Projects shows what can be cleaned by default; All shows the rest.
+    /// G4: arrows move through projects and folders; Space ticks a folder.
+    func testKeyboardMovesThroughProjectsAndFolders() {
+        scan()
+        open("shop-web")
+        let shop = app.buttons["project.shop-web"]
+        XCTAssertTrue(app.checkBoxes["item.node_modules"].waitForExistence(timeout: 10))
+        XCTAssertTrue(shop.isSelected)
+
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(NSPredicate(format: "isSelected == false").evaluate(with: shop), "↓ moves to the next project")
+        app.typeKey(.upArrow, modifierFlags: [])
+        XCTAssertTrue(shop.isSelected, "↑ comes back")
+
+        XCTAssertFalse(checked("item.node_modules"))
+        app.typeKey(.rightArrow, modifierFlags: [])
+        app.typeKey(.space, modifierFlags: [])
+        XCTAssertTrue(checked("item.node_modules"), "Space ticks the first folder")
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.space, modifierFlags: [])
+        XCTAssertFalse(checked("item..next"), "↓ then Space unticks the next one")
+        app.typeKey(.leftArrow, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertFalse(shop.isSelected, "← returns to the project list")
+    }
+
     func testProjectsFilter() throws {
         try file("empty-app/package.json", 2)
         scan()
