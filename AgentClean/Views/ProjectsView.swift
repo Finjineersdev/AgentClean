@@ -71,9 +71,10 @@ struct ProjectDetail: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(URL(fileURLWithPath: project.root).lastPathComponent)
                             .font(.system(size: 26, weight: .semibold, design: .rounded))
-                        Text((project.root as NSString).abbreviatingWithTildeInPath).foregroundStyle(Brand.muted).textSelection(.enabled)
+                        Text((project.root as NSString).abbreviatingWithTildeInPath).foregroundStyle(Brand.muted)
+                            .lineLimit(1).truncationMode(.middle).help(project.root)
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     Button(project.pinned ? "Unpin" : "Pin") {
                         Task { await model.setPinned(project.root, !project.pinned) }
                     }

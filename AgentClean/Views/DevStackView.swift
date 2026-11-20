@@ -28,7 +28,7 @@ struct DevStackView: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .disabled(model.devStackLoading)
             }
-            Picker("", selection: $group) {
+            Picker("Show", selection: $group) {
                 Text("All").tag(DevStackItem.Group?.none)
                 ForEach(DevStackItem.Group.allCases, id: \.self) { Text($0.displayName).tag(Optional($0)) }
             }
