@@ -133,7 +133,7 @@ struct BigScanButton: View {
 struct SectionLabel: View {
     let text: String
     var body: some View {
-        Text(text.uppercased()).font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(.white.opacity(0.55))
+        Text(text.uppercased()).font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(Brand.muted)
     }
 }
 
