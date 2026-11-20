@@ -39,6 +39,10 @@ jobs:
       - name: Engine checks
         working-directory: engine
         run: |
+          # The second-drive test needs a real other drive (engine.yml does the same).
+          hdiutil create -size 50m -fs APFS -volname ACTest "$RUNNER_TEMP/drive.dmg" -quiet
+          hdiutil attach "$RUNNER_TEMP/drive.dmg" -nobrowse -mountpoint "$RUNNER_TEMP/drive"
+          export OPENSWEEP_TEST_VOLUME="$RUNNER_TEMP/drive"
           cargo test --locked -q
           cargo run -q --locked -p opensweep-cli -- rules-check rules
 
