@@ -396,4 +396,12 @@ fn folders_kept_by_the_repository_are_refused() {
         f.guard.check(&a, &Candidate::unchecked("target/debug")),
         Err(Refusal::KeptByRepository)
     );
+
+    // A kept folder inside an artifact keeps the artifact too, whatever the case.
+    let inner = Activity::unchecked(&f.root, Verdict::Dormant, false)
+        .keeping(vec![PathBuf::from("Target/release-signed")]);
+    assert_eq!(
+        f.guard.check(&inner, &Candidate::unchecked("target")),
+        Err(Refusal::KeptByRepository)
+    );
 }

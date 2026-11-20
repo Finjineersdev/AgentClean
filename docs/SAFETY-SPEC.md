@@ -48,6 +48,9 @@ transport it chooses (`ext::` runs a command), so git also runs with
 which allows no transport and overrides the repository's own
 `protocol.<name>.allow`.
 `git_check_does_not_run_repository_programs` proves the fsmonitor case.
+git itself, and the tools that clear caches, are found only through absolute
+`PATH` folders: an empty or `.` entry would find a repository's own `git` when
+OpenSweep runs from inside it (`relative_path_entries_are_ignored`).
 
 ### Known limits
 
@@ -61,6 +64,12 @@ which allows no transport and overrides the repository's own
   and restore (I13, I14) are the backstop.
 - Only git is checked for tracked files. Mercurial, Jujutsu and Subversion
   checkouts are refused only at the directory level (I7).
+- `reverify` and the rename are two steps on a path. A process racing between
+  them (another user on a shared drive swapping a parent folder for a link)
+  could have a different folder of the same name moved, or a restored item
+  land elsewhere. Closing it needs `renameat` on an open folder handle, which
+  the standard library offers only through `unsafe` code; the engine forbids
+  that. The moved folder stays restorable from quarantine.
 
 ## Quarantine (M1)
 
@@ -71,7 +80,7 @@ which allows no transport and overrides the repository's own
 | I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
 | I14b | Purge deletes only real directories at `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `parse_manifest` | `purge_deletes_only_quarantined_items`, `purge_removes_only_real_directories`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
 | I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
-| I19 | A drive quarantine is used only if each of its folders is a real folder owned by the main store's owner and writable by no one else, at the top of a local drive whose top folder others cannot change (or has the sticky bit), checked before every clean, restore and purge; a manifest's `volume` must be an absolute `.opensweep-quarantine` folder whose parent contains the item's original | `quarantine::trusted`, `items_of`, `parse_manifest` | `a_drive_quarantine_must_be_a_private_folder_of_the_owner`, `a_shared_drive_top_needs_the_sticky_bit`, `manifests_cannot_point_at_another_drives_quarantine`, `folders_on_another_drive_use_that_drives_quarantine` |
+| I19 | The main store and its `runs` folder must be real folders owned by the owner of the home folder and writable by no one else; store, run and item folders are created owner-only (0700), and a run or its `items` folder that is a link is never followed. A drive quarantine is used only if each of its folders is a real folder owned by the main store's owner and writable by no one else, at the top of a local drive whose top folder others cannot change (or has the sticky bit), checked before every clean, restore and purge; a manifest's `volume` must be an absolute `.opensweep-quarantine` folder whose parent contains the item's original | `quarantine::trusted`, `items_of`, `parse_manifest` | `a_drive_quarantine_must_be_a_private_folder_of_the_owner`, `a_shared_drive_top_needs_the_sticky_bit`, `manifests_cannot_point_at_another_drives_quarantine`, `folders_on_another_drive_use_that_drives_quarantine`, `a_store_others_can_change_is_refused`, `a_linked_items_folder_is_not_followed` |
 | I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution`. `pin` and `unpin` are the exception: they change only OpenSweep's config, and pinning only adds protection. `clean --only` can only narrow: a pick the rules do not offer is an error before anything moves, and every pick still passes the guard | `opensweep-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag`, `only_narrows_the_selection` |
 
 Space is freed only when a run is purged, because a rename on the same volume
@@ -99,7 +108,7 @@ nothing is approved without an activity assessment.
 
 | # | Invariant | Enforced by | Test |
 | --- | --- | --- | --- |
-| I15 | A pinned project, or one inside a pinned folder, is refused with no override. A pin can carry an end time (`pinned_until`), after which the project is judged as usual; a pinned git remote (`pinned_remotes`) pins every clone of that repository, read from `.git/config` as text without running git, so a repository can only pin itself. An Active project (a process other than OpenSweep's own process family and pipeline runs inside it, or a file or commit is newer than `idle_days`) is refused unless the guard is built with `allow_active` (`--include-active`) | `Guard::check`, `activity::assess` | `active_and_pinned_projects_are_refused`, `pinned_projects_are_never_cleaned`, `a_pin_until_a_date_ends`, `a_repository_file_can_only_take_folders_away`, `folders_kept_by_the_repository_are_refused`, `user_rules_and_repository_files`, `user_rules_add_to_the_catalogue`, `a_pin_on_a_git_remote_follows_the_project`, `old_config_files_still_load`, `projects_in_use_need_an_explicit_flag`, `a_tool_running_inside_makes_it_active` |
+| I15 | A pinned project, or one inside a pinned folder, is refused with no override. A pin can carry an end time (`pinned_until`), after which the project is judged as usual; a pinned git remote (`pinned_remotes`) pins every clone of that repository, read from `.git/config` as text without running git, so a repository can only pin itself. A folder a repository keeps (`exclude`) also keeps any artifact that contains it, compared ignoring case. A commit time git reports that no clock can hold is an error, never a crash (`a_commit_time_out_of_range_does_not_crash`). An Active project (a process other than OpenSweep's own process family and pipeline runs inside it, or a file or commit is newer than `idle_days`) is refused unless the guard is built with `allow_active` (`--include-active`) | `Guard::check`, `activity::assess` | `active_and_pinned_projects_are_refused`, `pinned_projects_are_never_cleaned`, `a_pin_until_a_date_ends`, `a_repository_file_can_only_take_folders_away`, `folders_kept_by_the_repository_are_refused`, `user_rules_and_repository_files`, `user_rules_add_to_the_catalogue`, `a_pin_on_a_git_remote_follows_the_project`, `old_config_files_still_load`, `projects_in_use_need_an_explicit_flag`, `a_tool_running_inside_makes_it_active` |
 | I15a | Dormant needs every signal checked in full: git answered, the edit walk finished within its limits, and processes were listed. Otherwise the verdict is at most Idle | `activity::decide` | `an_incomplete_check_is_never_dormant`, `too_many_files_is_never_dormant`, `a_broken_repository_is_never_dormant` |
 | I15b | Reading the last commit runs git with the I11 settings plus `log.showSignature=false`, so a repository cannot make it run `gpg.program` or fetch from its own remote | `guard::hardened_git` | `reading_commits_does_not_run_repository_programs`, `reading_commits_does_not_fetch_from_the_repositorys_remote` |
 | I15c | A config file that exists but cannot be read, has an unknown key, a relative pin, or `idle_days` above `dormant_days` stops `plan` and `clean`: pins are never silently dropped | `Config::load` | `config_is_read_strictly`, `a_broken_config_stops_cleaning` |

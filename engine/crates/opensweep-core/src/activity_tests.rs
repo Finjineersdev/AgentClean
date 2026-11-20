@@ -206,6 +206,51 @@ fn the_last_commit_touching_the_project_counts() {
     );
 }
 
+/// A hostile commit time beyond what SystemTime holds must not panic: one
+/// cloned repository would otherwise end a whole scan.
+#[test]
+fn a_commit_time_out_of_range_does_not_crash() {
+    use std::io::Write;
+    let (_tmp, root) = project();
+    git(&root, &["init", "-q"], 0);
+    git(&root, &["add", "."], 0);
+    git(&root, &["commit", "-qm", "one"], 0);
+    let tree = Command::new("git")
+        .args(["rev-parse", "HEAD^{tree}"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    let body = format!(
+        "tree {}author a <a@b> 10000000000000000000 +0000\ncommitter a <a@b> 10000000000000000000 +0000\n\nm\n",
+        String::from_utf8_lossy(&tree.stdout)
+    );
+    let mut child = Command::new("git")
+        .args([
+            "hash-object",
+            "-t",
+            "commit",
+            "--literally",
+            "-w",
+            "--stdin",
+        ])
+        .current_dir(&root)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(body.as_bytes())
+        .unwrap();
+    let id = child.wait_with_output().unwrap();
+    let id = String::from_utf8_lossy(&id.stdout).trim().to_owned();
+    git(&root, &["update-ref", "HEAD", &id], 0);
+    let a = run(&root, Some(&quiet()));
+    assert_ne!(a.verdict(), Verdict::Dormant, "{}", a.reason());
+}
+
 #[test]
 fn a_broken_repository_is_never_dormant() {
     let (_tmp, root) = project();

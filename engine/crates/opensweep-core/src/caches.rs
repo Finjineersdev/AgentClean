@@ -43,9 +43,7 @@ impl Env {
                 .filter(|p| p.is_absolute())
         };
         let home = var("HOME")?;
-        let mut path: Vec<PathBuf> = std::env::var_os("PATH")
-            .map(|p| std::env::split_paths(&p).collect())
-            .unwrap_or_default();
+        let mut path = crate::guard::absolute_dirs(std::env::var_os("PATH").as_deref());
         // An app started from Finder gets a bare PATH; add the usual places.
         // ponytail: nvm's npm is not found from Finder; add ~/.nvm/alias/default if asked.
         for extra in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/local/go/bin"] {

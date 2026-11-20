@@ -180,10 +180,16 @@ impl Guard {
         if activity.pinned() {
             return Err(Refusal::Pinned);
         }
+        // A kept folder protects everything around it: the folder itself,
+        // anything inside it, and any artifact that contains it. Case is
+        // ignored, as macOS ignores it; refusing more on Linux is safe.
+        let folded = |p: &Path| PathBuf::from(p.to_string_lossy().to_lowercase());
+        let rel = folded(candidate.rel());
         if activity
             .kept()
             .iter()
-            .any(|k| candidate.rel().starts_with(k))
+            .map(|k| folded(k))
+            .any(|k| rel.starts_with(&k) || k.starts_with(&rel))
         {
             return Err(Refusal::KeptByRepository);
         }
@@ -370,8 +376,29 @@ fn too_shallow(root: &Path) -> bool {
 
 /// git in `root`, with every setting that could run a program supplied by
 /// the (untrusted) repository switched off. Callers add the subcommand.
+/// The folders of a PATH value that are absolute. An empty or relative
+/// entry means "the current folder", which inside a scanned repository would
+/// find the repository's own `git` or `npm`.
+pub(crate) fn absolute_dirs(path: Option<&std::ffi::OsStr>) -> Vec<PathBuf> {
+    path.map(|p| {
+        std::env::split_paths(p)
+            .filter(|d| d.is_absolute())
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+/// git, found through absolute PATH folders only.
+fn git_program(path: Option<&std::ffi::OsStr>) -> PathBuf {
+    absolute_dirs(path)
+        .into_iter()
+        .map(|d| d.join("git"))
+        .find(|g| g.is_file())
+        .unwrap_or_else(|| PathBuf::from("/usr/bin/git"))
+}
+
 pub(crate) fn hardened_git(root: &Path) -> Command {
-    let mut git = Command::new("git");
+    let mut git = Command::new(git_program(std::env::var_os("PATH").as_deref()));
     git.args([
         "-c",
         "core.fsmonitor=false",
@@ -445,5 +472,25 @@ mod tests {
         assert!(too_shallow(Path::new("/Users")));
         assert!(!too_shallow(Path::new("/Users/dev")));
         assert!(!too_shallow(Path::new("/Users/dev/proj")));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod path_tests {
+    use super::{absolute_dirs, git_program};
+    use std::ffi::OsStr;
+
+    /// A repository's own `git` is never found through `.` or an empty entry.
+    #[cfg(unix)]
+    #[test]
+    fn relative_path_entries_are_ignored() {
+        let dirs = absolute_dirs(Some(OsStr::new(".::bin:/usr/bin")));
+        assert_eq!(dirs, vec![std::path::PathBuf::from("/usr/bin")]);
+
+        assert_eq!(
+            git_program(Some(OsStr::new(".:"))),
+            std::path::PathBuf::from("/usr/bin/git")
+        );
     }
 }

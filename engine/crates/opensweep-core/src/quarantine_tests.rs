@@ -629,3 +629,41 @@ fn the_agentclean_folder_is_adopted_once_and_never_merged() {
     assert!(!linked.join("opensweep").exists());
     assert!(old.join("Quarantine").is_dir());
 }
+
+/// I19 for the main store: one others can change is refused, and new
+/// store folders are owner-only.
+#[cfg(unix)]
+#[test]
+fn a_store_others_can_change_is_refused() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = fixture();
+    let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(f.store.root()), 0o700);
+    let run = f.store.clean(vec![f.approve("target")]).unwrap();
+    assert_eq!(mode(&f.items(&run)), 0o700);
+
+    let open = f.base.join("shared-store");
+    fs::create_dir_all(open.join("runs")).unwrap();
+    fs::set_permissions(&open, fs::Permissions::from_mode(0o777)).unwrap();
+    assert!(matches!(Store::open(&open), Err(Error::Store(..))));
+}
+
+/// A run's items folder swapped for a link is never followed by purge or
+/// restore: purge would delete in the folder it points to.
+#[cfg(unix)]
+#[test]
+fn a_linked_items_folder_is_not_followed() {
+    let f = fixture();
+    let run = f.store.clean(vec![f.approve("node_modules")]).unwrap();
+    let items = f.items(&run);
+    let elsewhere = f.base.join("elsewhere");
+    fs::rename(&items, &elsewhere).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, &items).unwrap();
+
+    let purged = f.store.purge(&run.run_id).unwrap();
+    assert_eq!(purged.entries[0].state, State::Moved);
+    assert!(elsewhere.join("0000").is_dir(), "purge followed the link");
+    let restored = f.store.restore(&run.run_id, None).unwrap();
+    assert_eq!(restored.entries[0].state, State::Moved);
+    assert!(!f.root.join("node_modules").exists());
+}

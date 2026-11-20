@@ -170,16 +170,24 @@ pub struct Store {
 }
 
 impl Store {
-    /// Opens the store at `root`, creating it if needed. The store itself may
-    /// not be a symbolic link.
+    /// Opens the store at `root`, creating it owner-only if needed. The store
+    /// and its `runs` folder must be real folders (not links) owned by the
+    /// owner of the home folder, and no one else may change them (I19): a
+    /// store planted by another user could steer restore and purge.
     pub fn open(root: &Path) -> Result<Self, Error> {
         let fail = |m: String| Error::Store(root.to_path_buf(), m);
-        fs::create_dir_all(root.join("runs")).map_err(|e| fail(e.to_string()))?;
-        let meta = fs::symlink_metadata(root).map_err(|e| fail(e.to_string()))?;
-        // `symlink_metadata` never reports a link as a directory.
-        if !meta.is_dir() {
-            return Err(fail("must be a real directory".to_owned()));
+        if let Some(parent) = root.parent() {
+            fs::create_dir_all(parent).map_err(|e| fail(e.to_string()))?;
         }
+        let owner = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .and_then(|h| owner_of(&h).ok());
+        let owner = match owner {
+            Some(o) => o,
+            None => owner_of(root.parent().unwrap_or(root)).map_err(fail)?,
+        };
+        private_dir(root, owner, true).map_err(fail)?;
+        private_dir(&root.join("runs"), owner, true).map_err(fail)?;
         let root = fs::canonicalize(root).map_err(|e| fail(e.to_string()))?;
         Ok(Self { root })
     }
@@ -197,7 +205,10 @@ impl Store {
             return Err(Error::UnknownRun(run_id.to_owned()));
         }
         let dir = self.runs_dir().join(run_id);
-        if !dir.join(MANIFEST).is_file() {
+        // Never through a link: a linked run would point restore and purge
+        // somewhere else.
+        let real_file = fs::symlink_metadata(dir.join(MANIFEST)).is_ok_and(|m| m.is_file());
+        if !real_file || fs::symlink_metadata(&dir).map_or(true, |m| !m.is_dir()) {
             return Err(Error::UnknownRun(run_id.to_owned()));
         }
         Ok(dir)
@@ -216,7 +227,7 @@ impl Store {
         let (run_id, run_dir) = self.new_run_dir()?;
         let items = run_dir.join("items");
         let io = |e: std::io::Error| Error::Io(run_id.clone(), e.to_string());
-        fs::create_dir(&items).map_err(io)?;
+        owner_only().create(&items).map_err(io)?;
 
         let mut manifest = Manifest {
             format: FORMAT,
@@ -445,7 +456,7 @@ impl Store {
                 format!("{base}-{n}")
             };
             let dir = self.runs_dir().join(&id);
-            match fs::create_dir(&dir) {
+            match owner_only().create(&dir) {
                 Ok(()) => return Ok((id, dir)),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(e) => return Err(Error::Store(self.root.clone(), e.to_string())),
@@ -564,16 +575,21 @@ fn drive_run(
     Ok((store, items))
 }
 
-/// Creates `dir` owner-only (it must be new unless `existing_ok`), then
-/// checks it is trusted.
-fn private_dir(dir: &Path, owner: u32, existing_ok: bool) -> Result<(), String> {
+/// A folder builder that creates owner-only folders (0700).
+fn owner_only() -> fs::DirBuilder {
     let mut builder = fs::DirBuilder::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
         builder.mode(0o700);
     }
-    match builder.create(dir) {
+    builder
+}
+
+/// Creates `dir` owner-only (it must be new unless `existing_ok`), then
+/// checks it is trusted.
+fn private_dir(dir: &Path, owner: u32, existing_ok: bool) -> Result<(), String> {
+    match owner_only().create(dir) {
         Ok(()) => {}
         Err(e) if existing_ok && e.kind() == std::io::ErrorKind::AlreadyExists => {}
         Err(e) => return Err(format!("{}: {e}", dir.display())),
@@ -635,7 +651,10 @@ fn items_of(
     mounts: Option<&[Mount]>,
 ) -> Result<PathBuf, String> {
     let Some(store) = &entry.volume else {
-        return Ok(run_dir.join("items"));
+        let items = run_dir.join("items");
+        trusted(run_dir, owner)?;
+        trusted(&items, owner)?;
+        return Ok(items);
     };
     if fs::symlink_metadata(store).is_err() {
         return Err(format!("its drive is not connected ({})", store.display()));

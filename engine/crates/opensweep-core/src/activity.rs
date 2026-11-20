@@ -543,10 +543,14 @@ fn last_commit(root: &Path) -> Result<Option<SystemTime>, ()> {
     let text = String::from_utf8_lossy(&out.stdout);
     match text.trim() {
         "" => Ok(None),
+        // The repository chooses this number: a time past what SystemTime
+        // holds is an error, not a panic that would end the whole scan.
         secs => secs
             .parse()
-            .map(|s| Some(UNIX_EPOCH + Duration::from_secs(s)))
-            .map_err(|_| ()),
+            .ok()
+            .and_then(|s| UNIX_EPOCH.checked_add(Duration::from_secs(s)))
+            .map(Some)
+            .ok_or(()),
     }
 }
 
