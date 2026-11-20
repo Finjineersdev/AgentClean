@@ -123,6 +123,11 @@ updates, and a Homebrew cask. Since 20 Nov 2026 the repository is public and
 ships without Apple Developer ID (owner's choice): ad-hoc signed, normal
 releases, the tap `Finjineersdev/homebrew-tap` updates itself, the owner's
 icon is in. Left for the owner: the Sparkle key (`docs/RELEASING.md`).
+- Renamed AgentClean to OpenSweep on 20 Nov 2026: another Mac app already
+  sells as "AgentClean". The engine adopts an old `AgentClean` data folder
+  once (I22). A first-pass check of "OpenSweep" found no trademark but
+  several small open-source cleaners with the same name on GitHub, and an
+  AI dev-tools project at opensweep.ai; a lawyer's search is still advised.
 
 Verified on 2026-11-20: engine checks, CleanCore tests, the Release bundle
 (universal, hardened runtime, no update key), the Debug walkthrough (22/22)
