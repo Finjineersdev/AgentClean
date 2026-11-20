@@ -11,7 +11,7 @@ permissions:
   attestations: write
 
 # Secrets and variables are listed in docs/RELEASING.md. Without the Developer
-# ID secrets this publishes an ad-hoc signed build marked as a pre-release.
+# ID secrets this publishes an ad-hoc signed build (the open-source default).
 jobs:
   dmg:
     name: Build, sign, notarize and publish
@@ -20,7 +20,6 @@ jobs:
       VERSION: ${{ github.ref_name }}
       HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' }}
       HAS_SPARKLE: ${{ secrets.SPARKLE_PRIVATE_KEY != '' && vars.SPARKLE_PUBLIC_KEY != '' }}
-      HAS_TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -140,7 +139,7 @@ jobs:
           subject-path: dist/AgentClean-*.dmg
 
       - name: Sparkle appcast
-        if: env.HAS_SPARKLE == 'true' && env.HAS_CERT == 'true'
+        if: env.HAS_SPARKLE == 'true'
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -154,7 +153,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          prerelease: ${{ env.HAS_CERT != 'true' || contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             dist/AgentClean-*.dmg
             dist/AgentClean-*.dmg.sha256
@@ -170,22 +169,8 @@ jobs:
             or download the `.dmg` below and drag **AgentClean** to Applications.
             The cask also puts the `agentclean` command on your PATH.
 
-            Requires macOS 14 or later. No Full Disk Access needed; nothing leaves your Mac
-            except the update check, which asks first.
+            Requires macOS 14 or later. Nothing leaves your Mac except the update check,
+            which asks first.
 
-      - name: Bump Homebrew cask
-        if: env.HAS_TAP_TOKEN == 'true' && env.HAS_CERT == 'true' && !contains(github.ref_name, '-')
-        env:
-          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-        run: |
-          V="${VERSION#v}"
-          SHA=$(awk '{print $1}' "dist/AgentClean-$V.dmg.sha256")
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Finjineersdev/homebrew-tap.git" tap
-          mkdir -p tap/Casks
-          sed -E "s/^  version \".*\"/  version \"$V\"/; s/^  sha256 \".*\"/  sha256 \"$SHA\"/" \
-            packaging/homebrew/agentclean.rb | grep -v '^# ' > tap/Casks/agentclean.rb
-          cd tap
-          git config user.name "agentclean-release-bot"
-          git config user.email "release-bot@users.noreply.github.com"
-          git add Casks/agentclean.rb
-          git commit -m "agentclean $V" && git push
+            AgentClean is not notarized by Apple, so macOS blocks the first launch: open
+            System Settings > Privacy & Security and click "Open Anyway".

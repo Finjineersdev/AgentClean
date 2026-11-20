@@ -65,5 +65,6 @@ permanent deletion as a default.
 ## Open items
 
 - Bundle identifier: `com.finjineers.agentclean` (done).
-- New app icon and character art; the inherited icon stays until then.
+- App icon: done (owner supplied, `docs/assets/icon-source.png`). Character
+  art: the Open Peeps stay.
 - Trademark and name check for "AgentClean" before launch.

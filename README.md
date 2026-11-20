@@ -1,3 +1,5 @@
+<img src="docs/assets/icon.png" width="128" alt="AgentClean icon">
+
 # AgentClean
 
 A developer disk cleaner you can read the source of. It finds your projects,
@@ -9,9 +11,24 @@ every clean reversible. Local only: no account, no telemetry.
 > judge whether each is in use, and clean rebuildable folders into a
 > quarantine you can restore from. The Mac app (macOS 14 or later) runs that
 > same engine: scan, pick folders, review the dry run, clean, undo; clear
-> global tool caches with each tool's own command; a menu bar item. Signed,
-> notarized releases and the Homebrew cask need the owner's Apple keys
-> (`docs/RELEASING.md`).
+> global tool caches with each tool's own command; a menu bar item.
+
+## Install
+
+```bash
+brew install --cask finjineersdev/tap/agentclean
+```
+
+or download the `.dmg` from [Releases](https://github.com/Finjineersdev/AgentClean/releases)
+and drag AgentClean to Applications. macOS 14 or later.
+
+AgentClean is open source and not notarized by Apple, so:
+
+- **First launch:** macOS blocks it. Open System Settings > Privacy & Security
+  and click **Open Anyway** next to AgentClean.
+- **After an update:** macOS may forget Full Disk Access. If a scan stops
+  seeing folders, turn AgentClean off and on again under Privacy & Security >
+  Full Disk Access.
 
 Contributors and coding agents: start with [CLAUDE.md](CLAUDE.md) and
 [docs/HANDOFF.md](docs/HANDOFF.md).

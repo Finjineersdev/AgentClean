@@ -38,7 +38,6 @@ in this repository. Keep it that way.
 
 ## 3. Repository state
 
-- Location on the owner's Mac: `/Users/muhammad/prod-project`.
 - Private repository <https://github.com/Finjineersdev/AgentClean>, branch
   `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
@@ -120,8 +119,10 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
 See `docs/milestones/M4.md`. Global caches through each tool's own command
 (ADR 0006, I20), a Caches screen, a menu bar item, accessibility labels and an
 audit test, hardened runtime and notarization in the Release workflow, Sparkle
-updates, and a Homebrew cask template. Signing, the appcast key and the tap
-need the owner's accounts.
+updates, and a Homebrew cask. Since 20 Nov 2026 the repository is public and
+ships without Apple Developer ID (owner's choice): ad-hoc signed, normal
+releases, the tap `Finjineersdev/homebrew-tap` updates itself, the owner's
+icon is in. Left for the owner: the Sparkle key (`docs/RELEASING.md`).
 
 Verified on 2026-11-20: engine checks, CleanCore tests, the Release bundle
 (universal, hardened runtime, no update key), the Debug walkthrough (22/22)
