@@ -31,6 +31,7 @@ final class EngineContractTests: XCTestCase {
         XCTAssertEqual(p.verdict, .dormant)
         XCTAssertEqual(p.items.map(\.path), ["node_modules", ".next"])
         XCTAssertEqual(p.items.map(\.kind), [.caution, .safe])
+        XCTAssertEqual(p.items.map(\.shared), [false, false])
         XCTAssertEqual(s.projects, 1)
         XCTAssertEqual(s.ready.folders, 1)
     }

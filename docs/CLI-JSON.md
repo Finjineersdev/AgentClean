@@ -40,6 +40,7 @@ app (M3) reads. Snapshots of each shape live in
 | `rule` | string | Rule id (`node`, `rust`, …) |
 | `class` | `"safe"` \| `"caution"` | Safe needs no user action to rebuild |
 | `bytes` | integer or null | Size, when the guard allows the folder |
+| `shared` | bool | Some files are hard links to, or a pnpm or Bun install cloned from, files elsewhere: `bytes` is an upper estimate |
 | `refused` | string or null | Why the guard refuses it, when it does |
 
 In `scan` and `plan`, activity does not refuse items: an active project's

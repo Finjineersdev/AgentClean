@@ -547,15 +547,19 @@ impl Context {
         let items = candidates
             .into_iter()
             .map(|c| {
-                let (bytes, refused) = match guard.check(&activity, &c) {
-                    Ok(ok) => (Some(opensweep_core::size::usage(ok.path()).bytes), None),
-                    Err(why) => (None, Some(why.to_string())),
+                let (bytes, shared, refused) = match guard.check(&activity, &c) {
+                    Ok(ok) => {
+                        let u = opensweep_core::size::usage(ok.path());
+                        (Some(u.bytes), u.shared, None)
+                    }
+                    Err(why) => (None, false, Some(why.to_string())),
                 };
                 ItemReport {
                     path: c.rel().to_path_buf(),
                     rule: c.rule_id().to_owned(),
                     class: c.class(),
                     bytes,
+                    shared,
                     refused,
                 }
             })
@@ -620,6 +624,8 @@ struct ItemReport {
     rule: String,
     class: Class,
     bytes: Option<u64>,
+    /// The folder shares space with files elsewhere; `bytes` is an upper estimate.
+    shared: bool,
     refused: Option<String>,
 }
 
@@ -634,6 +640,7 @@ impl ProjectReport {
                     "rule": i.rule,
                     "class": class_name(i.class),
                     "bytes": i.bytes,
+                    "shared": i.shared,
                     "refused": i.refused,
                 })
             })
@@ -771,11 +778,16 @@ fn print_project(p: &ProjectReport) {
     for item in &p.items {
         match item.bytes {
             Some(b) => say!(
-                "         {:>9}    {}  [{}]  {:?}",
+                "         {:>9}    {}  [{}]  {:?}{}",
                 human(b),
                 item.path.display(),
                 item.rule,
-                item.class
+                item.class,
+                if item.shared {
+                    "  (shares space with files elsewhere; may free less)"
+                } else {
+                    ""
+                }
             ),
             None => say!(
                 "         {:>9}    {}  [{}]  kept: {}",

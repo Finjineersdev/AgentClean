@@ -24,9 +24,12 @@ public struct Item: Codable, Sendable, Hashable {
     public let bytes: UInt64?
     /// Why the guard refuses it, when it does.
     public let refused: String?
+    /// Shares space with files elsewhere (pnpm or Bun store, hard links):
+    /// `bytes` is an upper estimate. Older engines leave it out.
+    public var shared: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
-        case path, rule, kind = "class", bytes, refused
+        case path, rule, kind = "class", bytes, refused, shared
     }
 }
 

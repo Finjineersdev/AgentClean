@@ -4,8 +4,13 @@
 //! user sees. Hard-linked files are counted once, symbolic links are counted
 //! as links and never followed, and the walk does not cross onto another
 //! volume. Anything unreadable is counted in `unreadable` rather than guessed.
+//!
+//! Space a tree shares with files outside it cannot be freed by removing the
+//! tree. Hard links are seen directly. APFS clones are not visible without
+//! private file system calls, so the package managers known to clone or link
+//! from a global store (pnpm, Bun) mark their `node_modules` as `shared`.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,6 +22,10 @@ pub struct Usage {
     pub entries: u64,
     /// Entries that could not be read; `bytes` is a lower bound when non-zero.
     pub unreadable: u64,
+    /// Some of `bytes` may also belong to files outside the tree (a hard link
+    /// to elsewhere, or a pnpm or Bun install that clones from a store), so
+    /// removing the tree can free less. `bytes` is then an upper estimate.
+    pub shared: bool,
 }
 
 #[cfg(unix)]
@@ -31,14 +40,26 @@ fn allocated(meta: &fs::Metadata) -> u64 {
 }
 
 #[cfg(unix)]
-fn identity(meta: &fs::Metadata) -> (u64, u64, bool) {
+fn identity(meta: &fs::Metadata) -> (u64, u64, u64) {
     use std::os::unix::fs::MetadataExt;
-    (meta.dev(), meta.ino(), meta.nlink() > 1)
+    (meta.dev(), meta.ino(), meta.nlink())
 }
 
 #[cfg(not(unix))]
-fn identity(_meta: &fs::Metadata) -> (u64, u64, bool) {
-    (0, 0, false)
+fn identity(_meta: &fs::Metadata) -> (u64, u64, u64) {
+    (0, 0, 1)
+}
+
+/// A `node_modules` that pnpm or Bun installed: their files are clones or
+/// hard links of a global store, so removing it frees little.
+fn from_store(root: &Path) -> bool {
+    root.file_name().is_some_and(|n| n == "node_modules")
+        && (root.join(".pnpm").is_dir()
+            || root.parent().is_some_and(|p| {
+                ["bun.lock", "bun.lockb", "pnpm-lock.yaml"]
+                    .iter()
+                    .any(|f| p.join(f).is_file())
+            }))
 }
 
 /// Measures `root`. Never follows a symbolic link, including `root` itself.
@@ -49,12 +70,19 @@ pub fn usage(root: &Path) -> Usage {
         return usage;
     };
     let (root_dev, _, _) = identity(&root_meta);
-    let mut linked: HashSet<(u64, u64)> = HashSet::new();
+    usage.shared = root_meta.is_dir() && from_store(root);
+    // Hard-linked files: links not yet seen inside the tree.
+    let mut linked: HashMap<(u64, u64), u64> = HashMap::new();
     let mut stack: Vec<(PathBuf, fs::Metadata)> = vec![(root.to_path_buf(), root_meta)];
 
     while let Some((path, meta)) = stack.pop() {
-        let (dev, ino, shared) = identity(&meta);
-        if !shared || linked.insert((dev, ino)) {
+        let (dev, ino, links) = identity(&meta);
+        if links <= 1 || meta.is_dir() {
+            usage.bytes = usage.bytes.saturating_add(allocated(&meta));
+        } else if let Some(rest) = linked.get_mut(&(dev, ino)) {
+            *rest = rest.saturating_sub(1);
+        } else {
+            linked.insert((dev, ino), links - 1);
             usage.bytes = usage.bytes.saturating_add(allocated(&meta));
         }
         usage.entries += 1;
@@ -75,6 +103,7 @@ pub fn usage(root: &Path) -> Usage {
             }
         }
     }
+    usage.shared |= linked.values().any(|&rest| rest > 0);
     usage
 }
 
@@ -105,6 +134,7 @@ mod tests {
 
         fs::hard_link(&big, tmp.path().join("big2")).unwrap();
         assert_eq!(usage(tmp.path()).bytes, one);
+        assert!(!usage(tmp.path()).shared, "both links are inside");
 
         let outside = tempfile::tempdir().unwrap();
         fs::write(outside.path().join("huge"), vec![1u8; 400_000]).unwrap();
@@ -120,8 +150,36 @@ mod tests {
             super::Usage {
                 bytes: 0,
                 entries: 0,
-                unreadable: 1
+                unreadable: 1,
+                shared: false
             }
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_to_a_file_outside_is_shared() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = tmp.path().join("store");
+        let tree = tmp.path().join("tree");
+        fs::create_dir_all(&store).unwrap();
+        fs::create_dir_all(&tree).unwrap();
+        fs::write(store.join("f"), vec![1u8; 50_000]).unwrap();
+        assert!(!usage(&tree).shared);
+        fs::hard_link(store.join("f"), tree.join("f")).unwrap();
+        assert!(usage(&tree).shared);
+    }
+
+    #[test]
+    fn pnpm_and_bun_installs_are_shared() {
+        let tmp = tempfile::tempdir().unwrap();
+        let nm = tmp.path().join("node_modules");
+        fs::create_dir_all(nm.join("left-pad")).unwrap();
+        assert!(!usage(&nm).shared, "npm copies files");
+        fs::write(tmp.path().join("bun.lock"), "{}").unwrap();
+        assert!(usage(&nm).shared);
+        fs::remove_file(tmp.path().join("bun.lock")).unwrap();
+        fs::create_dir_all(nm.join(".pnpm")).unwrap();
+        assert!(usage(&nm).shared);
     }
 }

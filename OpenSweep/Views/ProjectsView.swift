@@ -214,6 +214,11 @@ struct ProjectDetail: View {
         }
     }
 
+    /// "up to" when the folder shares space with files elsewhere (F8).
+    private func size(_ item: Item) -> String? {
+        item.bytes.map { (item.shared == true ? "up to " : "") + bytes($0) }
+    }
+
     private func itemRow(_ item: Item, share: Double) -> some View {
         let path = Selection.path(item, in: project)
         let on = Binding(
@@ -223,7 +228,7 @@ struct ProjectDetail: View {
             Toggle("", isOn: on).labelsHidden().toggleStyle(.checkbox)
                 .disabled(!Selection.selectable(item) || project.pinned)
                 .accessibilityIdentifier("item.\(item.path)")
-                .accessibilityLabel("\(item.path), \(item.kind.label), \(item.bytes.map(bytes) ?? "size unknown")")
+                .accessibilityLabel("\(item.path), \(item.kind.label), \(size(item) ?? "size unknown")")
                 .accessibilityHint(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
             .padding(.top, 5)
             EcosystemBadge(ecosystem: Ecosystem.of(rule: item.rule), size: 26)
@@ -232,13 +237,14 @@ struct ProjectDetail: View {
                     Text(item.path).font(.body.monospaced().weight(.semibold)).foregroundStyle(Brand.text)
                     StatusChip(text: item.kind.label, systemImage: item.kind == .safe ? "checkmark.shield.fill" : "exclamationmark.triangle.fill", tint: item.kind.tint)
                 }
-                Text(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
+                Text(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation
+                     + (item.shared == true ? " Some files are shared with a package store or other copies, so cleaning may free less." : ""))
                     .font(.callout).foregroundStyle(Brand.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
             VStack(alignment: .trailing, spacing: 6) {
-                Text(item.bytes.map(bytes) ?? "—").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
+                Text(size(item) ?? "—").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
                 ShareBar(share: share, tint: Ecosystem.of(rule: item.rule).color).frame(width: 72)
             }
         }
