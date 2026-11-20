@@ -61,7 +61,7 @@ extension ScanSummary {
     }
 }
 
-/// What AgentClean has done on this Mac, from the quarantine's runs. Local only.
+/// What OpenSweep has done on this Mac, from the quarantine's runs. Local only.
 public struct Stats: Sendable, Equatable {
     /// Still in quarantine, restorable.
     public var held: UInt64 = 0

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="AgentClean/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" alt="AgentClean icon" />
+  <img src="OpenSweep/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" alt="OpenSweep icon" />
 </p>
 
-<h1 align="center">AgentClean</h1>
+<h1 align="center">OpenSweep</h1>
 
 <p align="center">
   <strong>A Mac cleaner that understands developers.</strong><br>
@@ -11,12 +11,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Finjineersdev/AgentClean/releases/latest"><img src="https://img.shields.io/github/v/release/Finjineersdev/AgentClean?style=flat-square&color=2DD4BF" alt="Release" /></a>
+  <a href="https://github.com/Finjineersdev/OpenSweep/releases/latest"><img src="https://img.shields.io/github/v/release/Finjineersdev/OpenSweep?style=flat-square&color=2DD4BF" alt="Release" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey?style=flat-square" alt="macOS 26+" />
   <img src="https://img.shields.io/badge/swift-6-orange?style=flat-square" alt="Swift 6" />
   <img src="https://img.shields.io/badge/telemetry-none-2DD4BF?style=flat-square" alt="No telemetry" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT" />
-  <a href="https://github.com/Finjineersdev/homebrew-tap"><img src="https://img.shields.io/badge/brew-Finjineersdev%2Ftap%2Fagentclean-fbb040?style=flat-square" alt="Homebrew" /></a>
+  <a href="https://github.com/Finjineersdev/homebrew-tap"><img src="https://img.shields.io/badge/brew-Finjineersdev%2Ftap%2Fopensweep-fbb040?style=flat-square" alt="Homebrew" /></a>
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 Generic cleaners are blind to the thing that actually fills a developer's disk: `node_modules` in forty projects, three Python venvs per repo, Docker layers, Xcode's DerivedData, half a dozen Node versions under nvm, and the npm cache from every `npx` you ever ran. Worse, they are dangerous around it: the one `node_modules` you must not touch is the one you're shipping on Sunday.
 
-AgentClean starts from the projects.
+OpenSweep starts from the projects.
 
 - **Every project on your Mac is found** by its marker files (`package.json`, `pyproject.toml`, `Cargo.toml`, `Podfile`, `.xcodeproj`, `docker-compose.yml`, 20 more) and identified by its git remote, so pins survive renames and moves.
 - **Each one gets a status with a reason**: *Active* (commit or file change in the last 14 days, a running compose container, a dev server, or a shell open in it), *Idle*, *Dormant*. You can *Pin* one until a date or mark it *Cleanable*. Nothing inside an Active or Pinned project is ever offered, including its Docker containers and volumes. Sub-packages inherit their monorepo's protection.
@@ -64,13 +64,13 @@ Everything else a cleaner should do is here too, but with the same honesty: Dock
 **Homebrew** (recommended, no Gatekeeper dance):
 
 ```bash
-brew install --cask Finjineersdev/tap/agentclean
+brew install --cask Finjineersdev/tap/opensweep
 ```
 
-**Or the DMG**: download the latest `.dmg` from [Releases](https://github.com/Finjineersdev/AgentClean/releases/latest), open it, drag **AgentClean** to Applications. The build is signed but not notarized yet, so the first launch needs **right-click → Open**, or:
+**Or the DMG**: download the latest `.dmg` from [Releases](https://github.com/Finjineersdev/OpenSweep/releases/latest), open it, drag **OpenSweep** to Applications. The build is signed but not notarized yet, so the first launch needs **right-click → Open**, or:
 
 ```bash
-xattr -d com.apple.quarantine /Applications/AgentClean.app
+xattr -d com.apple.quarantine /Applications/OpenSweep.app
 ```
 
 On first launch the app asks for **Full Disk Access** and refuses to go further without it. That is deliberate: without it macOS hides Mail, Safari and parts of `~/Library`, and consent dialogs would stall scans half way. Nothing leaves your Mac; the only network call is the speed test you trigger yourself.
@@ -80,20 +80,20 @@ Requires macOS 26 (Tahoe) or later. Apple Silicon and Intel.
 ### Build from source
 
 ```bash
-git clone https://github.com/Finjineersdev/AgentClean.git
-cd AgentClean/CleanCore && swift test      # engine tests
-cd .. && open AgentClean.xcodeproj         # Xcode 26+
+git clone https://github.com/Finjineersdev/OpenSweep.git
+cd OpenSweep/CleanCore && swift test      # engine tests
+cd .. && open OpenSweep.xcodeproj         # Xcode 26+
 ```
 
 Pick your own signing team in the target settings (or a self-signed Code Signing certificate). See `CONTRIBUTING.md`.
 
 ## Safety model
 
-- **Quarantine first.** Cleaned items move to `~/Library/Application Support/AgentClean/Quarantine/<run>/` with a manifest; one click restores a whole run. Trash and permanent delete are options, never defaults.
+- **Quarantine first.** Cleaned items move to `~/Library/Application Support/OpenSweep/Quarantine/<run>/` with a manifest; one click restores a whole run. Trash and permanent delete are options, never defaults.
 - **SafetyGuard on every path.** Protected system paths, your never-touch folders, and Active / Pinned projects are refused after symlink resolution. Batches are capped and chunked.
 - **Review-only categories.** Large files, project dependencies, Docker images, app leftovers, browser history, startup items: never pre-checked.
 - **Never deleted at all.** Database data directories, VM disks, Keychains, SSH keys, Claude's VM bundles. Shown with a lock so you know where the space is.
-- **Logged.** `~/Library/Logs/AgentClean/operations.log` has every dry-run, quarantine, restore, and error.
+- **Logged.** `~/Library/Logs/OpenSweep/operations.log` has every dry-run, quarantine, restore, and error.
 
 ## Settings worth knowing
 

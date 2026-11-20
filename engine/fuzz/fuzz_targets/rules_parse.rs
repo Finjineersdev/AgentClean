@@ -6,8 +6,8 @@
 
 use std::path::{Component, Path};
 
-use agentclean_core::deny::{protected_component, protected_target};
-use agentclean_core::rules;
+use opensweep_core::deny::{protected_component, protected_target};
+use opensweep_core::rules;
 use libfuzzer_sys::fuzz_target;
 
 fn plain_name(name: &str) {

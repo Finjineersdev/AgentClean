@@ -1,4 +1,4 @@
-# AgentClean QA checklist
+# OpenSweep QA checklist
 
 Always QA against throwaway projects with `HOME` pointed at a temporary
 folder, so the engine uses a throwaway config and quarantine.
@@ -9,9 +9,9 @@ folder, so the engine uses a throwaway config and quarantine.
 Q=$(mktemp -d); mkdir -p $Q/home $Q/work
 # make a few projects in $Q/work: one old Next.js app (package.json + .next +
 # node_modules), one old Rust crate (Cargo.toml + target), one recently
-# edited project, one pinned with: HOME=$Q/home agentclean pin $Q/work/<name>
-HOME=$Q/home AGENTCLEAN_QA=$Q/out \
-  build/dd/Build/Products/Debug/AgentClean.app/Contents/MacOS/AgentClean \
+# edited project, one pinned with: HOME=$Q/home opensweep pin $Q/work/<name>
+HOME=$Q/home OPENSWEEP_QA=$Q/out \
+  build/dd/Build/Products/Debug/OpenSweep.app/Contents/MacOS/OpenSweep \
   -scanRoots "(\"$Q/work\")"
 cat $Q/out/report.txt      # every line must start with PASS
 open $Q/out                # window snapshots of every screen
@@ -23,11 +23,11 @@ For the Caches steps, also create `$Q/home/.npm/_cacache/blob`,
 npm is never run.
 
 The walkthrough expects projects named `shop-web` (dormant Next.js),
-`live-api` (active) and `keep-me` (pinned); see `AgentClean/App/QAWalkthrough.swift`.
+`live-api` (active) and `keep-me` (pinned); see `OpenSweep/App/QAWalkthrough.swift`.
 
 ## UI tests
 
-`xcodebuild test -project AgentClean.xcodeproj -scheme AgentClean -destination 'platform=macOS'`.
+`xcodebuild test -project OpenSweep.xcodeproj -scheme OpenSweep -destination 'platform=macOS'`.
 On a developer Mac, enable automation mode once:
 `sudo automationmodetool enable-automationmode-without-authentication`.
 CI runs them on macOS 15 with Xcode 16.
@@ -48,5 +48,5 @@ CI runs them on macOS 15 with Xcode 16.
 | 10 | Caches | Nothing ticked; Clear… names the exact commands; afterwards each shows freed bytes or the tool's error |
 | 11 | Menu bar | Shows the last scan's total; Open and Review Projects bring the window forward; it has no clean action |
 | 13 | Overview: **Review all ready** | One sheet lists every idle project's Safe folders; Move, then Undo restores all of them in one step |
-| 14 | Quit and reopen | The last scan shows at once; an hour later it rescans in the background (Settings → Rescan when AgentClean opens) |
+| 14 | Quit and reopen | The last scan shows at once; an hour later it rescans in the background (Settings → Rescan when OpenSweep opens) |
 | 12 | VoiceOver (⌘F5) on Projects | Each folder checkbox reads its name, class and size |

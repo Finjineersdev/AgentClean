@@ -1,6 +1,6 @@
 # Security and safety
 
-AgentClean moves folders out of your projects. This page says exactly what it
+OpenSweep moves folders out of your projects. This page says exactly what it
 touches, what it needs, and how to report a problem.
 
 ## What it never does
@@ -27,7 +27,7 @@ touches, what it needs, and how to report a problem.
 
 ## Global caches
 
-The Caches screen and `agentclean clean-cache` clear caches shared by all
+The Caches screen and `opensweep clean-cache` clear caches shared by all
 projects (npm, pnpm, pip, Go, …) by running **that tool's own command** with
 fixed arguments, from your home folder, never through a shell (ADR 0006).
 This is the one clean that cannot be undone: the tool downloads again what it
@@ -53,7 +53,7 @@ never appear as caches.
 | --- | --- |
 | Read access to the folders you scan | To find projects and measure folders. Full Disk Access is **not** required; folders macOS will not show are listed as skipped. |
 | Write access to your projects | To move cleanable folders into the quarantine, and back on restore. |
-| `~/Library/Application Support/AgentClean` | Quarantine, run history and settings (`config.toml`). |
+| `~/Library/Application Support/OpenSweep` | Quarantine, run history and settings (`config.toml`). |
 
 The Dev Stack screen reads what tools are installed (Homebrew, version
 managers, Docker through your `docker` CLI) and shows each tool's own removal
@@ -61,7 +61,7 @@ command for you to copy. It never runs those commands.
 
 ## Reporting
 
-If AgentClean moved or deleted something it should not have, or you found a
+If OpenSweep moved or deleted something it should not have, or you found a
 way to make it do so, use GitHub's private vulnerability reporting on this
-repository. Include the output of `agentclean history --json` for the run
+repository. Include the output of `opensweep history --json` for the run
 involved if you can.

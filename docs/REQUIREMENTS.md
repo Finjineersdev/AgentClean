@@ -1,10 +1,10 @@
 # Requirements
 
-AgentClean reclaims disk space from developer projects on macOS, with a
+OpenSweep reclaims disk space from developer projects on macOS, with a
 command-line engine that also runs on Linux. This document says what v1 must
 do, what it will not do, and how each requirement is accepted.
 
-Decisions recorded 19 Nov 2026: name AgentClean; fork of Zouuabi/CleanMyDev;
+Decisions recorded 19 Nov 2026: name OpenSweep; fork of Zouuabi/CleanMyDev;
 Rust engine with a SwiftUI app; Apache-2.0 for new work; developer-only scope;
 local stats and an original character, no public leaderboard; Developer ID
 with notarization and a Homebrew cask.
@@ -64,7 +64,7 @@ permanent deletion as a default.
 
 ## Open items
 
-- Bundle identifier: `com.finjineers.agentclean` (done).
+- Bundle identifier: `com.finjineers.opensweep` (done).
 - App icon: done (owner supplied, `docs/assets/icon-source.png`). Character
   art: the Open Peeps stay.
-- Trademark and name check for "AgentClean" before launch.
+- Trademark and name check for "OpenSweep" before launch.

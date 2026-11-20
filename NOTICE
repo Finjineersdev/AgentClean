@@ -1,12 +1,12 @@
-AgentClean
-Copyright 2026 The AgentClean contributors
+OpenSweep
+Copyright 2026 The OpenSweep contributors
 
-AgentClean is a fork of CleanMyDev by Oubaied Allah Zouabi
+OpenSweep is a fork of CleanMyDev by Oubaied Allah Zouabi
 (https://github.com/Zouuabi/CleanMyDev), which is distributed under the MIT
 License. That license is reproduced in LICENSES/MIT-Zouuabi-CleanMyDev.txt and
 continues to apply to the code inherited from it.
 
-Code written for AgentClean after the fork is licensed under the Apache
+Code written for OpenSweep after the fork is licensed under the Apache
 License, Version 2.0 (see LICENSE).
 
 Inherited code also includes portions adapted from Mac Sai (BSD-3-Clause),

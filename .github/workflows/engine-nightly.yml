@@ -52,13 +52,13 @@ jobs:
       # Fails if any mutant in the safety code survives (exit code 2).
       - name: Mutation testing
         run: >-
-          cargo mutants -p agentclean-core --test-workspace=true
-          -f crates/agentclean-core/src/guard.rs
-          -f crates/agentclean-core/src/deny.rs
-          -f crates/agentclean-core/src/quarantine.rs
-          -f crates/agentclean-core/src/rules.rs
-          -f crates/agentclean-core/src/discover.rs
-          -f crates/agentclean-core/src/activity.rs
+          cargo mutants -p opensweep-core --test-workspace=true
+          -f crates/opensweep-core/src/guard.rs
+          -f crates/opensweep-core/src/deny.rs
+          -f crates/opensweep-core/src/quarantine.rs
+          -f crates/opensweep-core/src/rules.rs
+          -f crates/opensweep-core/src/discover.rs
+          -f crates/opensweep-core/src/activity.rs
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

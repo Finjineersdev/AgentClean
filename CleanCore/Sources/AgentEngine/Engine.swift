@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The app's only way to change files: it runs the bundled `agentclean`
+// The app's only way to change files: it runs the bundled `opensweep`
 // binary (ADR 0005). Arguments go straight to the process, never through a
 // shell. Changing commands are dry runs unless `execute` is true, exactly as
 // on the command line.
@@ -100,7 +100,7 @@ public struct Engine: Sendable {
         return out.pinned
     }
 
-    /// The settings; with arguments, changes them first. Only AgentClean's
+    /// The settings; with arguments, changes them first. Only OpenSweep's
     /// config changes.
     public func config(
         idleDays: Int? = nil,

@@ -9,7 +9,7 @@ about: Something is wrong, including "it offered or deleted something it shouldn
 
 **Category / screen** (e.g. Smart Care → Dev Junk → Project Dependencies)
 
-**Log lines** from `~/Library/Logs/AgentClean/operations.log` if a clean was involved:
+**Log lines** from `~/Library/Logs/OpenSweep/operations.log` if a clean was involved:
 
 ```
 ```

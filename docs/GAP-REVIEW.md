@@ -1,6 +1,6 @@
 # Gap review (20 Nov 2026)
 
-What AgentClean set out to be (`HANDOFF.md` §1, `REQUIREMENTS.md`,
+What OpenSweep set out to be (`HANDOFF.md` §1, `REQUIREMENTS.md`,
 `research/AUDIT.md`), checked against the code as of commit `d862b08`.
 Each gap names where the evidence is. Ordered by what hurts a real user most.
 
@@ -18,7 +18,7 @@ Each gap names where the evidence is. Ordered by what hurts a real user most.
 | --- | --- |
 | P1, U2 | "Review all ready" on Home and "Review all <language>" in each language drawer: one dry run, one engine run across projects, one Undo. Takes only what a project starts with ticked (Safe, allowed, not active, not pinned) |
 | P2 | Settings → "Free quarantined space" (default after 7 days): on launch the app runs `purge --older-than-days` through the engine. Review sheets say the date the space comes back |
-| P3 | The last scan is saved in `~/Library/Application Support/AgentClean/last-scan.json` and shown on launch; with "Rescan when AgentClean opens" (default on) a scan over an hour old refreshes in the background. Totals are recomputed after every clean and restore |
+| P3 | The last scan is saved in `~/Library/Application Support/OpenSweep/last-scan.json` and shown on launch; with "Rescan when OpenSweep opens" (default on) a scan over an hour old refreshes in the background. Totals are recomputed after every clean and restore |
 | U1 | Projects shows "To clean" by default (192 of 709 on the test Mac), with "All" and a sort menu |
 
 | P4 | Settings → "Also scan other drives" (with the whole Mac): local, writable drives you plugged in; never network drives, disk images or Time Machine |
@@ -49,8 +49,8 @@ owner: R1, R3, R5, P7; C2 stays a toolchain.
 | P4 | **Other drives are not scanned.** Developers keep projects on external SSDs | `whole_disk_roots` skips `/Volumes` by design | Settings: "Also scan other drives", listing local drives only (never network or Time Machine); each walked on its own volume |
 | P5 | Scheduled automatic clean (F17, M5) | Not started | Safe class only, idle and dormant projects only, size cap, notification with Undo; needs open at login (`SMAppService`) and notifications, neither exists yet |
 | P6 | Local stats and milestones (F19) | History holds every run; nothing adds them up | Home: freed this month and all time, by language; milestone moments for the character. No network |
-| P7 | The character is not original | Characters are Open Peeps (CC0 stock); the requirement says "an original character" | Commission or draw an AgentClean mascot before launch; keep the Peeps as placeholders |
-| P8 | User rules and a per-repository config (F20) | `rules::load_dir` reads the bundled catalogue only | `~/.config/agentclean/rules/*.toml` through the same linter; `.agentclean.toml` in a repo for pin, exclude and extra artifacts |
+| P7 | The character is not original | Characters are Open Peeps (CC0 stock); the requirement says "an original character" | Commission or draw an OpenSweep mascot before launch; keep the Peeps as placeholders |
+| P8 | User rules and a per-repository config (F20) | `rules::load_dir` reads the bundled catalogue only | `~/.config/opensweep/rules/*.toml` through the same linter; `.opensweep.toml` in a repo for pin, exclude and extra artifacts |
 | P9 | Pins are a path and forever | `activity.rs` has no expiry or git identity; the upstream had "pin until a date" and pins that follow the git remote | Pin until a date; key pins by git remote so they survive moves and renames |
 
 ## 2. Coverage gaps (things that fill a developer's disk and are not shown)
@@ -81,7 +81,7 @@ owner: R1, R3, R5, P7; C2 stays a toolchain.
 | # | Gap | Proposal |
 | --- | --- | --- |
 | R1 | **CI has not run since the billing block.** The UI tests and accessibility audit have not seen the two redesigns, the whole-disk mode or the access banner | Fix billing, run CI with UI tests (`gh workflow run CI`) |
-| R2 | No UI test for language cards and drawer, the whole-Mac toggle, the access banner | Add them to `AgentCleanUITests` |
+| R2 | No UI test for language cards and drawer, the whole-Mac toggle, the access banner | Add them to `OpenSweepUITests` |
 | R3 | App icon is still the upstream's; bundle ID is a placeholder; trademark check owed | Owner (`REQUIREMENTS.md` open items) |
 | R4 | Actions not pinned to SHAs; no SBOM or build attestation (N7) | Pin actions; `actions/attest-build-provenance` and an SBOM in `release.yml` |
 | R5 | Signing, notarization, Sparkle keys, Homebrew tap; 20-tester beta; five-developer usability pass (F13) | Owner, then the beta |

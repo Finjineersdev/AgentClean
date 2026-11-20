@@ -4,7 +4,7 @@ Status: accepted, 19 Nov 2026
 
 ## Decision
 
-AgentClean cleans developer projects and developer tool caches. The inherited
+OpenSweep cleans developer projects and developer tool caches. The inherited
 system-junk, malware, uninstaller, fan and sensor, and speed-test modules are
 removed in M3. Projects, developer caches, Docker, simulators and the disk map
 stay.

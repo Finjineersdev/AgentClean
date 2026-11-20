@@ -4,7 +4,7 @@ Status: accepted, 19 Nov 2026
 
 ## Decision
 
-Only `agentclean-core` may move or delete user files, and only for a path
+Only `opensweep-core` may move or delete user files, and only for a path
 holding an `Approved` token that has just passed `reverify`. `Candidate` and
 `Approved` cannot be constructed outside the crate.
 

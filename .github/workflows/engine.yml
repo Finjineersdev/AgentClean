@@ -40,11 +40,11 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             hdiutil create -size 50m -fs APFS -volname ACTest drive.dmg -quiet
             hdiutil attach drive.dmg -nobrowse -mountpoint "$RUNNER_TEMP/drive"
-            echo "AGENTCLEAN_TEST_VOLUME=$RUNNER_TEMP/drive" >> "$GITHUB_ENV"
+            echo "OPENSWEEP_TEST_VOLUME=$RUNNER_TEMP/drive" >> "$GITHUB_ENV"
           else
-            echo "AGENTCLEAN_TEST_VOLUME=/dev/shm" >> "$GITHUB_ENV"
+            echo "OPENSWEEP_TEST_VOLUME=/dev/shm" >> "$GITHUB_ENV"
           fi
       - name: Test
         run: cargo test --locked
       - name: Validate bundled rules
-        run: cargo run --locked -q -p agentclean-cli -- rules-check rules
+        run: cargo run --locked -q -p opensweep-cli -- rules-check rules

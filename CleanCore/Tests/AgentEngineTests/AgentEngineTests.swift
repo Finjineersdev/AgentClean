@@ -9,7 +9,7 @@ private let repo = URL(fileURLWithPath: #filePath)
 
 /// The engine's own JSON snapshots (one array of output lines per file).
 private func snapshot(_ name: String) throws -> [Data] {
-    let url = repo.appendingPathComponent("engine/crates/agentclean-cli/tests/snapshots/\(name).json")
+    let url = repo.appendingPathComponent("engine/crates/opensweep-cli/tests/snapshots/\(name).json")
     let lines = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [Any] ?? []
     return try lines.map { try JSONSerialization.data(withJSONObject: $0) }
 }
@@ -73,8 +73,8 @@ final class EngineContractTests: XCTestCase {
     }
 }
 
-/// Runs the real binary on a throwaway project. Set AGENTCLEAN_BIN, or
-/// build engine/target/debug/agentclean first; skipped otherwise.
+/// Runs the real binary on a throwaway project. Set OPENSWEEP_BIN, or
+/// build engine/target/debug/opensweep first; skipped otherwise.
 final class EngineEndToEndTests: XCTestCase {
     private var tmp: URL!
     private var engine: Engine!
@@ -82,8 +82,8 @@ final class EngineEndToEndTests: XCTestCase {
 
     override func setUpWithError() throws {
         let env = ProcessInfo.processInfo.environment
-        let binary = env["AGENTCLEAN_BIN"].map(URL.init(fileURLWithPath:))
-            ?? repo.appendingPathComponent("engine/target/debug/agentclean")
+        let binary = env["OPENSWEEP_BIN"].map(URL.init(fileURLWithPath:))
+            ?? repo.appendingPathComponent("engine/target/debug/opensweep")
         try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: binary.path),
                           "no engine binary at \(binary.path)")
         let fm = FileManager.default
@@ -234,7 +234,7 @@ final class ScheduleTests: XCTestCase {
         Project(root: root, verdict: verdict, pinned: pinned, reason: "", items: [
             Item(path: "target", rule: "rust", kind: .safe, bytes: safe, refused: nil),
             Item(path: ".venv", rule: "python", kind: .caution, bytes: 999, refused: nil),
-            Item(path: "out", rule: "rust", kind: .safe, bytes: 5, refused: "the project's .agentclean.toml keeps this folder"),
+            Item(path: "out", rule: "rust", kind: .safe, bytes: 5, refused: "the project's .opensweep.toml keeps this folder"),
         ])
     }
 

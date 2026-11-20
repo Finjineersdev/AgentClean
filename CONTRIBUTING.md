@@ -1,11 +1,11 @@
-# Contributing to AgentClean
+# Contributing to OpenSweep
 
 Thanks for looking under the hood. This is a tool that deletes files, so the bar for changes that touch scanning or cleaning is higher than for UI work. Read the safety section before anything else.
 
 ## Ground rules
 
 - **Only the Rust engine moves or deletes files** (ADR 0002). The app runs the
-  bundled `agentclean` binary and reads its `--json` output (ADR 0005).
+  bundled `opensweep` binary and reads its `--json` output (ADR 0005).
   `scripts/check-swift-never-deletes.sh` fails CI if app code calls a file
   removal or move API.
 - **Quarantine, never delete, at clean time.** Space comes back on purge.
@@ -18,16 +18,16 @@ Thanks for looking under the hood. This is a tool that deletes files, so the bar
 ## Setup
 
 ```bash
-git clone https://github.com/Finjineersdev/AgentClean.git
-cd AgentClean
+git clone https://github.com/Finjineersdev/OpenSweep.git
+cd OpenSweep
 (cd engine && cargo build)            # the Swift end-to-end tests use this binary
 (cd CleanCore && swift test)
-xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Debug \
+xcodebuild -project OpenSweep.xcodeproj -scheme OpenSweep -configuration Debug \
   -derivedDataPath build/dd build CODE_SIGN_IDENTITY=-   # builds and embeds the engine
 ```
 
 Xcode 16 or later; macOS 14 or later to run. The app finds its engine at
-`Contents/Helpers/agentclean`; set `AGENTCLEAN_BIN` to use another binary
+`Contents/Helpers/opensweep`; set `OPENSWEEP_BIN` to use another binary
 while developing.
 
 ## Layout
@@ -37,8 +37,8 @@ engine/                Rust workspace: rules, safety guard, quarantine, CLI (the
 CleanCore/
   Sources/AgentEngine  Swift client for the engine CLI, selection rules
   Sources/CleanCore    Read-only Dev Stack inventory
-AgentClean/            SwiftUI app: AppModel, Overview, Projects, History, Dev Stack, Settings
-AgentCleanUITests/     XCUITest suite against throwaway projects
+OpenSweep/            SwiftUI app: AppModel, Overview, Projects, History, Dev Stack, Settings
+OpenSweepUITests/     XCUITest suite against throwaway projects
 ```
 
 ## Pull requests
@@ -53,8 +53,8 @@ AgentCleanUITests/     XCUITest suite against throwaway projects
 ## Reporting a bug that moved something it shouldn't have
 
 Use private vulnerability reporting (see `SECURITY.md`) with the output of
-`agentclean history --json` for the run. Restore it first:
-`agentclean restore <run>`, or History in the app.
+`opensweep history --json` for the run. Restore it first:
+`opensweep restore <run>`, or History in the app.
 
 ## Engine (Rust)
 
@@ -67,7 +67,7 @@ cd engine
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test
-cargo run -p agentclean-cli -- rules-check rules
+cargo run -p opensweep-cli -- rules-check rules
 ```
 
 The `engine-nightly` workflow also runs two slower checks. Before you merge a
@@ -77,13 +77,13 @@ Mutation testing must report no surviving ("missed") mutants:
 ```bash
 cargo install --locked cargo-mutants cargo-fuzz
 cd engine
-cargo mutants -p agentclean-core --test-workspace=true \
-  -f crates/agentclean-core/src/guard.rs \
-  -f crates/agentclean-core/src/deny.rs \
-  -f crates/agentclean-core/src/quarantine.rs \
-  -f crates/agentclean-core/src/rules.rs \
-  -f crates/agentclean-core/src/discover.rs \
-  -f crates/agentclean-core/src/activity.rs
+cargo mutants -p opensweep-core --test-workspace=true \
+  -f crates/opensweep-core/src/guard.rs \
+  -f crates/opensweep-core/src/deny.rs \
+  -f crates/opensweep-core/src/quarantine.rs \
+  -f crates/opensweep-core/src/rules.rs \
+  -f crates/opensweep-core/src/discover.rs \
+  -f crates/opensweep-core/src/activity.rs
 ```
 
 Fuzzing needs the nightly toolchain (`rustup toolchain install nightly`). The

@@ -1,10 +1,10 @@
-# Releasing AgentClean
+# Releasing OpenSweep
 
 1. Make sure `main` is green (CI and engine workflows).
 2. Tag and push. The tag sets the version; `MARKETING_VERSION` in the project
    is only the default for local builds.
    ```bash
-   git tag -a v0.4.0 -m "AgentClean 0.4.0"
+   git tag -a v0.4.0 -m "OpenSweep 0.4.0"
    git push origin v0.4.0
    ```
    A tag with a suffix (`v0.4.0-beta.1`) is published as a pre-release, which
@@ -14,7 +14,7 @@
    secrets exist), writes a sha256, an SBOM and build provenance, signs a
    Sparkle appcast, and publishes the GitHub Release. The tap follows it.
 
-AgentClean ships without Apple Developer ID (an open-source choice): the app
+OpenSweep ships without Apple Developer ID (an open-source choice): the app
 is ad-hoc signed and not notarized, and the release is a normal release, so
 the update feed and the Homebrew cask pick it up. The README tells people how
 to open it the first time. Add the Developer ID secrets below later and the
@@ -32,7 +32,7 @@ Sparkle keys: build the app once so Xcode fetches Sparkle, then run, from the
 repository root:
 
 ```bash
-B=build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin A=com.finjineers.agentclean
+B=build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin A=com.finjineers.opensweep
 $B/generate_keys --account $A                  # creates the key in your login keychain
 gh variable set SPARKLE_PUBLIC_KEY --body "$($B/generate_keys --account $A -p)"
 $B/generate_keys --account $A -x /tmp/sp.key && gh secret set SPARKLE_PRIVATE_KEY < /tmp/sp.key && rm -P /tmp/sp.key
@@ -42,7 +42,7 @@ The login keychain is the backup: without the private key, installed copies
 can never be updated again, so keep your keychain backed up (Time Machine).
 
 Homebrew tap: [`Finjineersdev/homebrew-tap`](https://github.com/Finjineersdev/homebrew-tap)
-holds `Casks/agentclean.rb`. Its own workflow checks the latest release every
+holds `Casks/opensweep.rb`. Its own workflow checks the latest release every
 six hours (or on demand from its Actions tab) and updates version and sha256,
 so this repository needs no token for it.
 
@@ -56,9 +56,9 @@ network use. Local and ad-hoc builds carry no key and never check.
 ## Homebrew
 
 ```bash
-brew install --cask finjineersdev/tap/agentclean   # app, plus the agentclean command
-brew upgrade --cask agentclean
-brew uninstall --zap --cask agentclean             # also deletes settings and the quarantine
+brew install --cask finjineersdev/tap/opensweep   # app, plus the opensweep command
+brew upgrade --cask opensweep
+brew uninstall --zap --cask opensweep             # also deletes settings and the quarantine
 ```
 
 Restore or purge every run before `--zap`: it removes the quarantine with
@@ -67,6 +67,6 @@ whatever is still held there.
 ## Local release build
 
 ```bash
-xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
+xcodebuild -project OpenSweep.xcodeproj -scheme OpenSweep -configuration Release \
   -derivedDataPath build/dd build CODE_SIGN_IDENTITY=-
 ```

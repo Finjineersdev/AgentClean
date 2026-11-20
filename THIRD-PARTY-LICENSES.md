@@ -1,6 +1,6 @@
 # Third-party code
 
-AgentClean stands on the shoulders of these open-source projects. Parts of their
+OpenSweep stands on the shoulders of these open-source projects. Parts of their
 code were adapted into `CleanCore/`; the file headers say which. Their license
 texts are reproduced here as those licenses require.
 

@@ -1,6 +1,6 @@
 # Competitive audit (19 Nov 2026)
 
-Summary of the research behind AgentClean. Facts about CleanMyDev come from
+Summary of the research behind OpenSweep. Facts about CleanMyDev come from
 its public website, release notes, privacy policy and terms, from the
 installed app's bundle metadata and embedded text, and from using its screens
 without cleaning anything. No code was decompiled or copied.
@@ -31,9 +31,9 @@ or Caution and one Clean button for all), Global Caches (measure only), Activity
 (history), Leaderboard (embedded web page). Settings: idle threshold, scan on
 open, rescan interval, scan roots, character, privacy.
 
-## Gaps AgentClean addresses
+## Gaps OpenSweep addresses
 
-| # | Gap in CleanMyDev | AgentClean answer |
+| # | Gap in CleanMyDev | OpenSweep answer |
 | --- | --- | --- |
 | 1 | Closed source with broad disk access | Open source, reproducible builds |
 | 2 | Account to download, telemetry, ad pixels | No account, no telemetry; update check only |
@@ -62,7 +62,7 @@ dashboard that makes reclaimable space obvious; Reduce Motion support.
 
 | Tool | Type | Notes |
 | --- | --- | --- |
-| Zouuabi/CleanMyDev | SwiftUI Mac app, MIT | AgentClean's upstream; quarantine by default; Active, Idle, Dormant with reasons |
+| Zouuabi/CleanMyDev | SwiftUI Mac app, MIT | OpenSweep's upstream; quarantine by default; Active, Idle, Dormant with reasons |
 | cleanmydev.com | Mac app, $9.99 once | Unrelated product with the same name; cache-first |
 | kondo | Rust CLI and GUI | Many project types; deletes permanently |
 | npkill | Node CLI | `node_modules` focus; deletes permanently |

@@ -5,7 +5,7 @@ Status: accepted, 20 Nov 2026
 ## Decision
 
 A folder on a local drive other than the one holding the main quarantine is
-moved, by rename, into `<drive>/.agentclean-quarantine/runs/<run id>/items/`
+moved, by rename, into `<drive>/.opensweep-quarantine/runs/<run id>/items/`
 on its own drive. The run's manifest stays in the main store and records that
 quarantine as the entry's `volume`, so `history`, `restore` and `purge` work
 as before; an entry whose drive is not connected stays in quarantine with a
@@ -34,7 +34,7 @@ purge check again that the quarantine is at the top of a local drive.
   and emptying the Trash would delete items behind the manifest's back.
 - A rename on a network drive may not be atomic, and its owners and
   permissions can be whatever the server says.
-- A shared or second-hand drive may already hold a `.agentclean-quarantine`
+- A shared or second-hand drive may already hold a `.opensweep-quarantine`
   planted to redirect moves or purges; I19 refuses it.
 
 ## Consequences

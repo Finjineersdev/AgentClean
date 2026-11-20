@@ -3,28 +3,6 @@
 version = 3
 
 [[package]]
-name = "agentclean-cli"
-version = "0.0.1"
-dependencies = [
- "agentclean-core",
- "clap",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "agentclean-core"
-version = "0.0.1"
-dependencies = [
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "toml",
-]
-
-[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -331,6 +309,28 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "opensweep-cli"
+version = "0.0.1"
+dependencies = [
+ "clap",
+ "opensweep-core",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "opensweep-core"
+version = "0.0.1"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "toml",
+]
 
 [[package]]
 name = "proc-macro-crate"

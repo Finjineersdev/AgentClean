@@ -1,8 +1,8 @@
 # CLI JSON output
 
-Every `agentclean` command takes `--json`. This page is the contract the Mac
+Every `opensweep` command takes `--json`. This page is the contract the Mac
 app (M3) reads. Snapshots of each shape live in
-`engine/crates/agentclean-cli/tests/snapshots/`, where temporary paths are
+`engine/crates/opensweep-cli/tests/snapshots/`, where temporary paths are
 `$TMP` and sizes, times and run ids are masked.
 
 ## Rules
@@ -96,7 +96,7 @@ list after the change.
 
 **`config [--idle-days N] [--dormant-days N] [--exclude DIR]… [--include DIR]…`**:
 `command`, `path` (the config file), `idle_days`, `dormant_days`, `pinned`,
-`exclude`, after any change. Like `pin`, it changes only AgentClean's config.
+`exclude`, after any change. Like `pin`, it changes only OpenSweep's config.
 
 **`caches`**: `caches`, one object per cache found on disk: `id`, `tool`,
 `name`, `path`, `bytes`, `unreadable`, `command` (the tool's own command as

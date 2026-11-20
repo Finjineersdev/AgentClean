@@ -1,6 +1,6 @@
-# AgentClean: notes for coding agents
+# OpenSweep: notes for coding agents
 
-AgentClean is an open-source, local-only developer disk cleaner for macOS (CLI
+OpenSweep is an open-source, local-only developer disk cleaner for macOS (CLI
 also on Linux). It finds rebuildable folders in developer projects
 (`node_modules`, `target`, `.venv`, build output), explains why each is safe,
 and makes every clean reversible.
@@ -11,11 +11,11 @@ and what to do next. The milestone plan in progress is `docs/milestones/M2.md`.
 ## Non-negotiable rules
 
 1. **Only the Rust engine deletes or moves user files.** Never add file
-   removal or move calls on user paths in Swift (`AgentClean/`, `CleanCore/`)
+   removal or move calls on user paths in Swift (`OpenSweep/`, `CleanCore/`)
    or anywhere else. See `docs/adr/0002-single-deletion-path.md`.
 2. **Every path goes rule → `Candidate` → `Guard::check` → `Approved` →
    `reverify` → move.** Do not add a constructor for `Candidate` or `Approved`
-   outside `agentclean-core`, and do not weaken a check in `guard.rs`,
+   outside `opensweep-core`, and do not weaken a check in `guard.rs`,
    `deny.rs`, `rules.rs` or `quarantine.rs` without an ADR in `docs/adr/`.
 3. **A safety change ships with a test that fails without it.** The invariants
    and their tests are listed in `docs/SAFETY-SPEC.md`; keep that table current.
@@ -24,7 +24,7 @@ and what to do next. The milestone plan in progress is `docs/milestones/M2.md`.
 5. **No network code** in the engine, and none in the app beyond the updater.
 6. **Treat scanned repositories as hostile input.** Run git only with the
    hardened flags in `guard::check_untracked`; never build shell strings.
-7. **Clean-room.** AgentClean competes with the closed-source app CleanMyDev
+7. **Clean-room.** OpenSweep competes with the closed-source app CleanMyDev
    (cleanmydev.app). Never copy its code, rule file, strings, artwork or
    copy, and never decompile it. Write rules from each tool's own docs.
 
@@ -37,7 +37,7 @@ cd engine
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
-cargo run -q -p agentclean-cli -- rules-check rules
+cargo run -q -p opensweep-cli -- rules-check rules
 ```
 
 All four must pass before you call engine work done. Lints forbid `unsafe`,
@@ -46,7 +46,7 @@ All four must pass before you call engine work done. Lints forbid `unsafe`,
 Try the CLI against a throwaway copy, never a real project, while developing:
 
 ```bash
-cargo build && B=target/debug/agentclean
+cargo build && B=target/debug/opensweep
 $B plan  --rules rules /tmp/some-copy
 $B clean --rules rules --store /tmp/q /tmp/some-copy        # dry run
 ```
@@ -55,7 +55,7 @@ Inherited Mac app (Swift, untouched since the rename, not yet rebuilt):
 
 ```bash
 cd CleanCore && swift test
-xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
+xcodebuild -project OpenSweep.xcodeproj -scheme OpenSweep \
   -configuration Debug -derivedDataPath build/dd build       # macOS 26 SDK, Xcode 26+
 ```
 
@@ -63,14 +63,14 @@ xcodebuild -project AgentClean.xcodeproj -scheme AgentClean \
 
 | Path | What |
 | --- | --- |
-| `engine/crates/agentclean-core/src/rules.rs` | Rule files: parse, lint, `Candidate` |
-| `engine/crates/agentclean-core/src/deny.rs` | Names that are never deletable |
-| `engine/crates/agentclean-core/src/guard.rs` | Safety guard, `Approved`, `reverify` |
-| `engine/crates/agentclean-core/src/quarantine.rs` | Runs, manifest, restore, purge |
-| `engine/crates/agentclean-core/src/size.rs` | Allocated-size measurement |
-| `engine/crates/agentclean-cli/` | `agentclean` binary and end-to-end tests |
+| `engine/crates/opensweep-core/src/rules.rs` | Rule files: parse, lint, `Candidate` |
+| `engine/crates/opensweep-core/src/deny.rs` | Names that are never deletable |
+| `engine/crates/opensweep-core/src/guard.rs` | Safety guard, `Approved`, `reverify` |
+| `engine/crates/opensweep-core/src/quarantine.rs` | Runs, manifest, restore, purge |
+| `engine/crates/opensweep-core/src/size.rs` | Allocated-size measurement |
+| `engine/crates/opensweep-cli/` | `opensweep` binary and end-to-end tests |
 | `engine/rules/*.toml` | Rule catalogue, one file per ecosystem |
-| `AgentClean/`, `CleanCore/` | Inherited SwiftUI app and Swift engine (to be reduced in M3) |
+| `OpenSweep/`, `CleanCore/` | Inherited SwiftUI app and Swift engine (to be reduced in M3) |
 | `docs/` | Handoff, requirements, safety spec, rule schema, ADRs, research, milestones |
 
 ## Conventions

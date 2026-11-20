@@ -5,8 +5,8 @@ Status: accepted, 20 Nov 2026. Implements F15.
 ## Decision
 
 Caches shared by every project (npm, pnpm, Yarn, Bun, pip, uv, Go modules
-and build cache, Deno, Composer, CocoaPods) are listed by `agentclean caches`
-and cleared by `agentclean clean-cache <id> --execute`, which runs **that
+and build cache, Deno, Composer, CocoaPods) are listed by `opensweep caches`
+and cleared by `opensweep clean-cache <id> --execute`, which runs **that
 tool's own command** with a fixed argument list (`npm cache clean --force`,
 `go clean -modcache`, …). The engine never deletes cache files itself.
 

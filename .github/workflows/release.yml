@@ -40,7 +40,7 @@ jobs:
         working-directory: engine
         run: |
           cargo test --locked -q
-          cargo run -q --locked -p agentclean-cli -- rules-check rules
+          cargo run -q --locked -p opensweep-cli -- rules-check rules
 
       - name: No Swift file removal (ADR 0002)
         run: scripts/check-swift-never-deletes.sh
@@ -75,7 +75,7 @@ jobs:
           else
             ID=-; TEAM=""; HARDENED=NO; FLAGS=""
           fi
-          xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
+          xcodebuild -project OpenSweep.xcodeproj -scheme OpenSweep -configuration Release \
             -derivedDataPath build/dd build CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$ID" DEVELOPMENT_TEAM="$TEAM" \
             ENABLE_HARDENED_RUNTIME="$HARDENED" OTHER_CODE_SIGN_FLAGS="$FLAGS" \
@@ -84,16 +84,16 @@ jobs:
 
       - name: Check the bundle
         run: |
-          APP=build/dd/Build/Products/Release/AgentClean.app
-          lipo -archs "$APP/Contents/Helpers/agentclean" | grep -q "x86_64 arm64"
+          APP=build/dd/Build/Products/Release/OpenSweep.app
+          lipo -archs "$APP/Contents/Helpers/opensweep" | grep -q "x86_64 arm64"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "${VERSION#v}"
           codesign --verify --deep --strict --verbose=2 "$APP"
           # It must start: a library macOS refuses to load ends it at once.
-          "$APP/Contents/MacOS/AgentClean" & pid=$!; sleep 5; kill -0 $pid; kill $pid
+          "$APP/Contents/MacOS/OpenSweep" & pid=$!; sleep 5; kill -0 $pid; kill $pid
           if [ "$HAS_CERT" = true ]; then
             codesign -dv "$APP" 2>&1 | grep -q "flags=.*runtime"
-            codesign -dv "$APP/Contents/Helpers/agentclean" 2>&1 | grep -q "flags=.*runtime"
-            codesign -dv "$APP/Contents/Helpers/agentclean" 2>&1 | grep -q "Timestamp="
+            codesign -dv "$APP/Contents/Helpers/opensweep" 2>&1 | grep -q "flags=.*runtime"
+            codesign -dv "$APP/Contents/Helpers/opensweep" 2>&1 | grep -q "Timestamp="
           fi
 
       - name: Package DMG
@@ -102,11 +102,11 @@ jobs:
         run: |
           V="${VERSION#v}"
           mkdir -p dist/root
-          cp -R build/dd/Build/Products/Release/AgentClean.app dist/root/
+          cp -R build/dd/Build/Products/Release/OpenSweep.app dist/root/
           ln -s /Applications dist/root/Applications
-          hdiutil create -volname "AgentClean $V" -srcfolder dist/root -ov -format UDZO "dist/AgentClean-$V.dmg"
+          hdiutil create -volname "OpenSweep $V" -srcfolder dist/root -ov -format UDZO "dist/OpenSweep-$V.dmg"
           if [ "$HAS_CERT" = true ]; then
-            codesign --sign "$SIGN_IDENTITY" --timestamp "dist/AgentClean-$V.dmg"
+            codesign --sign "$SIGN_IDENTITY" --timestamp "dist/OpenSweep-$V.dmg"
           fi
 
       - name: Notarize and staple
@@ -117,26 +117,26 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           V="${VERSION#v}"
-          xcrun notarytool submit "dist/AgentClean-$V.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-          xcrun stapler staple "dist/AgentClean-$V.dmg"
-          spctl --assess --type open --context context:primary-signature -v "dist/AgentClean-$V.dmg"
+          xcrun notarytool submit "dist/OpenSweep-$V.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "dist/OpenSweep-$V.dmg"
+          spctl --assess --type open --context context:primary-signature -v "dist/OpenSweep-$V.dmg"
 
       - name: Checksum
-        run: cd dist && V="${VERSION#v}" && shasum -a 256 "AgentClean-$V.dmg" > "AgentClean-$V.dmg.sha256"
+        run: cd dist && V="${VERSION#v}" && shasum -a 256 "OpenSweep-$V.dmg" > "OpenSweep-$V.dmg.sha256"
 
       - name: SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           path: .
           format: spdx-json
-          output-file: dist/AgentClean-sbom.spdx.json
+          output-file: dist/OpenSweep-sbom.spdx.json
           upload-artifact: false
           upload-release-assets: false
 
       - name: Build provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: dist/AgentClean-*.dmg
+          subject-path: dist/OpenSweep-*.dmg
 
       - name: Sparkle appcast
         if: env.HAS_SPARKLE == 'true'
@@ -144,7 +144,7 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           V="${VERSION#v}"
-          mkdir -p updates && cp "dist/AgentClean-$V.dmg" updates/
+          mkdir -p updates && cp "dist/OpenSweep-$V.dmg" updates/
           echo "$SPARKLE_PRIVATE_KEY" | build/dd/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast \
             --ed-key-file - \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/$VERSION/" \
@@ -155,22 +155,22 @@ jobs:
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            dist/AgentClean-*.dmg
-            dist/AgentClean-*.dmg.sha256
-            dist/AgentClean-sbom.spdx.json
+            dist/OpenSweep-*.dmg
+            dist/OpenSweep-*.dmg.sha256
+            dist/OpenSweep-sbom.spdx.json
             dist/appcast.xml
           fail_on_unmatched_files: false
           generate_release_notes: true
           body: |
             ## Install
             ```bash
-            brew install --cask finjineersdev/tap/agentclean
+            brew install --cask finjineersdev/tap/opensweep
             ```
-            or download the `.dmg` below and drag **AgentClean** to Applications.
-            The cask also puts the `agentclean` command on your PATH.
+            or download the `.dmg` below and drag **OpenSweep** to Applications.
+            The cask also puts the `opensweep` command on your PATH.
 
             Requires macOS 14 or later. Nothing leaves your Mac except the update check,
             which asks first.
 
-            AgentClean is not notarized by Apple, so macOS blocks the first launch: open
+            OpenSweep is not notarized by Apple, so macOS blocks the first launch: open
             System Settings > Privacy & Security and click "Open Anyway".

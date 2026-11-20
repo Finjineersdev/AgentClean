@@ -1,11 +1,11 @@
 # Safety specification
 
-The one failure AgentClean cannot recover its reputation from is removing
+The one failure OpenSweep cannot recover its reputation from is removing
 something that cannot be rebuilt. This document states the invariants that
 prevent it. Each invariant names the code that enforces it and the test that
 proves it. A change that weakens an invariant needs an ADR.
 
-Status: **I1–I15c, I18 and I19 are implemented and tested** in `engine/crates/agentclean-core`.
+Status: **I1–I15c, I18 and I19 are implemented and tested** in `engine/crates/opensweep-core`.
 I16 and I17 are specified and not implemented yet.
 
 ## Model
@@ -66,13 +66,13 @@ which allows no transport and overrides the repository's own
 
 | # | Invariant | Enforced by | Test |
 | --- | --- | --- | --- |
-| I13 | Cleaning moves each approved folder by rename into a quarantine on its own drive: the main store, or `.agentclean-quarantine` at the top of another local drive (ADR 0004); nothing is copied or unlinked at clean time. A folder on a network drive, or a drive whose type is unknown, is skipped and recorded | `Store::clean`, `volumes::unusable` | `clean_then_restore_round_trips_exactly`, `folders_on_another_drive_use_that_drives_quarantine`, `only_known_local_drives_are_usable` |
+| I13 | Cleaning moves each approved folder by rename into a quarantine on its own drive: the main store, or `.opensweep-quarantine` at the top of another local drive (ADR 0004); nothing is copied or unlinked at clean time. A folder on a network drive, or a drive whose type is unknown, is skipped and recorded | `Store::clean`, `volumes::unusable` | `clean_then_restore_round_trips_exactly`, `folders_on_another_drive_use_that_drives_quarantine`, `only_known_local_drives_are_usable` |
 | I14 | The manifest is written before the first move and rewritten atomically after each one; `reverify` runs immediately before each move | `Store::clean`, `write_manifest` | `changed_items_are_skipped_and_recorded`, `a_crash_after_a_move_is_recoverable` |
 | I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
 | I14b | Purge deletes only real directories at `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `parse_manifest` | `purge_deletes_only_quarantined_items`, `purge_removes_only_real_directories`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
 | I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
-| I19 | A drive quarantine is used only if each of its folders is a real folder owned by the main store's owner and writable by no one else, at the top of a local drive whose top folder others cannot change (or has the sticky bit), checked before every clean, restore and purge; a manifest's `volume` must be an absolute `.agentclean-quarantine` folder whose parent contains the item's original | `quarantine::trusted`, `items_of`, `parse_manifest` | `a_drive_quarantine_must_be_a_private_folder_of_the_owner`, `a_shared_drive_top_needs_the_sticky_bit`, `manifests_cannot_point_at_another_drives_quarantine`, `folders_on_another_drive_use_that_drives_quarantine` |
-| I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution`. `pin` and `unpin` are the exception: they change only AgentClean's config, and pinning only adds protection. `clean --only` can only narrow: a pick the rules do not offer is an error before anything moves, and every pick still passes the guard | `agentclean-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag`, `only_narrows_the_selection` |
+| I19 | A drive quarantine is used only if each of its folders is a real folder owned by the main store's owner and writable by no one else, at the top of a local drive whose top folder others cannot change (or has the sticky bit), checked before every clean, restore and purge; a manifest's `volume` must be an absolute `.opensweep-quarantine` folder whose parent contains the item's original | `quarantine::trusted`, `items_of`, `parse_manifest` | `a_drive_quarantine_must_be_a_private_folder_of_the_owner`, `a_shared_drive_top_needs_the_sticky_bit`, `manifests_cannot_point_at_another_drives_quarantine`, `folders_on_another_drive_use_that_drives_quarantine` |
+| I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution`. `pin` and `unpin` are the exception: they change only OpenSweep's config, and pinning only adds protection. `clean --only` can only narrow: a pick the rules do not offer is an error before anything moves, and every pick still passes the guard | `opensweep-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag`, `only_narrows_the_selection` |
 
 Space is freed only when a run is purged, because a rename on the same volume
 moves no data. The CLI says so after every clean.
@@ -99,7 +99,7 @@ nothing is approved without an activity assessment.
 
 | # | Invariant | Enforced by | Test |
 | --- | --- | --- | --- |
-| I15 | A pinned project, or one inside a pinned folder, is refused with no override. A pin can carry an end time (`pinned_until`), after which the project is judged as usual; a pinned git remote (`pinned_remotes`) pins every clone of that repository, read from `.git/config` as text without running git, so a repository can only pin itself. An Active project (a process other than AgentClean's own process family and pipeline runs inside it, or a file or commit is newer than `idle_days`) is refused unless the guard is built with `allow_active` (`--include-active`) | `Guard::check`, `activity::assess` | `active_and_pinned_projects_are_refused`, `pinned_projects_are_never_cleaned`, `a_pin_until_a_date_ends`, `a_repository_file_can_only_take_folders_away`, `folders_kept_by_the_repository_are_refused`, `user_rules_and_repository_files`, `user_rules_add_to_the_catalogue`, `a_pin_on_a_git_remote_follows_the_project`, `old_config_files_still_load`, `projects_in_use_need_an_explicit_flag`, `a_tool_running_inside_makes_it_active` |
+| I15 | A pinned project, or one inside a pinned folder, is refused with no override. A pin can carry an end time (`pinned_until`), after which the project is judged as usual; a pinned git remote (`pinned_remotes`) pins every clone of that repository, read from `.git/config` as text without running git, so a repository can only pin itself. An Active project (a process other than OpenSweep's own process family and pipeline runs inside it, or a file or commit is newer than `idle_days`) is refused unless the guard is built with `allow_active` (`--include-active`) | `Guard::check`, `activity::assess` | `active_and_pinned_projects_are_refused`, `pinned_projects_are_never_cleaned`, `a_pin_until_a_date_ends`, `a_repository_file_can_only_take_folders_away`, `folders_kept_by_the_repository_are_refused`, `user_rules_and_repository_files`, `user_rules_add_to_the_catalogue`, `a_pin_on_a_git_remote_follows_the_project`, `old_config_files_still_load`, `projects_in_use_need_an_explicit_flag`, `a_tool_running_inside_makes_it_active` |
 | I15a | Dormant needs every signal checked in full: git answered, the edit walk finished within its limits, and processes were listed. Otherwise the verdict is at most Idle | `activity::decide` | `an_incomplete_check_is_never_dormant`, `too_many_files_is_never_dormant`, `a_broken_repository_is_never_dormant` |
 | I15b | Reading the last commit runs git with the I11 settings plus `log.showSignature=false`, so a repository cannot make it run `gpg.program` or fetch from its own remote | `guard::hardened_git` | `reading_commits_does_not_run_repository_programs`, `reading_commits_does_not_fetch_from_the_repositorys_remote` |
 | I15c | A config file that exists but cannot be read, has an unknown key, a relative pin, or `idle_days` above `dormant_days` stops `plan` and `clean`: pins are never silently dropped | `Config::load` | `config_is_read_strictly`, `a_broken_config_stops_cleaning` |
@@ -113,6 +113,12 @@ the seconds between the plan and the move is not seen.
 | --- | --- | --- | --- |
 | I20 | A global cache is cleared only by its tool's own command, with a fixed argument list, no shell, stdin closed, the home folder as working folder and a time limit, and only with `--execute`. No cache path is inside or above a toolchain folder or the home folder | `caches::known`, `caches::allowed`, `caches::run` | `toolchains_never_appear_as_caches`, `the_home_folder_and_its_parents_are_never_a_cache`, `cleaning_runs_the_tools_own_command`, `a_failing_or_hanging_tool_is_reported`, `caches_are_cleared_by_the_tools_own_command`, `xcode_archives_and_simulators_are_measured_only`, `simulators_are_cleared_only_of_unavailable_ones`, `editor_browser_docker_and_model_stores_are_measured_only` |
 | I21 | A project inside installed software is never cleaned: its root has a `node_modules`, `site-packages`, `dist-packages` or `Cellar` folder above it, or lies under Homebrew, MacPorts, Nix, `/Applications`, `/Library`, `/System`, `/usr`, or a toolchain folder in the home folder (`.nvm`, `.rustup`, `.cargo`, `go/pkg`, `Library/Caches` and the like). Removing its folders breaks the tool; it does not rebuild | `guard::installed_software`, `Guard::check` | `installed_packages_are_never_cleaned`, `package_manager_and_toolchain_folders_are_installed_software` |
+
+## Rename (November 2026)
+
+| # | Invariant | Enforced in | Tests |
+| --- | --- | --- | --- |
+| I22 | The old `AgentClean` (or `agentclean`) data folder is adopted only by renaming it whole to `OpenSweep` (`opensweep`), only when the new folder does not exist, and never through a symbolic link; nothing is copied or merged. Manifests keep items relative to the store, so restore still works | `quarantine::adopt_legacy`, called by `default_location` and `default_config_path` | `the_agentclean_folder_is_adopted_once_and_never_merged` |
 
 ## Specified, not implemented
 

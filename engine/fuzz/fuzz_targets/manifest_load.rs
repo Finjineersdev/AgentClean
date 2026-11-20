@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use agentclean_core::quarantine::{parse_manifest, Manifest};
+use opensweep_core::quarantine::{parse_manifest, Manifest};
 use libfuzzer_sys::fuzz_target;
 
 /// The seed's run id, so mutations of it reach the entry checks.

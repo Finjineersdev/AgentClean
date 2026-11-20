@@ -1,6 +1,6 @@
 ---
 name: Tool or project type not detected
-about: A package manager, runtime, database, or project marker AgentClean doesn't know about
+about: A package manager, runtime, database, or project marker OpenSweep doesn't know about
 ---
 
 **Tool / ecosystem**

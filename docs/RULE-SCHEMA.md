@@ -84,7 +84,7 @@ the engine and a rule that names one does not load.
 - An artifact path with a protected component (`.git`, `.env*`, keys,
   lockfiles) or whose last component is a source name (`src`, `lib`, `app`).
 - Evidence paths held to the same rules, and never naming a protected file:
-  AgentClean does not read keys, env files or lockfiles as evidence. A
+  OpenSweep does not read keys, env files or lockfiles as evidence. A
   `requires` with no conditions, or a `json.key` with an empty segment.
 - A duplicate artifact path in one file, or a duplicate `id` across files.
 - A missing `reason` or `restore`.
@@ -106,7 +106,7 @@ rules.
 ## Contributing a rule
 
 1. Add or edit a file in `engine/rules/`, with match and nomatch fixtures.
-2. Run `cargo run -p agentclean-cli -- rules-check rules` and `cargo test`.
+2. Run `cargo run -p opensweep-cli -- rules-check rules` and `cargo test`.
 3. In the pull request, link the tool's documentation that says the path is
    generated. Rule changes need two reviewers.
 
@@ -116,16 +116,16 @@ caches in M4, not to this schema.
 ## Your own rules
 
 Put rule files in `rules/` beside `config.toml`
-(`~/Library/Application Support/AgentClean/rules` on macOS,
-`~/.config/agentclean/rules` elsewhere). They are linted exactly like the
+(`~/Library/Application Support/OpenSweep/rules` on macOS,
+`~/.config/opensweep/rules` elsewhere). They are linted exactly like the
 catalogue and may add rules but not reuse a built-in `id`; a file that fails
 the linter stops `scan`, `plan` and `clean` with the reason. Check them with
-`agentclean rules-check <that folder>`. The safety guard still decides every
+`opensweep rules-check <that folder>`. The safety guard still decides every
 folder.
 
 ## A repository's own file
 
-A project may carry `.agentclean.toml`, which can only take folders away:
+A project may carry `.opensweep.toml`, which can only take folders away:
 
 ```toml
 pin = true                      # never clean this project

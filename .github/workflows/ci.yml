@@ -57,7 +57,7 @@ jobs:
           if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             echo "app=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          if git diff --name-only "$range" | grep -Eq '^(AgentClean/|AgentCleanUITests/|AgentClean.xcodeproj/|CleanCore/Sources/AgentEngine/|Config/)'; then
+          if git diff --name-only "$range" | grep -Eq '^(OpenSweep/|OpenSweepUITests/|OpenSweep.xcodeproj/|CleanCore/Sources/AgentEngine/|Config/)'; then
             echo "app=true" >> "$GITHUB_OUTPUT"
           else
             echo "app=false" >> "$GITHUB_OUTPUT"
@@ -77,24 +77,24 @@ jobs:
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - name: CleanCore tests
         run: |
-          cargo build --manifest-path engine/Cargo.toml --locked -p agentclean-cli
+          cargo build --manifest-path engine/Cargo.toml --locked -p opensweep-cli
           cd CleanCore && swift test
       - name: Build (Release, unsigned)
         run: |
-          xcodebuild -project AgentClean.xcodeproj -scheme AgentClean -configuration Release \
+          xcodebuild -project OpenSweep.xcodeproj -scheme OpenSweep -configuration Release \
             -derivedDataPath build/dd build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=""
       - name: Check the bundle
         run: |
-          app=build/dd/Build/Products/Release/AgentClean.app
-          test -x "$app/Contents/MacOS/AgentClean"
-          lipo -archs "$app/Contents/Helpers/agentclean" | tee /dev/stderr | grep -q "x86_64 arm64"
-          "$app/Contents/Helpers/agentclean" --version
+          app=build/dd/Build/Products/Release/OpenSweep.app
+          test -x "$app/Contents/MacOS/OpenSweep"
+          lipo -archs "$app/Contents/Helpers/opensweep" | tee /dev/stderr | grep -q "x86_64 arm64"
+          "$app/Contents/Helpers/opensweep" --version
           test "$(/usr/libexec/PlistBuddy -c 'Print LSMinimumSystemVersion' "$app/Contents/Info.plist")" = 14.0
           codesign --verify --deep --strict "$app"
       - name: The app starts
         run: |
           # dyld ends the app at once if macOS refuses a bundled library (Sparkle).
-          build/dd/Build/Products/Release/AgentClean.app/Contents/MacOS/AgentClean & pid=$!
+          build/dd/Build/Products/Release/OpenSweep.app/Contents/MacOS/OpenSweep & pid=$!
           sleep 5
           kill -0 $pid
           kill $pid
@@ -113,7 +113,7 @@ jobs:
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)" && xcodebuild -version
       - name: UI tests
         run: |
-          xcodebuild test -project AgentClean.xcodeproj -scheme AgentClean -destination 'platform=macOS' \
+          xcodebuild test -project OpenSweep.xcodeproj -scheme OpenSweep -destination 'platform=macOS' \
             -derivedDataPath build/dd -resultBundlePath build/ui.xcresult \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=""
       - name: Keep screenshots

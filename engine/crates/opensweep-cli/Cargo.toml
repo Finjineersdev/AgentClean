@@ -1,0 +1,24 @@
+[package]
+name = "opensweep-cli"
+description = "OpenSweep command-line interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "opensweep"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+opensweep-core = { path = "../opensweep-core" }
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true

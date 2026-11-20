@@ -1,4 +1,4 @@
-# AgentClean handoff
+# OpenSweep handoff
 
 Written 19 Nov 2026 at the end of milestone M1, to move the work from a
 claude.ai session into Claude Code. It records how the project started, what
@@ -12,7 +12,7 @@ The owner wanted an open-source alternative to **CleanMyDev**
 developer projects and moves rebuildable folders to the Trash. Its weak points
 are trust and reach: closed source with broad disk access, an account needed to
 download, telemetry and ad pixels, a leaderboard on by default, 5 free cleans a
-day, no CLI and no Linux. AgentClean answers with: open source, no account,
+day, no CLI and no Linux. OpenSweep answers with: open source, no account,
 nothing leaves the machine, every verdict explained, every clean reversible.
 
 The full audit and gap list is in `docs/research/AUDIT.md`.
@@ -26,7 +26,7 @@ in this repository. Keep it that way.
 
 | Topic | Decision |
 | --- | --- |
-| Name | AgentClean. A trademark and GitHub-name check is still owed before launch |
+| Name | OpenSweep. A trademark and GitHub-name check is still owed before launch |
 | Base | Fork of [Zouuabi/CleanMyDev](https://github.com/Zouuabi/CleanMyDev) (MIT, Swift, unrelated to the commercial app despite the name) |
 | Engine | Rust workspace in `engine/`; it is the only code allowed to delete (ADR 0001, 0002) |
 | App | The inherited SwiftUI app, reduced and connected to the Rust engine in M3 |
@@ -38,20 +38,20 @@ in this repository. Keep it that way.
 
 ## 3. Repository state
 
-- Private repository <https://github.com/Finjineersdev/AgentClean>, branch
-  `main` (the local branch `agentclean-m0` tracks it), on top of 22 upstream
+- Private repository <https://github.com/Finjineersdev/OpenSweep>, branch
+  `main` (the local branch `opensweep-m0` tracks it), on top of 22 upstream
   commits. The upstream fork is the `upstream` remote. Make it public after
   the name check and the `SECURITY.md` rewrite.
 - M0 to M3 are done; M4 (beta) is built and waits on the owner's signing keys
   and testers (`docs/milestones/M4.md`).
-- Bundle identifier is `com.finjineers.agentclean` (owner's domain, set
+- Bundle identifier is `com.finjineers.opensweep` (owner's domain, set
   20 Nov 2026).
 
 ## 4. What exists
 
 ### M0 (done)
 
-- Upstream renamed to AgentClean throughout (folders, Xcode project, bundle
+- Upstream renamed to OpenSweep throughout (folders, Xcode project, bundle
   ID, docs, workflows) by text replacement. **The app has not been built since
   the rename.**
 - Upstream agent-hook configuration removed (`.claude/`, `.agents/`,
@@ -78,9 +78,9 @@ in this repository. Keep it that way.
   end-to-end tests of the binary.
 - Rules: Node.js, Rust, Python (7 artifacts).
 
-Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
-(macOS), `$XDG_DATA_HOME/agentclean/quarantine` or
-`~/.local/share/agentclean/quarantine` (Linux).
+Default quarantine: `~/Library/Application Support/OpenSweep/Quarantine`
+(macOS), `$XDG_DATA_HOME/opensweep/quarantine` or
+`~/.local/share/opensweep/quarantine` (Linux).
 
 ### M3 (done): the app on the engine
 
@@ -89,8 +89,8 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
   `docs/CLI-JSON.md` and streams `scan`. Its tests decode the engine's own
   snapshot files and run the real binary.
 - The engine binary is built by an Xcode build phase and embedded at
-  `Contents/Helpers/agentclean` (not `Contents/MacOS`: the file system ignores
-  case, and `agentclean` would replace the app's `AgentClean` executable).
+  `Contents/Helpers/opensweep` (not `Contents/MacOS`: the file system ignores
+  case, and `opensweep` would replace the app's `OpenSweep` executable).
 - All inherited deletion code and out-of-scope modules are gone (malware,
   uninstaller, system junk, privacy, large files, disk map, fans, sensors,
   speed test, ports, the scheduler and the Full Disk Access gate). `CleanCore`
@@ -104,13 +104,13 @@ Default quarantine: `~/Library/Application Support/AgentClean/Quarantine`
   (restore a run or one item, purge with a confirmation), Dev Stack
   (read-only, removal commands to copy), Settings (scan folders, idle and
   dormant days, never-scan folders, pins), all through engine commands; the
-  new `agentclean config` command writes settings.
+  new `opensweep config` command writes settings.
 - macOS 14 floor. Liquid Glass on macOS 26, a material fallback before it.
 - Tests: `AgentEngineTests` (contract, end to end, selection rules for F14);
-  `AgentCleanUITests` (XCUITest: scan, clean only what is ticked and undo,
+  `OpenSweepUITests` (XCUITest: scan, clean only what is ticked and undo,
   active-project consent, pinning, history restore and purge confirmation),
   run on a macOS 15 runner in CI (GitHub retired macOS 14 runners; the macOS 14 floor is checked by the deployment target only). Debug builds have a walkthrough
-  (`AGENTCLEAN_QA=<folder>`) that drives every screen against throwaway
+  (`OPENSWEEP_QA=<folder>`) that drives every screen against throwaway
   projects, checks the results on disk and saves window snapshots; see
   `QA-CHECKLIST.md`.
 
@@ -180,7 +180,7 @@ From the competitor's public behaviour (no code taken):
   split chosen here.
 - Defaults: idle after 7 days, automatic rescan every 8 hours.
 - Its "global caches" include installed software (Homebrew Cellar, nvm
-  versions, global npm and pip packages). AgentClean must list those as
+  versions, global npm and pip packages). OpenSweep must list those as
   toolchains, review-only, never as cache.
 
 ## 9. Reference

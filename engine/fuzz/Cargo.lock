@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "agentclean-core"
+name = "opensweep-core"
 version = "0.0.1"
 dependencies = [
  "serde",
@@ -13,10 +13,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "agentclean-fuzz"
+name = "opensweep-fuzz"
 version = "0.0.0"
 dependencies = [
- "agentclean-core",
+ "opensweep-core",
  "libfuzzer-sys",
  "serde_json",
 ]
