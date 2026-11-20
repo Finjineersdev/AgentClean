@@ -36,7 +36,7 @@ struct ProjectsView: View {
                             }
                         }
                         .accessibilityElement(children: .contain)
-                        .accessibilityLabel("Project list")
+                        .accessibilityLabel("Projects")
                     }
                 }
             }
