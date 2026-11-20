@@ -88,6 +88,7 @@ struct OverviewView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .glassCard(radius: 14)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -100,6 +101,7 @@ struct ProjectRow: View {
             Image(systemName: project.pinned ? "pin.fill" : project.verdict.symbol)
                 .foregroundStyle(project.pinned ? Brand.slate : project.verdict.tint)
                 .frame(width: 20)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(URL(fileURLWithPath: project.root).lastPathComponent).font(.headline)
                 Text((project.root as NSString).abbreviatingWithTildeInPath)

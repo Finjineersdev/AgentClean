@@ -28,6 +28,7 @@ struct RootView: View {
                 switch model.screen {
                 case .overview: OverviewView()
                 case .projects: ProjectsView()
+                case .caches: CachesView()
                 case .history: HistoryView()
                 case .devStack: DevStackView()
                 }

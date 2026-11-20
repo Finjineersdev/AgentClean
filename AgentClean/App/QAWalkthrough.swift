@@ -93,12 +93,28 @@ enum QAWalkthrough {
             snap("08-history-restored")
         }
 
+        // Global caches: needs ~/.npm/_cacache and a stand-in npm on PATH
+        // (see QA-CHECKLIST.md); never the real npm.
+        model.screen = .caches
+        await model.loadCaches()
+        await pause()
+        let npm = model.caches.first { $0.id == "npm" }
+        check(npm?.clearable == true, "the npm cache is listed and clearable")
+        check(model.caches.contains { $0.id == "gradle" && !$0.clearable }, "Gradle is measured only")
+        snap("09-caches")
+        if let npm {
+            let done = await model.clearCaches([npm.id])
+            check(done.first?.status == 0, "npm's own command ran")
+            check(!fm.fileExists(atPath: npm.path), "the npm cache is gone")
+            check(!model.caches.contains { $0.id == "npm" }, "the list refreshed")
+        }
+
         model.screen = .devStack
         model.loadDevStack()
         while model.devStackLoading { await pause(0.5) }
         await pause()
         check(!model.devStack.isEmpty, "dev stack inventory loaded (\(model.devStack.count) items)")
-        snap("09-dev-stack")
+        snap("10-dev-stack")
 
         await model.setDays(idle: 7, dormant: 60)
         check(model.config?.idleDays == 7, "settings save through the engine")

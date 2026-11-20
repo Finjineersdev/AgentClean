@@ -20,6 +20,7 @@ final class AgentCleanUITests: XCTestCase {
         app.launchEnvironment["HOME"] = base.appendingPathComponent("home").path
         app.launchEnvironment["XDG_CONFIG_HOME"] = ""
         app.launchEnvironment["XDG_DATA_HOME"] = ""
+        app.launchEnvironment["PATH"] = base.appendingPathComponent("bin").path + ":/usr/bin:/bin"
         app.launchArguments += ["-scanRoots", "(\"\(work.path)\")"]
         app.launch()
     }
@@ -47,6 +48,15 @@ final class AgentCleanUITests: XCTestCase {
         try file("live-api/.next/cache/x.bin", 2_000_000)
         try Data(#"{"dependencies":{"next":"14"}}"#.utf8).write(to: work.appendingPathComponent("live-api/package.json"))
         try fm.createDirectory(at: base.appendingPathComponent("home"), withIntermediateDirectories: true)
+        // A global cache and a stand-in npm (never the real one) for the Caches screen.
+        let home = base.appendingPathComponent("home")
+        try fm.createDirectory(at: home.appendingPathComponent(".npm/_cacache"), withIntermediateDirectories: true)
+        try Data(count: 2_000_000).write(to: home.appendingPathComponent(".npm/_cacache/blob"))
+        let bin = base.appendingPathComponent("bin")
+        try fm.createDirectory(at: bin, withIntermediateDirectories: true)
+        try Data("#!/bin/sh\necho \"$*\" > \"$HOME/npm-ran\"\nrm -rf \"$HOME/.npm/_cacache\"\n".utf8)
+            .write(to: bin.appendingPathComponent("npm"))
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bin.appendingPathComponent("npm").path)
         // Everything but live-api is old enough to be Dormant.
         let old = Date(timeIntervalSinceNow: -200 * 86_400)
         for project in ["shop-web", "ledger-rs"] {
@@ -170,5 +180,39 @@ final class AgentCleanUITests: XCTestCase {
         restore.click()
         let back = NSPredicate { _, _ in self.exists("ledger-rs/target/debug/ledger") }
         wait(for: [expectation(for: back, evaluatedWith: nil)], timeout: 15)
+    }
+
+    /// F15: a cache is never ticked for you, the confirmation names the
+    /// command, and the tool's own command is what clears it.
+    func testCachesAreClearedByTheToolsCommand() {
+        app.outlines.cells.containing(.any, identifier: "nav.caches").firstMatch.click()
+        let box = app.checkBoxes["cache.npm"]
+        XCTAssertTrue(box.waitForExistence(timeout: 15))
+        XCTAssertFalse(checked("cache.npm"), "caches are never pre-selected")
+        XCTAssertFalse(app.buttons["caches.clear"].isEnabled)
+        box.click()
+        app.buttons["caches.clear"].click()
+        let confirm = app.buttons["caches.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        XCTAssertTrue(exists("../home/.npm/_cacache"), "asking runs nothing")
+        shot("10-caches-confirm")
+        confirm.click()
+        XCTAssertTrue(app.descendants(matching: .any)["caches.result"].waitForExistence(timeout: 30))
+        XCTAssertFalse(exists("../home/.npm/_cacache"))
+        let ran = try? String(contentsOf: base.appendingPathComponent("home/npm-ran"), encoding: .utf8)
+        XCTAssertEqual(ran, "cache clean --force\n")
+        shot("11-caches-cleared")
+    }
+
+    /// Xcode's accessibility audit on every screen: labels, hit areas,
+    /// text clipping and contrast.
+    func testAccessibilityAudit() throws {
+        scan()
+        for screen in ["overview", "projects", "caches", "history", "devStack"] {
+            app.outlines.cells.containing(.any, identifier: "nav.\(screen)").firstMatch.click()
+            if screen == "projects" { app.buttons["project.shop-web"].click() }
+            sleep(2)
+            try app.performAccessibilityAudit()
+        }
     }
 }

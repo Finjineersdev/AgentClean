@@ -9,12 +9,13 @@ import AgentEngine
 @Observable
 final class AppModel {
     enum Screen: String, CaseIterable, Identifiable {
-        case overview, projects, history, devStack
+        case overview, projects, caches, history, devStack
         var id: String { rawValue }
         var title: String {
             switch self {
             case .overview: "Overview"
             case .projects: "Projects"
+            case .caches: "Caches"
             case .history: "History"
             case .devStack: "Dev Stack"
             }
@@ -23,6 +24,7 @@ final class AppModel {
             switch self {
             case .overview: "sparkles"
             case .projects: "folder"
+            case .caches: "internaldrive"
             case .history: "clock.arrow.circlepath"
             case .devStack: "shippingbox"
             }
@@ -45,6 +47,8 @@ final class AppModel {
     private(set) var config: ConfigOutput?
     private(set) var devStack: [DevStackItem] = []
     private(set) var devStackLoading = false
+    private(set) var caches: [ToolCache] = []
+    private(set) var cachesLoading = false
 
     var error: String?
 
@@ -215,6 +219,28 @@ final class AppModel {
             await refresh(root)
         } catch {
             self.error = describe(error)
+        }
+    }
+
+    // MARK: Global caches (ADR 0006)
+
+    func loadCaches() async {
+        guard let engine, !cachesLoading else { return }
+        cachesLoading = true
+        defer { cachesLoading = false }
+        do { caches = try await engine.caches() } catch { self.error = describe(error) }
+    }
+
+    /// Runs each tool's own command. Not undoable; the caller has asked first.
+    func clearCaches(_ ids: [String]) async -> [ToolCache] {
+        guard let engine, !ids.isEmpty else { return [] }
+        do {
+            let out = try await engine.cleanCaches(ids, execute: true)
+            await loadCaches()
+            return out.caches
+        } catch {
+            self.error = describe(error)
+            return []
         }
     }
 

@@ -45,7 +45,7 @@ struct DevStackView: View {
                             let items = rows.filter { $0.group == g }
                             if !items.isEmpty {
                                 HStack {
-                                    Image(systemName: g.systemImage).foregroundStyle(Brand.sky)
+                                    Image(systemName: g.systemImage).foregroundStyle(Brand.sky).accessibilityHidden(true)
                                     SectionLabel(text: g.displayName)
                                     Spacer()
                                     Text(bytes(items.reduce(0) { $0 + $1.bytes })).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
@@ -78,6 +78,7 @@ struct DevStackView: View {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(cmd, forType: .string)
                         } label: { Image(systemName: "doc.on.doc") }
+                            .accessibilityLabel("Copy the command \(cmd)")
                             .buttonStyle(.borderless).help("Copy the command")
                     }
                 }
@@ -89,6 +90,7 @@ struct DevStackView: View {
                 Button {
                     NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
                 } label: { Image(systemName: "folder") }
+                    .accessibilityLabel("Show \(item.name) in Finder")
                     .buttonStyle(.borderless).help("Show in Finder")
             }
         }

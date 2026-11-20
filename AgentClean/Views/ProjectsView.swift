@@ -143,6 +143,8 @@ struct ProjectDetail: View {
             Toggle("", isOn: on).labelsHidden().toggleStyle(.checkbox)
                 .disabled(!Selection.selectable(item) || project.pinned)
                 .accessibilityIdentifier("item.\(item.path)")
+                .accessibilityLabel("\(item.path), \(item.kind.label), \(item.bytes.map(bytes) ?? "size unknown")")
+                .accessibilityHint(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(item.path).font(.body.monospaced().weight(.semibold))
@@ -190,6 +192,7 @@ struct ReviewSheet: View {
                     HStack {
                         Image(systemName: item.action == .move ? "arrow.right.circle.fill" : "minus.circle")
                             .foregroundStyle(item.action == .move ? Brand.teal : Brand.slate)
+                            .accessibilityLabel(item.action == .move ? "Will move" : "Kept")
                         Text(item.path).font(.body.monospaced())
                         Text(item.kind.label).font(.caption).foregroundStyle(item.kind.tint)
                         Spacer()

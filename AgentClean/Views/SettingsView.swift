@@ -6,9 +6,14 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var idle = 14
     @State private var dormant = 90
+    @AppStorage("showMenuBar") private var showMenuBar = true
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Show AgentClean in the menu bar", isOn: $showMenuBar)
+                    .accessibilityIdentifier("settings.menuBar")
+            }
             Section("Scan these folders") {
                 ForEach(model.scanRoots, id: \.self) { root in
                     HStack {

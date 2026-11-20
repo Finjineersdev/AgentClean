@@ -17,6 +17,11 @@ cat $Q/out/report.txt      # every line must start with PASS
 open $Q/out                # window snapshots of every screen
 ```
 
+For the Caches steps, also create `$Q/home/.npm/_cacache/blob`,
+`$Q/home/.gradle/caches/x`, and a stand-in `$Q/bin/npm` that removes
+`$HOME/.npm/_cacache`, and launch with `PATH=$Q/bin:/usr/bin:/bin` so the real
+npm is never run.
+
 The walkthrough expects projects named `shop-web` (dormant Next.js),
 `live-api` (active) and `keep-me` (pinned); see `AgentClean/App/QAWalkthrough.swift`.
 
@@ -40,3 +45,6 @@ CI runs them on macOS 15 with Xcode 16.
 | 7 | Pin a project | Its folders cannot be ticked; it appears under Settings → Pinned |
 | 8 | History: Purge… | A confirmation shows the bytes; cancel keeps everything |
 | 9 | Dev Stack | Lists tools; copy a removal command; nothing runs |
+| 10 | Caches | Nothing ticked; Clear… names the exact commands; afterwards each shows freed bytes or the tool's error |
+| 11 | Menu bar | Shows the last scan's total; Open and Review Projects bring the window forward; it has no clean action |
+| 12 | VoiceOver (⌘F5) on Projects | Each folder checkbox reads its name, class and size |

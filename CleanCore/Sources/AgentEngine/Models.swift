@@ -195,6 +195,36 @@ public struct ConfigOutput: Codable, Sendable, Hashable {
     public let exclude: [String]
 }
 
+/// A global tool cache (ADR 0006). `command` is empty when the cache is
+/// measured only.
+public struct ToolCache: Codable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let tool: String
+    public let name: String
+    public let path: String
+    public let bytes: UInt64
+    public let command: [String]?
+    public let installed: Bool
+    public let note: String
+    /// After `clean-cache --execute`: exit code (nil if stopped), what is left, freed.
+    public let status: Int?
+    public let bytesAfter: UInt64?
+    public let freed: UInt64?
+    public let stderr: String?
+
+    /// Can be cleared from the app: has a command and the tool is installed.
+    public var clearable: Bool { installed && !(command ?? []).isEmpty }
+}
+
+struct CachesOutput: Decodable {
+    let caches: [ToolCache]
+}
+
+public struct CleanCacheOutput: Decodable, Sendable {
+    public let execute: Bool
+    public let caches: [ToolCache]
+}
+
 struct ErrorOutput: Decodable {
     let error: String
 }

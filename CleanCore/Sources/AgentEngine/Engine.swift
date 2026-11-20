@@ -105,6 +105,19 @@ public struct Engine: Sendable {
         return try await call(args)
     }
 
+    /// Global tool caches on this computer (read-only).
+    public func caches() async throws -> [ToolCache] {
+        let out: CachesOutput = try await call(["caches"])
+        return out.caches
+    }
+
+    /// Runs each tool's own command; a dry run unless `execute`. Not undoable.
+    public func cleanCaches(_ ids: [String], execute: Bool = false) async throws -> CleanCacheOutput {
+        var args = ["clean-cache"]
+        if execute { args.append("--execute") }
+        return try await call(args + ["--"] + ids)
+    }
+
     /// Projects as they are found, then skipped folders and a summary last.
     /// Cancelling the consuming task stops the engine.
     public func scan(roots: [URL]) -> AsyncThrowingStream<ScanEvent, Error> {

@@ -56,6 +56,11 @@ final class EngineContractTests: XCTestCase {
         XCTAssertFalse(try one(PurgeOutput.self, "purge-dry-run").execute)
         XCTAssertEqual(try one(PinsOutput.self, "pin").pinned, ["$TMP/work/site"])
         XCTAssertEqual(try one(ConfigOutput.self, "config").idleDays, 7)
+        let caches = try one(CachesOutput.self, "caches").caches
+        XCTAssertEqual(caches.map(\.id), ["npm"])
+        XCTAssertTrue(caches[0].clearable)
+        XCTAssertFalse(try one(CleanCacheOutput.self, "clean-cache-dry-run").execute)
+        XCTAssertEqual(try one(CleanCacheOutput.self, "clean-cache-execute").caches[0].status, 0)
         XCTAssertEqual(try one(ErrorOutput.self, "error").error, #"no run named "nope""#)
     }
 }
