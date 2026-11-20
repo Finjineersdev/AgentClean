@@ -118,9 +118,10 @@ struct HoverTilt: ViewModifier {
                                    startRadius: 0, endRadius: 220)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
-            .background(GeometryReader { g in Color.clear.onAppear { size = g.size }.onChange(of: g.size) { size = g.size } })
+            .background(GeometryReader { g in Color.clear.onAppear { size = g.size }.onChange(of: g.size) { size = g.size } }.accessibilityHidden(true))
             .rotation3DEffect(.degrees(reduce ? 0 : 7), axis: (x: -dy, y: dx, z: 0), perspective: 0.6)
             .scaleEffect(point == nil || reduce ? 1 : 1.025)
             .shadow(color: tint.opacity(point == nil ? 0 : 0.28), radius: 22, y: 10)
@@ -340,6 +341,7 @@ struct SpeechBubble: View {
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Brand.hairline))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
+        .accessibilityAddTraits(.isStaticText)
         .task(id: text) {
             if reduce { shown = text.count; return }
             shown = 0

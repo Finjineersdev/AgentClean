@@ -200,15 +200,17 @@ struct OverviewView: View {
                         opened = opened == s.id ? nil : s.id
                     } label: {
                         LanguageCard(stat: s, share: Double(s.total) / Double(max(biggest, 1)), open: opened == s.id, index: i)
+                            .hoverTilt(s.ecosystem.color)
                     }
                     .buttonStyle(.plain)
-                    .hoverTilt(s.ecosystem.color)
-                    .onHover { hovered = $0 ? s.id : (hovered == s.id ? nil : hovered) }
                     .accessibilityIdentifier("language.\(s.id)")
                     .accessibilityLabel("\(s.ecosystem.name), \(bytes(s.total)) in \(s.projects.count) projects")
+                    .onHover { hovered = $0 ? s.id : (hovered == s.id ? nil : hovered) }
                     .entrance(3 + i)
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Languages")
         }
     }
 
@@ -355,6 +357,7 @@ struct LanguageRing: View {
         .animation(.spring(response: 0.6), value: total)
         .accessibilityElement()
         .accessibilityLabel("Space by language")
+        .accessibilityAddTraits(.isImage)
         .accessibilityValue(stats.map { "\($0.ecosystem.name) \(bytes($0.total))" }.joined(separator: ", "))
         .onAppear {
             withAnimation(reduce ? .none : .easeOut(duration: 1.2).delay(0.2)) { progress = 1 }
@@ -574,6 +577,7 @@ struct CleanedSoFar: View {
         .padding(24)
         .glassCard(radius: 22)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
         .accessibilityIdentifier("cleanedSoFar")
     }
 }

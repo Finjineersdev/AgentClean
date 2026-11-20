@@ -83,6 +83,7 @@ struct HistoryView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
     }
 
     private func runCard(_ run: Run) -> some View {

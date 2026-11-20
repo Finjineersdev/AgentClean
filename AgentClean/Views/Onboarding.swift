@@ -67,6 +67,7 @@ struct Onboarding: View {
                     }
                 }
                 .accessibilityElement().accessibilityLabel("Step \(step + 1) of \(steps.count)")
+                .accessibilityAddTraits(.isStaticText)
                 Spacer()
                 if step > 0 {
                     Button("Back") { step -= 1 }.buttonStyle(SecondaryButtonStyle())

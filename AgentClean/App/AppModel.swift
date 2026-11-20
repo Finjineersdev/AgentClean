@@ -123,8 +123,10 @@ final class AppModel {
         engine = Self.locateEngine().map { Engine(binary: $0) }
         scanRoots = UserDefaults.standard.stringArray(forKey: "scanRoots") ?? [CMConstants.homePath]
         // Tests and the QA walkthrough pass -scanRoots: scan only those.
-        wholeDisk = UserDefaults.standard.object(forKey: "wholeDisk") as? Bool
-            ?? !ProcessInfo.processInfo.arguments.contains("-scanRoots")
+        // bool(forKey:) also reads a "-wholeDisk YES" launch argument.
+        wholeDisk = UserDefaults.standard.object(forKey: "wholeDisk") != nil
+            ? UserDefaults.standard.bool(forKey: "wholeDisk")
+            : !ProcessInfo.processInfo.arguments.contains("-scanRoots")
         autoFreeDays = UserDefaults.standard.object(forKey: "autoFreeDays") as? Int ?? 7
         otherDrives = UserDefaults.standard.bool(forKey: "otherDrives")
         scanOnOpen = UserDefaults.standard.object(forKey: "scanOnOpen") as? Bool ?? true
