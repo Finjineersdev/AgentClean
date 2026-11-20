@@ -62,6 +62,9 @@ struct OverviewView: View {
                             .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
                     }
                 }
+                if model.summary != nil && !stats.isEmpty {
+                    DiskMap(stats: stats).entrance(3)
+                }
                 skippedFolders
             }
             .padding(.horizontal, 36).padding(.vertical, 30)
@@ -572,5 +575,76 @@ struct CleanedSoFar: View {
         .glassCard(radius: 22)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("cleanedSoFar")
+    }
+}
+
+/// Read-only map of the space found: one block per language, split by project.
+struct DiskMap: View {
+    @Environment(AppModel.self) private var model
+    let stats: [LanguageStat]
+    @State private var hovered: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Disk map").font(.title2.bold()).foregroundStyle(Brand.text).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text(hovered ?? "Each block is a project; pick one to open it")
+                    .font(.callout).foregroundStyle(Brand.muted).lineLimit(1).truncationMode(.middle)
+            }
+            GeometryReader { g in
+                let outer = Treemap.squarify(stats.map { Double($0.total) }, in: CGRect(origin: .zero, size: g.size))
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(stats.enumerated()), id: \.element.id) { i, s in
+                        language(s, in: outer[i].insetBy(dx: 2, dy: 2))
+                    }
+                }
+            }
+            .frame(height: 320)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Disk map")
+        }
+    }
+
+    private func language(_ s: LanguageStat, in r: CGRect) -> some View {
+        let shown = Array(s.projects.prefix(12))
+        let inner = Treemap.squarify(shown.map { Double($0.bytes) }, in: CGRect(origin: .zero, size: r.size).insetBy(dx: 3, dy: 3))
+        return ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(s.ecosystem.color.opacity(0.10))
+            ForEach(Array(shown.enumerated()), id: \.element.project.root) { j, row in
+                let t = inner[j].insetBy(dx: 1.5, dy: 1.5)
+                let name = URL(fileURLWithPath: row.project.root).lastPathComponent
+                Button {
+                    model.selectedProject = row.project.root
+                    model.screen = .projects
+                } label: {
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(s.ecosystem.color.opacity(hovered == name ? 0.55 : 0.30))
+                        if t.width > 70 && t.height > 34 {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(name).font(.caption.weight(.semibold)).lineLimit(1)
+                                Text(bytes(row.bytes)).font(.caption2).monospacedDigit().opacity(0.8)
+                            }
+                            .foregroundStyle(Brand.text).padding(6)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .frame(width: max(t.width, 0), height: max(t.height, 0))
+                .offset(x: t.minX, y: t.minY)
+                .onHover { hovered = $0 ? "\(name): \(s.ecosystem.name), \(bytes(row.bytes))" : nil }
+                .help("\(name), \(bytes(row.bytes))")
+                .accessibilityLabel("\(name), \(s.ecosystem.name), \(bytes(row.bytes))")
+            }
+            if r.width > 40 && r.height > 40 {
+                EcosystemBadge(ecosystem: s.ecosystem, size: 22).padding(6)
+                    .frame(width: r.width, height: r.height, alignment: .bottomTrailing)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: max(r.width, 0), height: max(r.height, 0))
+        .offset(x: r.minX, y: r.minY)
+        .animation(.spring(response: 0.4), value: hovered)
     }
 }

@@ -255,3 +255,22 @@ final class ScheduleTests: XCTestCase {
         XCTAssertTrue(Selection.scheduled(projects, cap: 5).isEmpty)
     }
 }
+
+final class TreemapTests: XCTestCase {
+    func testAreasAreProportionalAndTileTheRect() {
+        let bounds = CGRect(x: 10, y: 20, width: 600, height: 400)
+        let values: [Double] = [6, 0, 6, 4, 3, 2, 2, 1]
+        let rects = Treemap.squarify(values, in: bounds)
+        XCTAssertEqual(rects.count, values.count)
+        XCTAssertEqual(rects[1], .zero)
+        let total = values.reduce(0, +)
+        for (r, v) in zip(rects, values) where v > 0 {
+            XCTAssertEqual(Double(r.width * r.height), v / total * 240_000, accuracy: 1)
+            XCTAssertTrue(bounds.insetBy(dx: -0.01, dy: -0.01).contains(r), "\(r)")
+        }
+        for i in rects.indices { for j in rects.indices where i < j {
+            XCTAssertLessThan(rects[i].intersection(rects[j]).width * rects[i].intersection(rects[j]).height, 0.01)
+        } }
+        XCTAssertTrue(Treemap.squarify([], in: bounds).isEmpty)
+    }
+}

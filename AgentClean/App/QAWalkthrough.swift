@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import SwiftUI
 import AgentEngine
 
 /// Debug builds only. With AGENTCLEAN_QA=<folder>, the app walks through
@@ -105,6 +106,16 @@ enum QAWalkthrough {
         check((model.summary?.ready.bytes ?? 0) < before, "totals drop after a bulk clean")
         if let run = bulk?.run { await model.restore(run) }
         check(model.summary?.ready.bytes == before, "one Undo restores them all")
+
+        // The disk map sits below the fold: render it on its own.
+        let map = ImageRenderer(content: DiskMap(stats: LanguageStat.of(model.projects))
+            .environment(model).padding(24).frame(width: 980).background(Brand.canvas))
+        map.scale = 2
+        if let cg = map.cgImage {
+            try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
+                .write(to: out.appendingPathComponent("12-disk-map.png"))
+        }
+        check(map.cgImage != nil, "the disk map renders")
 
         // Scheduled clean (P5): dormant projects' Safe folders only, one run, one Undo.
         let sched = await model.runSchedule(cap: 1_000_000_000)
