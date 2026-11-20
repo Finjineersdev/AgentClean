@@ -54,6 +54,7 @@ struct OverviewView: View {
                     welcome.entrance(1)
                 } else {
                     hero(stats).entrance(1)
+                    if model.stats.cleaned > 0 { CleanedSoFar(stats: model.stats).entrance(2) }
                     languages(stats)
                     if let id = opened, let s = stats.first(where: { $0.id == id }) {
                         LanguageDrawer(stat: s) { opened = nil }
@@ -101,8 +102,9 @@ struct OverviewView: View {
             return "Hi! Scan your projects and I'll show where your disk went, language by language."
         }
         guard let top = stats.first else { return "All tidy. Nothing to clean right now." }
-        if s.ready.bytes == 0 { return "\(top.ecosystem.name) holds the most, but nothing can go without a reinstall." }
-        return "\(bytes(s.ready.bytes)) can go right now. \(top.ecosystem.name) is the hungriest, at \(bytes(top.total))."
+        let milestone = Stats.milestone(for: model.stats.cleaned).map { " We have cleared over \(bytes($0)) together." } ?? ""
+        if s.ready.bytes == 0 { return "\(top.ecosystem.name) holds the most, but nothing can go without a reinstall.\(milestone)" }
+        return "\(bytes(s.ready.bytes)) can go right now. \(top.ecosystem.name) is the hungriest, at \(bytes(top.total)).\(milestone)"
     }
 
     // MARK: Before the first scan
@@ -536,5 +538,39 @@ struct AccessBanner: View {
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Brand.amber.opacity(0.08)))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Brand.amber.opacity(0.35)))
+    }
+}
+
+/// What AgentClean has cleaned on this Mac, from History. Local only.
+struct CleanedSoFar: View {
+    let stats: Stats
+
+    var body: some View {
+        let top = stats.byRule.sorted { $0.value > $1.value }.prefix(4)
+        HStack(alignment: .center, spacing: 28) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Cleaned so far").font(.headline).foregroundStyle(Brand.muted)
+                Text(bytes(stats.cleaned)).font(.figure(36)).foregroundStyle(Brand.text)
+                    .contentTransition(.numericText(value: Double(stats.cleaned)))
+                Text("\(bytes(stats.freed)) freed for good, \(bytes(stats.freedThisMonth)) this month. \(bytes(stats.held)) still held, so you can undo it.")
+                    .font(.callout).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: 380, alignment: .leading)
+            Spacer(minLength: 0)
+            HStack(spacing: 18) {
+                ForEach(Array(top), id: \.key) { rule, b in
+                    VStack(spacing: 6) {
+                        EcosystemBadge(ecosystem: .of(rule: rule), size: 34)
+                        Text(bytes(b)).font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
+                        Text(Ecosystem.of(rule: rule).name).font(.caption).foregroundStyle(Brand.muted).lineLimit(1)
+                    }
+                    .frame(minWidth: 72)
+                }
+            }
+        }
+        .padding(24)
+        .glassCard(radius: 22)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("cleanedSoFar")
     }
 }

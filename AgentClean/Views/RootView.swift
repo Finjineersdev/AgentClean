@@ -67,6 +67,7 @@ struct RootView: View {
         }
         .task {
             await model.loadConfig()
+            await model.loadHistory()
             await model.freeExpired()
             model.scanIfStale()
             model.onboarding = !UserDefaults.standard.bool(forKey: "onboarded")
