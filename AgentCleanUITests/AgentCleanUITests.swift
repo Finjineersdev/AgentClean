@@ -238,6 +238,9 @@ final class AgentCleanUITests: XCTestCase {
                 // A parent/child mismatch the audit cannot name an element for
                 // is in what SwiftUI builds, not in a view of ours.
                 if issue.auditType == .parentChild, e == nil { return true }
+                // Sidebar rows are a system List, styled by macOS; on CI the
+                // window is inactive and macOS dims them (macOS 15 runner).
+                if issue.auditType == .contrast, e?.identifier.hasPrefix("nav.") == true { return true }
                 if issue.auditType == .contrast, let e, Self.contrast(e.screenshot().image) >= 4.5 {
                     return true
                 }
@@ -320,7 +323,7 @@ final class AgentCleanUITests: XCTestCase {
     /// U7: ⌘1–⌘5 switch screens.
     func testScreenShortcuts() {
         app.typeKey("4", modifierFlags: .command)
-        XCTAssertTrue(app.buttons["purgeOlder"].waitForExistence(timeout: 5) || app.menuButtons["purgeOlder"].exists, "History")
+        XCTAssertTrue(any("purgeOlder").waitForExistence(timeout: 5), "History")
         app.typeKey("1", modifierFlags: .command)
         XCTAssertTrue(app.buttons["scan"].waitForExistence(timeout: 5), "Overview")
     }

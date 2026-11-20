@@ -62,7 +62,8 @@ struct RootView: View {
             ForEach(Array(AppModel.Screen.allCases.enumerated()), id: \.element) { i, screen in
                 Button(screen.title) { model.screen = screen }
                     .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
-                    .hidden()
+                    // .hidden() switches the shortcut off on macOS 15.
+                    .opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
             }
         }
         .task {
