@@ -72,7 +72,7 @@ final class AppModel {
     func recheckAccess() { fullDiskAccess = FullDiskAccess.granted }
 
     /// Folders the last scan could not read because of macOS privacy settings.
-    var privacyBlocked: Int { skipped.filter { $0.detail.contains("Operation not permitted") }.count }
+    var privacyBlocked: Int { skipped.filter { $0.reason == .protected }.count }
 
     /// Quarantined runs are purged after this many days, freeing their space; 0 keeps them until purged by hand.
     var autoFreeDays: Int {
@@ -178,7 +178,7 @@ final class AppModel {
                 for try await event in engine.scan(roots: roots, wholeDisk: whole, otherDrives: drives) {
                     switch event {
                     case .project(let p): projects.append(p)
-                    case .skipped(let path, _, let detail): skipped.append(SkippedFolder(path: path, detail: detail))
+                    case .skipped(let path, let reason, let detail): skipped.append(SkippedFolder(path: path, detail: detail, reason: reason))
                     case .summary(let s): summary = s
                     }
                 }
@@ -526,6 +526,8 @@ enum FullDiskAccess {
 struct SkippedFolder: Codable, Hashable {
     let path: String
     let detail: String
+    /// Missing in summaries saved by older versions.
+    var reason: SkipReason? = nil
 }
 
 /// Folders ticked in one project, for a clean.

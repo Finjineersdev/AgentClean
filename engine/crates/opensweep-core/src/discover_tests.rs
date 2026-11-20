@@ -266,6 +266,15 @@ fn unreadable_folders_are_reported() {
     }
 }
 
+/// The app's Full Disk Access banner counts these; EACCES is not one.
+#[test]
+fn a_privacy_refusal_is_told_apart() {
+    let eperm = std::io::Error::from_raw_os_error(1);
+    let eacces = std::io::Error::from_raw_os_error(13);
+    assert!(matches!(Skip::from_error(&eperm), Skip::Protected(_)));
+    assert!(matches!(Skip::from_error(&eacces), Skip::Unreadable(_)));
+}
+
 #[test]
 fn missing_roots_and_files_are_reported() {
     let (_tmp, base) = base();

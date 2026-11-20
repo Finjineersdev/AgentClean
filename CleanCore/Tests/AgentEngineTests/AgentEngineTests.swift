@@ -51,6 +51,11 @@ final class EngineContractTests: XCTestCase {
             .skipped(path: "/x", reason: .otherVolume, detail: "on another volume"))
     }
 
+    func testProtectedLine() throws {
+        let line = Data(#"{"schema_version":1,"type":"skipped","path":"/x","reason":"protected","detail":"d"}"#.utf8)
+        XCTAssertEqual(try Engine.decode(ScanEvent.self, from: line), .skipped(path: "/x", reason: .protected, detail: "d"))
+    }
+
     func testPlanCleanAndRuns() throws {
         XCTAssertEqual(try one(PlanOutput.self, "plan").project.items.count, 2)
         let dry = try one(CleanOutput.self, "clean-dry-run")

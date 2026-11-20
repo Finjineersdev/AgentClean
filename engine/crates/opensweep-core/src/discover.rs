@@ -102,9 +102,24 @@ impl Options {
     }
 }
 
+impl Skip {
+    /// EPERM is what macOS privacy protection returns; ordinary permissions
+    /// give EACCES.
+    pub fn from_error(e: &std::io::Error) -> Self {
+        if e.raw_os_error() == Some(1) {
+            Skip::Protected(e.to_string())
+        } else {
+            Skip::Unreadable(e.to_string())
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Skip {
     Unreadable(String),
+    /// Refused by macOS privacy protection (EPERM): Full Disk Access would
+    /// let OpenSweep read it.
+    Protected(String),
     OtherVolume,
     DepthLimit,
     EntryLimit,
@@ -149,7 +164,7 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
             match std::fs::canonicalize(root).and_then(|r| std::fs::metadata(&r).map(|m| (r, m))) {
                 Ok(found) => found,
                 Err(e) => {
-                    let reason = Skip::Unreadable(e.to_string());
+                    let reason = Skip::from_error(&e);
                     on(Event::Skipped {
                         path: root.clone(),
                         reason,
@@ -177,7 +192,7 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
             let mut children = match std::fs::read_dir(&dir) {
                 Ok(read) => read.filter_map(Result::ok).collect::<Vec<_>>(),
                 Err(e) => {
-                    let reason = Skip::Unreadable(e.to_string());
+                    let reason = Skip::from_error(&e);
                     on(Event::Skipped { path: dir, reason });
                     continue;
                 }
@@ -228,7 +243,7 @@ pub fn discover(rules: &[RuleFile], opts: &Options, mut on: impl FnMut(Event)) {
                 let meta = match entry.metadata() {
                     Ok(m) => m,
                     Err(e) => {
-                        let reason = Skip::Unreadable(e.to_string());
+                        let reason = Skip::from_error(&e);
                         on(Event::Skipped { path, reason });
                         continue;
                     }

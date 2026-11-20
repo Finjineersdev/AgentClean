@@ -804,6 +804,7 @@ fn print_project(p: &ProjectReport) {
 fn skip_names(skip: &Skip) -> (&'static str, String) {
     let name = match skip {
         Skip::Unreadable(_) => "unreadable",
+        Skip::Protected(_) => "protected",
         Skip::OtherVolume => "other_volume",
         Skip::DepthLimit => "depth_limit",
         Skip::EntryLimit => "entry_limit",
@@ -816,6 +817,9 @@ fn skip_names(skip: &Skip) -> (&'static str, String) {
 fn describe(skip: &Skip) -> String {
     match skip {
         Skip::Unreadable(why) => format!("could not be read: {why}"),
+        Skip::Protected(why) => {
+            format!("could not be read: {why}; macOS privacy protection, give OpenSweep Full Disk Access")
+        }
         Skip::OtherVolume => "on another volume".to_owned(),
         Skip::DepthLimit => "deeper than the depth limit".to_owned(),
         Skip::EntryLimit => {

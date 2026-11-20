@@ -58,6 +58,8 @@ public struct ScanSummary: Codable, Sendable, Hashable {
 
 public enum SkipReason: String, Codable, Sendable {
     case unreadable
+    /// Refused by macOS privacy protection; Full Disk Access fixes it.
+    case protected
     case otherVolume = "other_volume"
     case depthLimit = "depth_limit"
     case entryLimit = "entry_limit"

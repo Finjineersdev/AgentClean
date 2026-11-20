@@ -70,7 +70,8 @@ backup; each is walked on its own volume:
 {"schema_version":1,"type":"summary","projects":12,"ready":{"folders":3,"bytes":0},"caution":{…},"active":{…}}
 ```
 
-`reason` for a skipped folder is one of `unreadable`, `other_volume`,
+`reason` for a skipped folder is one of `unreadable`, `protected` (refused by
+macOS privacy protection; Full Disk Access fixes it), `other_volume`,
 `depth_limit`, `entry_limit`, `excluded`, `installed` (installed software such
 as Homebrew or `/Applications`, never walked or cleaned). The summary is always last: `ready`
 is what `clean` takes with no flags, `caution` what `--include-caution` adds,
