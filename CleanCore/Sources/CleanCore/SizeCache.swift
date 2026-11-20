@@ -30,8 +30,7 @@ public final class SizeCache: Sendable {
         let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
         let now = Date().timeIntervalSince1970
         if let e = state.withLock({ $0[path] }), e.mtime == mtime, now - e.measured < maxAge {
-            ScanTelemetry.shared.visited(path, bytes: e.bytes)
-            return DirectorySizer.Sizes(logical: e.bytes, allocated: e.bytes, fileCount: e.files)
+            return DirectorySizer.Sizes(allocated: e.bytes, fileCount: e.files)
         }
         let s = DirectorySizer.size(of: url)
         state.withLock { $0[path] = Entry(bytes: s.allocated, files: s.fileCount, mtime: mtime, measured: now) }

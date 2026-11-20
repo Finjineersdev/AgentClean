@@ -1,30 +1,15 @@
 import Foundation
 
-/// Talks to the `docker` CLI. Images, volumes, and containers are mapped to
-/// compose projects via labels so anything belonging to an active or pinned
-/// project is never offered.
+/// Reads containers and volume sizes from the `docker` CLI, read-only, so
+/// Dev Stack can show database containers and their compose volumes.
 public actor DockerService {
     public static let shared = DockerService()
     public nonisolated let scheme = "docker"
-
-    public struct Image: Sendable, Identifiable {
-        public var id: String { imageID }
-        public let imageID: String
-        public let repository: String
-        public let tag: String
-        public let sizeBytes: UInt64
-        public let uniqueBytes: UInt64
-        public let containers: Int
-        public let created: String
-        public var ref: String { tag == "<none>" ? imageID : "\(repository):\(tag)" }
-        public var shortID: String { String(imageID.replacingOccurrences(of: "sha256:", with: "").prefix(12)) }
-    }
 
     public struct Volume: Sendable, Identifiable {
         public var id: String { name }
         public let name: String
         public let sizeBytes: UInt64
-        public let links: Int
         public let composeProject: String?
     }
 
@@ -36,29 +21,26 @@ public actor DockerService {
         public let state: String
         public let composeProject: String?
         public let workingDir: String?
-        public let sizeBytes: UInt64
         public var isRunning: Bool { state.lowercased() == "running" }
     }
 
     public struct Snapshot: Sendable {
         public let available: Bool
-        public let images: [Image]
         public let volumes: [Volume]
         public let containers: [Container]
-        public let buildCacheBytes: UInt64
-        public static let unavailable = Snapshot(available: false, images: [], volumes: [], containers: [], buildCacheBytes: 0)
+        public static let unavailable = Snapshot(available: false, volumes: [], containers: [])
     }
 
     private var dockerPath: String? { Shell.which("docker") }
 
-    public func isAvailable() async -> Bool {
+    private func isAvailable() async -> Bool {
         guard let docker = dockerPath else { return false }
         return await Shell.run(docker, ["info", "--format", "{{.ServerVersion}}"], timeout: 10).ok
     }
 
     public func snapshot() async -> Snapshot {
         guard let docker = dockerPath, await isAvailable() else { return .unavailable }
-        async let containersOut = Shell.run(docker, ["ps", "-a", "--format", "{{json .}}", "--size"])
+        async let containersOut = Shell.run(docker, ["ps", "-a", "--format", "{{json .}}"])
         async let dfOut = Shell.run(docker, ["system", "df", "-v", "--format", "{{json .}}"])
         async let volumesOut = Shell.run(docker, ["volume", "ls", "--format", "{{json .}}"])
 
@@ -72,26 +54,12 @@ public actor DockerService {
                 image: obj["Image"] as? String ?? "",
                 state: obj["State"] as? String ?? "",
                 composeProject: labels["com.docker.compose.project"],
-                workingDir: labels["com.docker.compose.project.working_dir"],
-                sizeBytes: Self.parseSize((obj["Size"] as? String ?? "").split(separator: " ").first.map(String.init) ?? "0")
+                workingDir: labels["com.docker.compose.project.working_dir"]
             ))
         }
 
-        var images: [Image] = []
         var volumes: [Volume] = []
-        var buildCache: UInt64 = 0
         if let df = Self.json(await dfOut.stdout) {
-            for obj in df["Images"] as? [[String: Any]] ?? [] {
-                images.append(Image(
-                    imageID: obj["ID"] as? String ?? "",
-                    repository: obj["Repository"] as? String ?? "<none>",
-                    tag: obj["Tag"] as? String ?? "<none>",
-                    sizeBytes: Self.parseSize(obj["Size"] as? String ?? "0"),
-                    uniqueBytes: Self.parseSize(obj["UniqueSize"] as? String ?? obj["Size"] as? String ?? "0"),
-                    containers: Int(obj["Containers"] as? String ?? "0") ?? 0,
-                    created: obj["CreatedSince"] as? String ?? ""
-                ))
-            }
             let volumeLabels: [String: String?] = Dictionary(uniqueKeysWithValues:
                 (await volumesOut.stdout.split(separator: "\n")).compactMap { line -> (String, String?)? in
                     guard let o = Self.json(String(line)), let name = o["Name"] as? String else { return nil }
@@ -102,35 +70,11 @@ public actor DockerService {
                 volumes.append(Volume(
                     name: name,
                     sizeBytes: Self.parseSize(obj["Size"] as? String ?? "0"),
-                    links: Int(obj["Links"] as? String ?? "0") ?? 0,
                     composeProject: volumeLabels[name] ?? nil
                 ))
             }
-            for obj in df["BuildCache"] as? [[String: Any]] ?? [] {
-                buildCache += Self.parseSize(obj["Size"] as? String ?? "0")
-            }
         }
-        return Snapshot(available: true, images: images, volumes: volumes, containers: containers, buildCacheBytes: buildCache)
-    }
-
-    public func runningContainersByWorkingDir() async -> [String: Int] {
-        let snap = await snapshot()
-        var map: [String: Int] = [:]
-        for c in snap.containers where c.isRunning {
-            if let dir = c.workingDir { map[dir, default: 0] += 1 }
-        }
-        return map
-    }
-
-    public enum DockerError: LocalizedError {
-        case unavailable, unknownKind(String), commandFailed(String)
-        public var errorDescription: String? {
-            switch self {
-            case .unavailable: "Docker is not running"
-            case .unknownKind(let k): "Unknown docker resource \(k)"
-            case .commandFailed(let s): s
-            }
-        }
+        return Snapshot(available: true, volumes: volumes, containers: containers)
     }
 
     // MARK: - Parsing

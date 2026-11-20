@@ -163,7 +163,7 @@ public enum DevStackInventory {
         ]
         for (name, app, data) in apps where exists(app) {
             let dataExists = exists(data)
-            items.append(DevStackItem(group: .databases, name: name, detail: dataExists ? "App · data in \(data.replacingOccurrences(of: home, with: "~"))" : "App",
+            items.append(DevStackItem(group: .databases, name: name, detail: dataExists ? "App · data in \(tilde(data, home))" : "App",
                                       path: dataExists ? data : app, bytes: size(app) + (dataExists ? size(data) : 0), modified: mtime(app),
                                       status: .installed, removal: .never, hint: name == "Postgres.app" ? "Databases live in Application Support/Postgres." : nil))
         }
@@ -190,7 +190,7 @@ public enum DevStackInventory {
                 items.append(DevStackItem(group: .databases, name: c.name, detail: "Docker · \(c.image)" + (c.composeProject.map { " · compose \($0) · \(ByteFormatter.string(bytes)) in project volumes" } ?? ""),
                                           path: "docker://container/\(c.containerID)", bytes: bytes, modified: nil,
                                           status: c.isRunning ? .running : .stopped, removal: .never,
-                                          hint: c.workingDir.map { "Belongs to \($0.replacingOccurrences(of: home, with: "~"))" }))
+                                          hint: c.workingDir.map { "Belongs to \(tilde($0, home))" }))
             }
         }
         return items
@@ -237,7 +237,7 @@ public enum DevStackInventory {
         versions("\(home)/.volta/tools/image/node", manager: "node", defaultFile: nil)
         versions("\(home)/.local/share/mise/installs", manager: "mise", defaultFile: nil)
         for (name, path) in [("bun", "\(home)/.bun"), ("deno", "\(home)/.deno"), ("dotnet", "\(home)/.dotnet"), ("conda", "\(home)/miniconda3"), ("conda", "\(home)/anaconda3"), ("conda", "\(home)/miniforge3"), ("flutter", "\(home)/development/flutter"), ("flutter", "\(home)/flutter")] where exists(path) {
-            items.append(DevStackItem(group: .toolchains, name: name, detail: path.replacingOccurrences(of: home, with: "~"), path: path, bytes: size(path), modified: mtime(path), status: .installed, removal: .quarantinePath, hint: nil))
+            items.append(DevStackItem(group: .toolchains, name: name, detail: tilde(path, home), path: path, bytes: size(path), modified: mtime(path), status: .installed, removal: .quarantinePath, hint: nil))
         }
         return items
     }
@@ -269,6 +269,12 @@ public enum DevStackInventory {
         return items
     }
 
+    /// `path` with the home folder shown as ~; only a whole leading folder
+    /// matches (home /Users/bob leaves /Users/bobby alone).
+    static func tilde(_ path: String, _ home: String) -> String {
+        path == home || path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
+    }
+
     static func add(_ items: inout [DevStackItem], _ name: String, _ path: String, _ source: String, _ removal: DevStackItem.Removal?, sizeIt: Bool = true) {
         let bytes = sizeIt ? size(path) : 0
         let m = mtime(path)
@@ -298,7 +304,7 @@ public enum DevStackInventory {
         for (name, p) in known where exists(p) {
             let bytes = size(p)
             guard bytes > 1_000_000 else { continue }
-            items.append(DevStackItem(group: .sdks, name: name, detail: p.replacingOccurrences(of: home, with: "~"), path: p, bytes: bytes, modified: mtime(p), status: .installed,
+            items.append(DevStackItem(group: .sdks, name: name, detail: tilde(p, home), path: p, bytes: bytes, modified: mtime(p), status: .installed,
                                       removal: name.contains("AWS") ? .never : .quarantinePath, hint: nil))
         }
         return items
@@ -307,7 +313,7 @@ public enum DevStackInventory {
     static func vmItems() async -> [DevStackItem] {
         var items: [DevStackItem] = []
         let known: [(String, String, String?)] = [
-            ("colima VM disk", "\(home)/.colima/_lima/_disks", "Docker images and volumes live inside this disk. Prune with the Docker module; the file shrinks only when colima recreates it."),
+            ("colima VM disk", "\(home)/.colima/_lima/_disks", "Docker images and volumes live inside this disk. Prune them with docker system prune; the file shrinks only when colima recreates it."),
             ("lima VMs", "\(home)/.lima", nil),
             ("Docker Desktop VM", "\(home)/Library/Containers/com.docker.docker/Data/vms", nil),
             ("OrbStack", "\(home)/.orbstack", nil),
@@ -319,7 +325,7 @@ public enum DevStackInventory {
             ("Multipass", "\(home)/Library/Application Support/multipassd", nil),
         ]
         for (name, p, hint) in known where exists(p) {
-            items.append(DevStackItem(group: .vms, name: name, detail: p.replacingOccurrences(of: home, with: "~"), path: p, bytes: size(p), modified: mtime(p), status: .installed, removal: .never, hint: hint))
+            items.append(DevStackItem(group: .vms, name: name, detail: tilde(p, home), path: p, bytes: size(p), modified: mtime(p), status: .installed, removal: .never, hint: hint))
         }
         return items
     }

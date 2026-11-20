@@ -139,13 +139,16 @@ public struct Engine: Sendable {
         return AsyncThrowingStream { continuation in
             let process: Process
             let exit: AsyncStream<Int32>
-            let out = Pipe()
+            let out = Pipe(), err = Pipe()
             do {
-                (process, exit) = try launch(args, stdout: out)
+                (process, exit) = try launch(args, stdout: out, stderr: err)
             } catch {
                 continuation.finish(throwing: error)
                 return
             }
+            // Drained alongside stdout so a chatty engine cannot stall, and
+            // kept so a failed scan says why.
+            let errors = Task.detached { await Self.readAll(err) }
             let reader = Task.detached {
                 do {
                     for try await line in out.fileHandleForReading.bytes.lines {
@@ -157,7 +160,9 @@ public struct Engine: Sendable {
                     }
                     let status = await Self.status(exit)
                     if status != 0 {
-                        throw EngineError.badOutput("scan exited with \(status)")
+                        let why = String(decoding: await errors.value, as: UTF8.self)
+                            .trimmingCharacters(in: .whitespacesAndNewlines).suffix(500)
+                        throw EngineError.badOutput("scan exited with \(status)" + (why.isEmpty ? "" : ": \(why)"))
                     }
                     continuation.finish()
                 } catch {
@@ -167,6 +172,7 @@ public struct Engine: Sendable {
             continuation.onTermination = { _ in
                 if process.isRunning { process.terminate() }
                 reader.cancel()
+                errors.cancel()
             }
         }
     }

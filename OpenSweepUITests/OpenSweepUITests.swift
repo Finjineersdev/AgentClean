@@ -177,7 +177,7 @@ final class OpenSweepUITests: XCTestCase {
         XCTAssertTrue(purge.waitForExistence(timeout: 10))
         shot("08-history")
         purge.click()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 10) || app.buttons["confirmPurge"].waitForExistence(timeout: 1))
+        XCTAssertTrue(waitFor { self.app.buttons["Cancel"].exists || self.app.buttons["confirmPurge"].exists }, "purge asks first")
         shot("09-purge-confirmation")
         app.typeKey(.escape, modifierFlags: [])
 
@@ -224,6 +224,8 @@ final class OpenSweepUITests: XCTestCase {
         for (i, screen) in ["overview", "projects", "caches", "history", "devStack"].enumerated() {
             app.typeKey(String(i + 1), modifierFlags: .command)
             if screen == "projects" { app.buttons["project.shop-web"].click() }
+            // Let entrance animations finish: the audit measures what is on
+            // screen, and a half-faded view reads as low contrast.
             sleep(2)
             // Every issue fails the test except:
             // - a framework container (a Group or AppKit's TouchBar) with no
@@ -373,6 +375,8 @@ final class OpenSweepUITests: XCTestCase {
         let size = window.frame.size
         for screen in ["projects", "caches", "history", "devStack", "overview"] {
             app.outlines.cells.containing(.any, identifier: "nav.\(screen)").firstMatch.click()
+            // This asserts nothing moves, so it must let layout settle; there
+            // is no element to wait for when the right outcome is no change.
             sleep(3)
             if screen == "devStack" { shot("sidebar-dev-stack") }
             XCTAssertEqual(overview.frame.minY, top, accuracy: 2, "\(screen) pushed the sidebar up")

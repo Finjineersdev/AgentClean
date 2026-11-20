@@ -199,7 +199,9 @@ final class AppModel {
             let fresh = try await engine.plan(project: URL(fileURLWithPath: root)).project
             if let i = projects.firstIndex(where: { $0.root == root }) { projects[i] = fresh }
         } catch {
-            projects.removeAll { $0.root == root }
+            // A project whose folder is gone leaves the list; any other
+            // failure keeps it and says what went wrong.
+            if FileManager.default.fileExists(atPath: root) { fail(error) } else { projects.removeAll { $0.root == root } }
         }
         if persist { settle() }
     }
@@ -267,9 +269,11 @@ final class AppModel {
     func runScheduleIfDue(now: Date = Date()) async {
         guard !testRun, let interval = autoClean.interval, !scanning else { return }
         if let last = lastAutoClean, now.timeIntervalSince(last) < interval { return }
+        // This scan's own outcome decides, not an older error still on screen.
+        let before = lastScan
         toggleScan()
         await scanTask?.value
-        guard error == nil, summary != nil else { return }
+        guard lastScan != before, summary != nil else { return }
         lastAutoClean = now
         guard let run = await runSchedule(cap: UInt64(max(autoCleanCapGB, 1)) * 1_000_000_000) else { return }
         let moved = run.entries.filter { $0.state == .moved }
