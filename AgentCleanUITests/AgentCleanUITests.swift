@@ -216,16 +216,16 @@ final class AgentCleanUITests: XCTestCase {
             if screen == "projects" { app.buttons["project.shop-web"].click() }
             sleep(2)
             // Every issue fails the test except:
-            // - a container Group with no identifier: no description or a
+            // - a framework container (Group, AppKit TouchBar) with no identifier: no description or a
             //   parent/child mismatch on the groups SwiftUI builds for the
             //   split view (the app's own views set identifiers);
             // - a contrast finding our own pixel measurement disproves. The
             //   audit misreads text on the gradient (it flagged 6.4:1 and
             //   8.1:1 text), so the element's screenshot is measured instead.
             try app.performAccessibilityAudit { issue in
-                if let e = issue.element, e.elementType == .group, e.identifier.isEmpty,
+                if let e = issue.element, [.group, .touchBar].contains(e.elementType), e.identifier.isEmpty,
                    issue.auditType == .sufficientElementDescription || issue.auditType == .parentChild {
-                    print("audit ignored \(issue.compactDescription) on a framework Group")
+                    print("audit ignored \(issue.compactDescription) on a framework \(e.elementType.rawValue)")
                     return true
                 }
                 if issue.auditType == .contrast, let element = issue.element {
