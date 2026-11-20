@@ -215,16 +215,42 @@ final class AgentCleanUITests: XCTestCase {
             app.outlines.cells.containing(.any, identifier: "nav.\(screen)").firstMatch.click()
             if screen == "projects" { app.buttons["project.shop-web"].click() }
             sleep(2)
-            // Two exemptions, everything else is audited:
+            // Every issue fails the test except:
             // - a container Group with no description (the window content
             //   SwiftUI builds for the split view);
-            // - contrast on the 28 pt screen titles over the gradient: measured
-            //   from CI screenshots at 8.1:1 (3:1 needed), the audit misreads it.
-            let titles: Set = ["Overview", "Projects", "Caches", "History", "Dev Stack"]
+            // - a contrast finding our own pixel measurement disproves. The
+            //   audit misreads text on the gradient (it flagged 6.4:1 and
+            //   8.1:1 text), so the element's screenshot is measured instead.
             try app.performAccessibilityAudit { issue in
-                (issue.auditType == .sufficientElementDescription && issue.element?.elementType == .group)
-                    || (issue.auditType == .contrast && (titles.contains(issue.element?.label ?? "") || titles.contains(issue.element?.value as? String ?? "")))
+                if issue.auditType == .sufficientElementDescription && issue.element?.elementType == .group { return true }
+                if issue.auditType == .contrast, let element = issue.element {
+                    let ratio = Self.contrast(element.screenshot().image)
+                    print("audit contrast \(element.label) \(ratio)")
+                    return ratio >= 4.5
+                }
+                return false
             }
         }
+    }
+
+    /// WCAG contrast between the text and background of a screenshot: the
+    /// brightest and darkest few percent of pixels (text is the minority).
+    static func contrast(_ image: NSImage) -> Double {
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return 0 }
+        func lum(_ c: NSColor) -> Double {
+            func ch(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+            guard let c = c.usingColorSpace(.sRGB) else { return 0 }
+            return 0.2126 * ch(c.redComponent) + 0.7152 * ch(c.greenComponent) + 0.0722 * ch(c.blueComponent)
+        }
+        var l: [Double] = []
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<rep.pixelsWide {
+                if let c = rep.colorAt(x: x, y: y) { l.append(lum(c)) }
+            }
+        }
+        guard l.count > 50 else { return 0 }
+        l.sort()
+        let dark = l[l.count / 20], light = l[l.count - 1 - l.count / 50]
+        return (light + 0.05) / (dark + 0.05)
     }
 }
