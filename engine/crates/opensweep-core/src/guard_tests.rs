@@ -5,6 +5,7 @@
 //! checks can be attacked directly.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -223,6 +224,56 @@ fn reverify_catches_a_swap_after_approval() {
     fs::rename(f.root.join("android"), f.base.join("moved")).unwrap();
     symlink(f.base.join("moved"), f.root.join("android")).unwrap();
     assert_eq!(approved.reverify(), Err(Refusal::ChangedSinceApproval));
+}
+
+/// I12: a folder on the way swapped for a link after `reverify` cannot
+/// redirect the move: the entry is checked again through an open handle on
+/// its parent and moved from that same handle.
+#[cfg(unix)]
+#[test]
+fn a_swap_after_reverify_cannot_redirect_the_move() {
+    use std::os::unix::fs::symlink;
+    let f = fixture();
+    let dest = f.base.join("q");
+    fs::create_dir(&dest).unwrap();
+    let approved = f.check("node_modules").unwrap();
+    approved.reverify().unwrap();
+    // The race: `work` becomes a link to a look-alike holding other files.
+    fs::create_dir_all(f.base.join("decoy/proj/node_modules")).unwrap();
+    fs::write(f.base.join("decoy/proj/node_modules/keep"), "x").unwrap();
+    fs::rename(f.base.join("work"), f.base.join("work-real")).unwrap();
+    symlink(f.base.join("decoy"), f.base.join("work")).unwrap();
+    assert!(approved.move_into(&dest, OsStr::new("0000")).is_err());
+    assert!(f.base.join("decoy/proj/node_modules/keep").exists());
+    assert!(!dest.join("0000").exists());
+    // Put back, the same token moves the real folder.
+    fs::remove_file(f.base.join("work")).unwrap();
+    fs::rename(f.base.join("work-real"), f.base.join("work")).unwrap();
+    approved.move_into(&dest, OsStr::new("0000")).unwrap();
+    assert!(dest.join("0000/pkg").is_dir() && !f.root.join("node_modules").exists());
+}
+
+/// I15: a restore never replaces what appeared at the destination, not even
+/// an empty folder, and never goes through a folder that became a link.
+#[cfg(unix)]
+#[test]
+fn a_restore_rename_never_replaces_or_follows() {
+    use crate::guard::rename_into;
+    use std::os::unix::fs::symlink;
+    let f = fixture();
+    let q = f.base.join("q");
+    fs::create_dir_all(q.join("0000/pkg")).unwrap();
+    fs::create_dir(f.root.join("empty")).unwrap();
+    assert!(rename_into(&q, OsStr::new("0000"), &f.root, OsStr::new("empty")).is_err());
+    assert!(q.join("0000/pkg").is_dir());
+    fs::rename(f.base.join("work"), f.base.join("elsewhere")).unwrap();
+    symlink(f.base.join("elsewhere"), f.base.join("work")).unwrap();
+    assert!(rename_into(&q, OsStr::new("0000"), &f.root, OsStr::new("back")).is_err());
+    assert!(!f.base.join("elsewhere/proj/back").exists());
+    fs::remove_file(f.base.join("work")).unwrap();
+    fs::rename(f.base.join("elsewhere"), f.base.join("work")).unwrap();
+    rename_into(&q, OsStr::new("0000"), &f.root, OsStr::new("back")).unwrap();
+    assert!(f.root.join("back/pkg").is_dir());
 }
 
 #[test]

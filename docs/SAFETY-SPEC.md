@@ -34,7 +34,7 @@ through a linted rule and the guard. There is no free-form delete.
 | I9 | The target is on the same volume as the project root | `Guard::check` | `CrossDevice` |
 | I10 | The target does not contain its own repository | `Guard::check` | `ContainsRepository` |
 | I11 | Git tracks nothing under the target; if the project is a repository and git cannot answer, refuse | `guard::check_untracked` | `ContainsTrackedFiles`, `VcsCheckFailed` |
-| I12 | Immediately before a move, the directory is the same one that was approved (device, inode, creation time, canonical path) | `Approved::reverify` | `ChangedSinceApproval` |
+| I12 | Immediately before a move, the directory is the same one that was approved (device, inode, creation time, canonical path). The move itself opens the parent once, checks the entry under that handle is still the approved device and inode, and renames from that handle without replacing anything, so a folder on the way swapped for a link after the check cannot redirect it | `Approved::reverify`, `Approved::move_into` | `ChangedSinceApproval`, `a_swap_after_reverify_cannot_redirect_the_move` |
 
 ### Notes on I11
 
@@ -64,12 +64,10 @@ OpenSweep runs from inside it (`relative_path_entries_are_ignored`).
   and restore (I13, I14) are the backstop.
 - Only git is checked for tracked files. Mercurial, Jujutsu and Subversion
   checkouts are refused only at the directory level (I7).
-- `reverify` and the rename are two steps on a path. A process racing between
-  them (another user on a shared drive swapping a parent folder for a link)
-  could have a different folder of the same name moved, or a restored item
-  land elsewhere. Closing it needs `renameat` on an open folder handle, which
-  the standard library offers only through `unsafe` code; the engine forbids
-  that. The moved folder stays restorable from quarantine.
+- Between the handle check and the rename, only something with write access
+  to the project folder itself could swap the entry, and it could delete the
+  folder anyway. Handles come from `rustix`, a safe wrapper, because the
+  engine forbids `unsafe`.
 
 ## Quarantine (M1)
 
@@ -79,7 +77,7 @@ OpenSweep runs from inside it (`relative_path_entries_are_ignored`).
 | I14 | The manifest is written before the first move and rewritten atomically after each one; `reverify` runs immediately before each move | `Store::clean`, `write_manifest` | `changed_items_are_skipped_and_recorded`, `a_crash_after_a_move_is_recoverable` |
 | I14a | Restore never overwrites and never recreates a missing project folder | `Store::restore` | `restore_never_overwrites`, `restore_refuses_when_the_project_is_gone` |
 | I14b | Purge deletes only real directories at `items/<digits>` inside the store; run ids and item names from disk are validated; a malformed manifest stops the command | `Store::purge`, `parse_manifest` | `purge_deletes_only_quarantined_items`, `purge_removes_only_real_directories`, `tampered_manifests_are_refused`, `run_ids_cannot_escape_the_store` |
-| I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link) | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent` |
+| I14d | Restore puts an item back only inside the project it came from: the manifest's original must be an absolute, normalized path strictly below its project root, and the parent folder's real path must still be the recorded one (no folder on the way replaced by a link), checked on the open handle the rename goes into. The rename never replaces anything, an empty folder included | `parse_manifest`, `Store::restore` | `manifests_cannot_send_items_outside_their_project`, `restore_does_not_follow_a_replaced_parent`, `a_restore_rename_never_replaces_or_follows` |
 | I19 | The main store and its `runs` folder must be real folders owned by the owner of the home folder and writable by no one else; store, run and item folders are created owner-only (0700), and a run or its `items` folder that is a link is never followed. A drive quarantine is used only if each of its folders is a real folder owned by the main store's owner and writable by no one else, at the top of a local drive whose top folder others cannot change (or has the sticky bit), checked before every clean, restore and purge; a manifest's `volume` must be an absolute `.opensweep-quarantine` folder whose parent contains the item's original | `quarantine::trusted`, `items_of`, `parse_manifest` | `a_drive_quarantine_must_be_a_private_folder_of_the_owner`, `a_shared_drive_top_needs_the_sticky_bit`, `manifests_cannot_point_at_another_drives_quarantine`, `folders_on_another_drive_use_that_drives_quarantine`, `a_store_others_can_change_is_refused`, `a_linked_items_folder_is_not_followed` |
 | I14c | Every changing CLI command is a dry run without `--execute`; Caution folders also need `--include-caution`. `pin` and `unpin` are the exception: they change only OpenSweep's config, and pinning only adds protection. `clean --only` can only narrow: a pick the rules do not offer is an error before anything moves, and every pick still passes the guard | `opensweep-cli` | `clean_is_a_dry_run_by_default`, `caution_folders_need_an_explicit_flag`, `only_narrows_the_selection` |
 
@@ -87,10 +85,7 @@ Space is freed only when a run is purged, because a rename on the same volume
 moves no data. The CLI says so after every clean.
 
 Known limits: a crash between a rename and the manifest update leaves the entry
-`pending`; restore and purge treat it as moved if its item is present. Restore
-checks the destination is free and then renames, so a directory created in
-that instant could, if empty, be replaced; a non-empty one makes the rename
-fail safely. Two cleans running at the same moment use separate run folders
+`pending`; restore and purge treat it as moved if its item is present. Two cleans running at the same moment use separate run folders
 but are not otherwise coordinated.
 
 ## Discovery (M2)
@@ -120,7 +115,7 @@ the seconds between the plan and the move is not seen.
 
 | # | Invariant | Enforced in | Tests |
 | --- | --- | --- | --- |
-| I20 | A global cache is cleared only by its tool's own command, with a fixed argument list, no shell, stdin closed, the home folder as working folder and a time limit, and only with `--execute`. No cache path is inside or above a toolchain folder or the home folder | `caches::known`, `caches::allowed`, `caches::run` | `toolchains_never_appear_as_caches`, `the_home_folder_and_its_parents_are_never_a_cache`, `cleaning_runs_the_tools_own_command`, `a_failing_or_hanging_tool_is_reported`, `caches_are_cleared_by_the_tools_own_command`, `xcode_archives_and_simulators_are_measured_only`, `simulators_are_cleared_only_of_unavailable_ones`, `editor_browser_docker_and_model_stores_are_measured_only` |
+| I20 | A global cache is cleared only by its tool's own command, with a fixed argument list, no shell, stdin closed, the home folder as working folder and a time limit, and only with `--execute`. At the limit the tool's whole process group is stopped, so a helper it started cannot keep running or hold the engine. No cache path is inside or above a toolchain folder or the home folder | `caches::known`, `caches::allowed`, `caches::run` | `toolchains_never_appear_as_caches`, `the_home_folder_and_its_parents_are_never_a_cache`, `cleaning_runs_the_tools_own_command`, `a_failing_or_hanging_tool_is_reported`, `a_hanging_tool_is_stopped_with_its_helpers`, `caches_are_cleared_by_the_tools_own_command`, `xcode_archives_and_simulators_are_measured_only`, `simulators_are_cleared_only_of_unavailable_ones`, `editor_browser_docker_and_model_stores_are_measured_only` |
 | I21 | A project inside installed software is never cleaned: its root has a `node_modules`, `site-packages`, `dist-packages` or `Cellar` folder above it, or lies under Homebrew, MacPorts, Nix, `/Applications`, `/Library`, `/System`, `/usr`, or a toolchain folder in the home folder (`.nvm`, `.rustup`, `.cargo`, `go/pkg`, `Library/Caches` and the like). Removing its folders breaks the tool; it does not rebuild | `guard::installed_software`, `Guard::check` | `installed_packages_are_never_cleaned`, `package_manager_and_toolchain_folders_are_installed_software` |
 
 ## Rename (November 2026)

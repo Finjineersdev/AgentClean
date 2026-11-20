@@ -25,3 +25,5 @@ thiserror = "2"
 clap = { version = "4", features = ["derive"] }
 proptest = "1"
 tempfile = "3"
+# Safe openat/renameat for the move (I12, I15); the engine forbids `unsafe`.
+rustix = { version = "1", features = ["fs"] }

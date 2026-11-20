@@ -21,6 +21,7 @@
 //! owner, the owner of the main store, can change (invariant I19).
 
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -28,7 +29,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use crate::guard::Approved;
+use crate::guard::{rename_into, Approved, MoveFailed, Refusal};
 use crate::rules::Class;
 use crate::size;
 use crate::volumes::{self, Mount};
@@ -279,9 +280,13 @@ impl Store {
                 Ok(items) => match approved.reverify() {
                     Err(why) => Err((State::Skipped, why.to_string())),
                     Ok(()) => {
-                        let dest = items.join(&manifest.entries[i].stored);
-                        fs::rename(approved.path(), &dest)
-                            .map_err(|e| (State::Failed, e.to_string()))
+                        let name = OsStr::new(&manifest.entries[i].stored);
+                        approved.move_into(&items, name).map_err(|e| match e {
+                            MoveFailed::Changed => {
+                                (State::Skipped, Refusal::ChangedSinceApproval.to_string())
+                            }
+                            MoveFailed::Io(e) => (State::Failed, e.to_string()),
+                        })
                     }
                 },
             };
@@ -372,7 +377,13 @@ impl Store {
                 // now means a folder on the way was replaced, e.g. by a link.
                 Err("the folder it came from is now a link or has moved".to_owned())
             } else {
-                fs::rename(&src, &dest).map_err(|e| e.to_string())
+                match (src.parent(), dest.parent(), dest.file_name()) {
+                    (Some(from), Some(to), Some(name)) => {
+                        rename_into(from, OsStr::new(&entry.stored), to, name)
+                            .map_err(|e| e.to_string())
+                    }
+                    _ => Err("the folder it came from no longer exists".to_owned()),
+                }
             };
             match outcome {
                 Ok(()) => {
