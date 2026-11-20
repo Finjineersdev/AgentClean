@@ -288,7 +288,7 @@ pub fn known(env: &Env) -> Vec<Cache> {
                 name: "Homebrew downloads",
                 path: c.join("Homebrew"),
                 command: &[],
-                note: "`brew cleanup` also removes old versions of installed formulae, so AgentClean does not run it.",
+                note: "brew cleanup also removes old versions of installed formulae, so AgentClean does not run it.",
             },
         ]);
     }

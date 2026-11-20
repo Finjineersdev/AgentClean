@@ -98,7 +98,7 @@ was found), `note`.
 
 **`clean-cache ID… [--execute]`**: `execute` and `caches`, the same objects;
 with `--execute` each also has `status` (exit code, `null` if stopped),
-`bytes_after`, `freed` and `stderr` (its last lines). Exits non-zero if any
+`bytes_after`, `freed` and `stderr` (its last lines). Exit code 3 if any
 tool failed. Not undoable (ADR 0006).
 
 **`rules-check DIR`**: `command`, `rule_files`, `artifacts`.
