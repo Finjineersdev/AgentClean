@@ -16,6 +16,9 @@ jobs:
   dmg:
     name: Build, sign, notarize and publish
     runs-on: macos-26
+    # Waits for the owner's approval; the signing secrets live only in this
+    # environment, so no other workflow or branch can read them.
+    environment: release
     env:
       VERSION: ${{ github.ref_name }}
       HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' }}
@@ -61,7 +64,7 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p "$PASS" "$KEYCHAIN"
           echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -T /usr/bin/codesign -t cert -f pkcs12 -k "$KEYCHAIN"
           rm "$RUNNER_TEMP/cert.p12"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$PASS" "$KEYCHAIN"
           security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
@@ -112,6 +115,12 @@ jobs:
           if [ "$HAS_CERT" = true ]; then
             codesign --sign "$SIGN_IDENTITY" --timestamp "dist/OpenSweep-$V.dmg"
           fi
+
+      # Nothing after this signs, so the key leaves before any later step
+      # (notarization, the SBOM and release actions) runs.
+      - name: Remove the signing keychain
+        if: always() && env.HAS_CERT == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
 
       - name: Notarize and staple
         if: env.HAS_CERT == 'true'

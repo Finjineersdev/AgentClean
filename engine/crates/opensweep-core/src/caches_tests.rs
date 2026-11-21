@@ -143,6 +143,37 @@ fn a_failing_or_hanging_tool_is_reported() {
     assert_eq!(ran.status, None, "stopped at the time limit");
 }
 
+/// A tool that started helpers (npm runs node) is stopped with them; a
+/// helper still holding stderr must not keep the engine waiting.
+#[test]
+fn a_hanging_tool_is_stopped_with_its_helpers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = fs::canonicalize(tmp.path()).unwrap();
+    fs::create_dir_all(home.join("Library/Caches/deno")).unwrap();
+    tool(&home, "deno", "sleep 60 & echo $! > helper; wait; true");
+    let e = env(&home, true);
+    let deno = caches::list(&e)
+        .into_iter()
+        .find(|f| f.cache.id == "deno")
+        .unwrap();
+    let start = std::time::Instant::now();
+    let ran = caches::run(&deno, &e, Duration::from_secs(3)).unwrap();
+    assert_eq!(ran.status, None);
+    assert!(
+        start.elapsed() < Duration::from_secs(20),
+        "{:?}",
+        start.elapsed()
+    );
+    let pid = fs::read_to_string(home.join("helper")).unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    let alive = std::process::Command::new("/bin/kill")
+        .args(["-0", pid.trim()])
+        .status()
+        .unwrap()
+        .success();
+    assert!(!alive, "the helper was left running");
+}
+
 #[test]
 fn a_cache_without_a_command_cannot_be_run() {
     let tmp = tempfile::tempdir().unwrap();

@@ -6,14 +6,16 @@
         "class": "caution",
         "path": "node_modules",
         "refused": null,
-        "rule": "node"
+        "rule": "node",
+        "shared": false
       },
       {
         "bytes": 0,
         "class": "safe",
         "path": ".next",
         "refused": null,
-        "rule": "node"
+        "rule": "node",
+        "shared": false
       }
     ],
     "pinned": false,

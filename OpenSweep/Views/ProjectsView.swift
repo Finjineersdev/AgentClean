@@ -5,10 +5,24 @@ struct ProjectsView: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @FocusState private var searching: Bool
+    /// Arrow keys move through whichever list has focus (gap G4).
+    @FocusState private var pane: Pane?
     @AppStorage("projectsShowAll") private var showAll = false
     @AppStorage("projectsSort") private var sort = Sort.size
 
     enum Sort: String, CaseIterable { case size, name }
+    enum Pane { case projects, folders }
+
+    /// ↑/↓ in the project list: the next or previous project.
+    private func step(_ by: Int, _ proxy: ScrollViewProxy) -> KeyPress.Result {
+        let roots = rows.map(\.root)
+        guard !roots.isEmpty else { return .ignored }
+        let now = roots.firstIndex(of: model.selectedProject ?? "") ?? (by > 0 ? -1 : roots.count)
+        let next = roots[min(max(now + by, 0), roots.count - 1)]
+        model.selectedProject = next
+        proxy.scrollTo(next)
+        return .handled
+    }
 
     private var rows: [AgentEngine.Project] {
         (showAll ? model.projects : model.cleanable)
@@ -62,20 +76,33 @@ struct ProjectsView: View {
                         .foregroundStyle(Brand.muted).frame(maxWidth: .infinity)
                     Spacer()
                 } else {
+                    ScrollViewReader { proxy in
                     ScrollView {
                         let biggest = rows.map(model.total).max() ?? 1
                         LazyVStack(spacing: 2) {
                             ForEach(Array(rows.enumerated()), id: \.element.root) { i, p in
-                                Button { model.selectedProject = p.root } label: {
+                                Button { model.selectedProject = p.root; pane = .projects } label: {
                                     CompactProjectRow(project: p, total: model.total(p), share: Double(model.total(p)) / Double(max(biggest, 1)))
                                 }
                                 .buttonStyle(RowButtonStyle(selected: model.selectedProject == p.root))
+                                .accessibilityAddTraits(model.selectedProject == p.root ? .isSelected : [])
                                 .accessibilityIdentifier("project.\(URL(fileURLWithPath: p.root).lastPathComponent)")
                                 .entrance(i, from: .leading)
                             }
                         }
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel("Projects")
+                    }
+                    .focusable()
+                    .focusEffectDisabled()
+                    .focused($pane, equals: .projects)
+                    .onKeyPress(.downArrow) { step(1, proxy) }
+                    .onKeyPress(.upArrow) { step(-1, proxy) }
+                    .onKeyPress(.rightArrow) {
+                        guard model.project(model.selectedProject)?.items.isEmpty == false else { return .ignored }
+                        pane = .folders
+                        return .handled
+                    }
                     }
                 }
             }
@@ -88,7 +115,7 @@ struct ProjectsView: View {
             if let p = model.project(model.selectedProject) {
                 // Keyed by path, not value: a refresh after a clean must not tear down
                 // the open Review sheet (and its Undo).
-                ProjectDetail(project: p).id(p.root).entrance(0, from: .trailing)
+                ProjectDetail(project: p, pane: $pane).id(p.root).entrance(0, from: .trailing)
             } else {
                 VStack(spacing: 8) {
                     Peep(crew: 2, size: 96)
@@ -97,6 +124,7 @@ struct ProjectsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onAppear { if !searching { pane = .projects } }
     }
 }
 
@@ -105,7 +133,10 @@ struct ProjectsView: View {
 struct ProjectDetail: View {
     @Environment(AppModel.self) private var model
     let project: AgentEngine.Project
+    var pane: FocusState<ProjectsView.Pane?>.Binding
     @State private var picked: Set<String> = []
+    /// The folder ↑/↓ and Space act on while the folder list has focus.
+    @State private var cursor = 0
     @State private var allowActive = false
     @State private var review: CleanOutput?
     @State private var busy = false
@@ -118,7 +149,7 @@ struct ProjectDetail: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(URL(fileURLWithPath: project.root).lastPathComponent)
                             .font(.system(size: 26, weight: .bold)).tracking(-0.4).foregroundStyle(Brand.text)
-                        Text((project.root as NSString).abbreviatingWithTildeInPath).font(.callout.monospaced()).foregroundStyle(Brand.muted)
+                        Text(tildePath(project.root)).font(.callout.monospaced()).foregroundStyle(Brand.muted)
                             .lineLimit(1).truncationMode(.middle).help(project.root)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -166,14 +197,34 @@ struct ProjectDetail: View {
                     Text("Nothing to clean here.").foregroundStyle(Brand.muted)
                 } else {
                     let biggest = project.items.compactMap(\.bytes).max() ?? 1
+                    let keys = pane.wrappedValue == .folders
                     VStack(spacing: 0) {
                         ForEach(Array(project.items.enumerated()), id: \.element.path) { i, item in
                             itemRow(item, share: Double(item.bytes ?? 0) / Double(max(biggest, 1)))
+                                .background(keys && i == cursor ? Brand.teal.opacity(0.10) : .clear)
+                                .overlay(alignment: .leading) {
+                                    if keys && i == cursor { Rectangle().fill(Brand.teal).frame(width: 3) }
+                                }
                                 .entrance(i + 1)
                             if i < project.items.count - 1 { Divider().overlay(Brand.hairline).padding(.leading, 76) }
                         }
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .glassCard()
+                    .focusable()
+                    .focusEffectDisabled()
+                    .focused(pane, equals: .folders)
+                    .onKeyPress(.downArrow) { cursor = min(cursor + 1, project.items.count - 1); return .handled }
+                    .onKeyPress(.upArrow) { cursor = max(cursor - 1, 0); return .handled }
+                    .onKeyPress(.leftArrow) { pane.wrappedValue = .projects; return .handled }
+                    .onKeyPress(.space) {
+                        guard project.items.indices.contains(cursor), !project.pinned,
+                              Selection.selectable(project.items[cursor]) else { return .ignored }
+                        let path = Selection.path(project.items[cursor], in: project)
+                        if picked.contains(path) { picked.remove(path) } else { picked.insert(path) }
+                        return .handled
+                    }
+                    .accessibilityHint("Arrow keys move between folders; Space ticks one")
                 }
             }
             .padding(.horizontal, 28).padding(.top, 26).padding(.bottom, 90)
@@ -214,6 +265,11 @@ struct ProjectDetail: View {
         }
     }
 
+    /// "up to" when the folder shares space with files elsewhere (F8).
+    private func size(_ item: Item) -> String? {
+        item.bytes.map { (item.shared == true ? "up to " : "") + bytes($0) }
+    }
+
     private func itemRow(_ item: Item, share: Double) -> some View {
         let path = Selection.path(item, in: project)
         let on = Binding(
@@ -223,7 +279,7 @@ struct ProjectDetail: View {
             Toggle("", isOn: on).labelsHidden().toggleStyle(.checkbox)
                 .disabled(!Selection.selectable(item) || project.pinned)
                 .accessibilityIdentifier("item.\(item.path)")
-                .accessibilityLabel("\(item.path), \(item.kind.label), \(item.bytes.map(bytes) ?? "size unknown")")
+                .accessibilityLabel("\(item.path), \(item.kind.label), \(size(item) ?? "size unknown")")
                 .accessibilityHint(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
             .padding(.top, 5)
             EcosystemBadge(ecosystem: Ecosystem.of(rule: item.rule), size: 26)
@@ -232,13 +288,14 @@ struct ProjectDetail: View {
                     Text(item.path).font(.body.monospaced().weight(.semibold)).foregroundStyle(Brand.text)
                     StatusChip(text: item.kind.label, systemImage: item.kind == .safe ? "checkmark.shield.fill" : "exclamationmark.triangle.fill", tint: item.kind.tint)
                 }
-                Text(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation)
+                Text(item.refused.map { "Kept: \($0)" } ?? item.kind.explanation
+                     + (item.shared == true ? " Some files are shared with a package store or other copies, so cleaning may free less." : ""))
                     .font(.callout).foregroundStyle(Brand.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
             VStack(alignment: .trailing, spacing: 6) {
-                Text(item.bytes.map(bytes) ?? "—").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
+                Text(size(item) ?? "—").font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Brand.text)
                 ShareBar(share: share, tint: Ecosystem.of(rule: item.rule).color).frame(width: 72)
             }
         }

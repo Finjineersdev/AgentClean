@@ -43,9 +43,7 @@ impl Env {
                 .filter(|p| p.is_absolute())
         };
         let home = var("HOME")?;
-        let mut path: Vec<PathBuf> = std::env::var_os("PATH")
-            .map(|p| std::env::split_paths(&p).collect())
-            .unwrap_or_default();
+        let mut path = crate::guard::absolute_dirs(std::env::var_os("PATH").as_deref());
         // An app started from Finder gets a bare PATH; add the usual places.
         // ponytail: nvm's npm is not found from Finder; add ~/.nvm/alias/default if asked.
         for extra in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/local/go/bin"] {
@@ -504,6 +502,17 @@ pub fn list(env: &Env) -> Vec<Found> {
         .collect()
 }
 
+/// Kills the process group `pid` leads. `/bin/kill` keeps the engine free
+/// of `unsafe`.
+fn stop_group(pid: u32) {
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", "--", &format!("-{pid}")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
 /// The first executable regular file named `name` in `dirs`.
 pub fn which(name: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
     dirs.iter().map(|d| d.join(name)).find(|p| executable(p))
@@ -550,28 +559,36 @@ pub fn run(found: &Found, env: &Env, limit: Duration) -> Result<Ran, String> {
     // Tool scripts need the basics even when the engine got a bare PATH.
     path.extend(["/usr/bin", "/bin", "/usr/sbin", "/sbin"].map(PathBuf::from));
     let path = std::env::join_paths(path).map_err(|e| e.to_string())?;
-    let mut child = Command::new(program)
+    let mut child = Command::new(program);
+    child
         .args(&found.cache.command[1..])
         .current_dir(&env.home)
         .env("PATH", path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    // Its own process group, so helpers it starts (npm runs node) can be
+    // stopped with it.
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut child, 0);
+    let mut child = child
         .spawn()
         .map_err(|e| format!("cannot run {}: {e}", program.display()))?;
     let mut err = child.stderr.take();
-    let reader = std::thread::spawn(move || {
+    let (send, recv) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
         let mut s = String::new();
         if let Some(e) = err.as_mut() {
             let _ = e.read_to_string(&mut s);
         }
-        s
+        let _ = send.send(s);
     });
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
             Ok(Some(s)) => break s.code(),
             Ok(None) if start.elapsed() > limit => {
+                stop_group(child.id());
                 let _ = child.kill();
                 let _ = child.wait();
                 break None;
@@ -580,7 +597,10 @@ pub fn run(found: &Found, env: &Env, limit: Duration) -> Result<Ran, String> {
             Err(e) => return Err(e.to_string()),
         }
     };
-    let stderr = reader.join().unwrap_or_default();
+    // A helper that escaped the group could still hold stderr open.
+    let stderr = recv
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap_or_default();
     let tail: String = stderr
         .lines()
         .rev()

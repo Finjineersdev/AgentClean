@@ -547,15 +547,19 @@ impl Context {
         let items = candidates
             .into_iter()
             .map(|c| {
-                let (bytes, refused) = match guard.check(&activity, &c) {
-                    Ok(ok) => (Some(opensweep_core::size::usage(ok.path()).bytes), None),
-                    Err(why) => (None, Some(why.to_string())),
+                let (bytes, shared, refused) = match guard.check(&activity, &c) {
+                    Ok(ok) => {
+                        let u = opensweep_core::size::usage(ok.path());
+                        (Some(u.bytes), u.shared, None)
+                    }
+                    Err(why) => (None, false, Some(why.to_string())),
                 };
                 ItemReport {
                     path: c.rel().to_path_buf(),
                     rule: c.rule_id().to_owned(),
                     class: c.class(),
                     bytes,
+                    shared,
                     refused,
                 }
             })
@@ -620,6 +624,8 @@ struct ItemReport {
     rule: String,
     class: Class,
     bytes: Option<u64>,
+    /// The folder shares space with files elsewhere; `bytes` is an upper estimate.
+    shared: bool,
     refused: Option<String>,
 }
 
@@ -634,6 +640,7 @@ impl ProjectReport {
                     "rule": i.rule,
                     "class": class_name(i.class),
                     "bytes": i.bytes,
+                    "shared": i.shared,
                     "refused": i.refused,
                 })
             })
@@ -771,11 +778,16 @@ fn print_project(p: &ProjectReport) {
     for item in &p.items {
         match item.bytes {
             Some(b) => say!(
-                "         {:>9}    {}  [{}]  {:?}",
+                "         {:>9}    {}  [{}]  {:?}{}",
                 human(b),
                 item.path.display(),
                 item.rule,
-                item.class
+                item.class,
+                if item.shared {
+                    "  (shares space with files elsewhere; may free less)"
+                } else {
+                    ""
+                }
             ),
             None => say!(
                 "         {:>9}    {}  [{}]  kept: {}",
@@ -792,6 +804,7 @@ fn print_project(p: &ProjectReport) {
 fn skip_names(skip: &Skip) -> (&'static str, String) {
     let name = match skip {
         Skip::Unreadable(_) => "unreadable",
+        Skip::Protected(_) => "protected",
         Skip::OtherVolume => "other_volume",
         Skip::DepthLimit => "depth_limit",
         Skip::EntryLimit => "entry_limit",
@@ -804,6 +817,9 @@ fn skip_names(skip: &Skip) -> (&'static str, String) {
 fn describe(skip: &Skip) -> String {
     match skip {
         Skip::Unreadable(why) => format!("could not be read: {why}"),
+        Skip::Protected(why) => {
+            format!("could not be read: {why}; macOS privacy protection, give OpenSweep Full Disk Access")
+        }
         Skip::OtherVolume => "on another volume".to_owned(),
         Skip::DepthLimit => "deeper than the depth limit".to_owned(),
         Skip::EntryLimit => {
@@ -1286,12 +1302,7 @@ fn print_run(run: &Manifest) {
     }
 }
 
-fn now_unix() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
+use opensweep_core::quarantine::now_unix;
 
 fn count(n: usize, noun: &str) -> String {
     if n == 1 {
@@ -1317,17 +1328,9 @@ fn human(bytes: u64) -> String {
     }
 }
 
-/// A Unix time as a UTC date, `YYYY-MM-DD` (Howard Hinnant's civil_from_days).
+/// A Unix time as a UTC date, `YYYY-MM-DD`.
 fn day(unix: u64) -> String {
-    let z = i64::try_from(unix / 86_400).unwrap_or(0) + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    let (y, m, d) = opensweep_core::quarantine::civil_from_days(unix / 86_400);
     format!("{y:04}-{m:02}-{d:02}")
 }
 

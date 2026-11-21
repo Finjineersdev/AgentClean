@@ -30,6 +30,7 @@ struct DevStackView: View {
                     if model.devStackLoading { ProgressView().controlSize(.small) } else { Label("Refresh", systemImage: "arrow.clockwise") }
                 }
                 .buttonStyle(SecondaryButtonStyle())
+                .accessibilityLabel(model.devStackLoading ? "Refreshing" : "Refresh")
                 .disabled(model.devStackLoading)
             }
             // A Menu, not a menu Picker: the picker's pop-up has no press action for VoiceOver.
@@ -55,6 +56,8 @@ struct DevStackView: View {
                             }
                         }
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Installed tools")
             }
         }
         .padding(28)

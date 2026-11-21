@@ -39,6 +39,17 @@ U8 (light appearance), R2 (UI tests, accessibility audit passing again), R4
 (Actions pinned, SBOM, build provenance), R6 (timing recorded). Left for the
 owner: R1, R3, R5, P7; C2 stays a toolchain.
 
+## Second pass (20 Nov 2026, after M5)
+
+| # | Gap | Status |
+| --- | --- | --- |
+| G1 | APFS clones (pnpm, Finder Duplicate) share blocks but were measured in full (F8) | See commit history |
+| G2 | The update check could not be turned off after Sparkle's first prompt (principle 1) | Settings switch |
+| G3 | The character and stats could not be turned off (F19) | Settings switch |
+| G4 | Keyboard: moving through projects and ticking folders without the mouse (N5) | See commit history |
+| G5 | No docs site or screenshots (M5) | See commit history |
+| G6 | Light palette and Reduce Motion unchecked after the solid-canvas redesign | Walkthrough takes `OPENSWEEP_QA_APPEARANCE` |
+
 ## 1. Product gaps (the idea is not delivered without these)
 
 | # | Gap | Evidence | Proposal |

@@ -31,7 +31,7 @@ struct RootView: View {
             }
         } detail: {
             ZStack {
-                AnimatedBackdrop(colors: backdrop)
+                Brand.canvas.ignoresSafeArea()
                 Group {
                     switch model.screen {
                     case .overview: OverviewView()
@@ -44,7 +44,7 @@ struct RootView: View {
                 .id(model.screen)
                 .transition(.page(reduce: reduce))
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.86), value: model.screen)
+            .animation(.smooth(duration: 0.3), value: model.screen)
         }
         .tint(Brand.teal)
         .alert("Something went wrong", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
@@ -77,12 +77,6 @@ struct RootView: View {
             await QAWalkthrough.run(model)
             #endif
         }
-    }
-
-    /// The backdrop glows in the colours of the biggest languages found.
-    private var backdrop: [Color] {
-        let top = LanguageStat.of(model.projects).prefix(3).map(\.ecosystem.color)
-        return top.count >= 2 ? Array(top) : [Brand.teal, Color(hex: 0x8B6CEF), Brand.sky]
     }
 
     /// Counts the sidebar shows next to a screen, when there is something to count.

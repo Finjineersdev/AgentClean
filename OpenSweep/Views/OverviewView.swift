@@ -39,6 +39,7 @@ struct OverviewView: View {
     @State private var hovered: String?
     @State private var opened: String?
     @AppStorage("accessBannerDismissed") private var accessDismissed = false
+    @AppStorage(Peep.showKey) private var showCharacter = true
 
     var body: some View {
         let stats = LanguageStat.of(model.projects)
@@ -54,7 +55,7 @@ struct OverviewView: View {
                     welcome.entrance(1)
                 } else {
                     hero(stats).entrance(1)
-                    if model.stats.cleaned > 0 { CleanedSoFar(stats: model.stats).entrance(2) }
+                    if showCharacter && model.stats.cleaned > 0 { CleanedSoFar(stats: model.stats).entrance(2) }
                     languages(stats)
                     if let id = opened, let s = stats.first(where: { $0.id == id }) {
                         LanguageDrawer(stat: s) { opened = nil }
@@ -63,12 +64,13 @@ struct OverviewView: View {
                     }
                 }
                 if model.summary != nil && !stats.isEmpty {
+                    SpaceFlow(stats: stats, hovered: $hovered).entrance(3)
                     DiskMap(stats: stats).entrance(3)
                 }
                 skippedFolders
             }
             .padding(.horizontal, 36).padding(.vertical, 30)
-            .frame(maxWidth: 1080, alignment: .leading)
+            .frame(maxWidth: 1440, alignment: .leading)
             .frame(maxWidth: .infinity)
             .animation(.spring(response: 0.5, dampingFraction: 0.85), value: opened)
         }
@@ -105,7 +107,7 @@ struct OverviewView: View {
             return "Hi! Scan your projects and I'll show where your disk went, language by language."
         }
         guard let top = stats.first else { return "All tidy. Nothing to clean right now." }
-        let milestone = Stats.milestone(for: model.stats.cleaned).map { " We have cleared over \(bytes($0)) together." } ?? ""
+        let milestone = (showCharacter ? Stats.milestone(for: model.stats.cleaned) : nil).map { " We have cleared over \(bytes($0)) together." } ?? ""
         if s.ready.bytes == 0 { return "\(top.ecosystem.name) holds the most, but nothing can go without a reinstall.\(milestone)" }
         return "\(bytes(s.ready.bytes)) can go right now. \(top.ecosystem.name) is the hungriest, at \(bytes(top.total)).\(milestone)"
     }
@@ -117,7 +119,6 @@ struct OverviewView: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Your disk, by language").font(.system(size: 40, weight: .bold)).tracking(-0.8).foregroundStyle(Brand.text)
                     .accessibilityAddTraits(.isHeader)
-                DoodleView(kind: .squiggle, color: Brand.teal, lineWidth: 3).frame(width: 220, height: 14)
                 Text("A scan reads your project folders and measures build output, dependencies and caches. It changes nothing. Cleaning moves folders to a quarantine you can undo.")
                     .font(.title3).foregroundStyle(Brand.muted).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
@@ -133,7 +134,6 @@ struct OverviewView: View {
         .padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(radius: 24)
-        .overlay(alignment: .topTrailing) { DoodleView(kind: .sparkle, color: Brand.amber, delay: 0.4).frame(width: 22, height: 22).offset(x: -24, y: 20) }
     }
 
     // MARK: Hero
@@ -154,10 +154,6 @@ struct OverviewView: View {
                 }
                 .font(.figure(68)).foregroundStyle(Brand.text)
                 .animation(.spring(response: 0.6), value: found)
-                .overlay(alignment: .topTrailing) {
-                    DoodleView(kind: .sparkle, color: Brand.amber, delay: 0.6).frame(width: 20, height: 20).offset(x: 24, y: -6)
-                }
-                DoodleView(kind: .squiggle, color: Brand.teal, lineWidth: 3, delay: 0.3).frame(width: 200, height: 14)
                 if let s = model.summary {
                     Text("\(s.ready.folders) folders that rebuild on their own, across \(stats.count) \(stats.count == 1 ? "language" : "languages").")
                         .font(.title3).foregroundStyle(Brand.muted)
@@ -167,7 +163,7 @@ struct OverviewView: View {
                         if s.active.bytes > 0 { StatusChip(text: "\(bytes(s.active.bytes)) in active projects", systemImage: "bolt.fill", tint: Brand.sky) }
                     }
                 } else {
-                    ScanningLine().frame(width: 260, height: 18)
+                    ProgressView().progressViewStyle(.linear).tint(Brand.teal).frame(width: 260)
                     Text("\(model.projects.count) projects so far").font(.title3).foregroundStyle(Brand.muted)
                         .contentTransition(.numericText(value: Double(model.projects.count)))
                         .animation(.spring, value: model.projects.count)
@@ -176,7 +172,6 @@ struct OverviewView: View {
             Spacer(minLength: 0)
             LanguageRing(stats: stats, highlighted: hovered)
                 .frame(width: 230, height: 230)
-                .overlay(alignment: .bottomLeading) { DoodleView(kind: .loops, color: Brand.slate.opacity(0.5), lineWidth: 2, delay: 0.8).frame(width: 90, height: 26).offset(x: -60, y: 6) }
         }
         .padding(30)
         .glassCard(radius: 24)
@@ -188,7 +183,6 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("By language").font(.title2.bold()).foregroundStyle(Brand.text).accessibilityAddTraits(.isHeader)
-                DoodleView(kind: .zigzag, color: Brand.amber, lineWidth: 2, delay: 0.5).frame(width: 34, height: 10)
                 Spacer()
                 Text("Pick one to see its projects").font(.callout).foregroundStyle(Brand.muted)
             }
@@ -200,7 +194,7 @@ struct OverviewView: View {
                         opened = opened == s.id ? nil : s.id
                     } label: {
                         LanguageCard(stat: s, share: Double(s.total) / Double(max(biggest, 1)), open: opened == s.id, index: i)
-                            .hoverTilt(s.ecosystem.color)
+                            .hoverLift(s.ecosystem.color)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("language.\(s.id)")
@@ -220,7 +214,7 @@ struct OverviewView: View {
             DisclosureGroup("\(model.skipped.count) folders were not scanned") {
                 ForEach(model.skipped, id: \.path) { s in
                     HStack {
-                        Text((s.path as NSString).abbreviatingWithTildeInPath).font(.caption.monospaced())
+                        Text(tildePath(s.path)).font(.caption.monospaced())
                             .lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Text(s.detail).font(.caption)
@@ -273,7 +267,7 @@ struct LanguageCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(LinearGradient(colors: [c.opacity(open ? 0.22 : 0.12), Brand.surface], startPoint: .topLeading, endPoint: .center))
+                .fill(open ? c.opacity(0.08) : .clear)
                 .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Brand.surface)))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(open ? c.opacity(0.7) : Brand.hairline, lineWidth: open ? 1.5 : 1))
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -431,24 +425,10 @@ struct LogoOrbit: View {
                 Circle().stroke(style: StrokeStyle(lineWidth: 1, dash: [3, 7])).foregroundStyle(Brand.slate.opacity(0.35)).padding(26)
                 Circle().stroke(style: StrokeStyle(lineWidth: 1, dash: [2, 9])).foregroundStyle(Brand.slate.opacity(0.2)).padding(80)
                 Peep(mood: .calm, size: 120, backdrop: Brand.teal)
-                DoodleView(kind: .sparkle, color: Brand.amber, delay: 0.2).frame(width: 18, height: 18).offset(x: 62, y: -58)
-                DoodleView(kind: .plus, color: Brand.teal, lineWidth: 2, delay: 0.5).frame(width: 12, height: 12).offset(x: -70, y: 50)
             }
             .frame(width: g.size.width, height: g.size.height)
         }
         .accessibilityHidden(true)
-    }
-}
-
-/// A squiggle that keeps drawing itself while a scan runs.
-struct ScanningLine: View {
-    @State private var phase: CGFloat = 0
-    var body: some View {
-        Doodle(kind: .squiggle)
-            .trim(from: max(0, phase - 0.35), to: phase)
-            .stroke(Brand.teal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            .accessibilityHidden(true)
-            .onAppear { withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) { phase = 1.35 } }
     }
 }
 
@@ -496,7 +476,7 @@ struct ProjectRow: View {
             EcosystemStack(ecosystems: project.ecosystems.isEmpty ? [Ecosystem.of(rule: "")] : project.ecosystems)
             VStack(alignment: .leading, spacing: 3) {
                 Text(URL(fileURLWithPath: project.root).lastPathComponent).font(.body.weight(.semibold)).foregroundStyle(Brand.text)
-                Text((project.root as NSString).abbreviatingWithTildeInPath)
+                Text(tildePath(project.root))
                     .font(.caption.monospaced()).foregroundStyle(Brand.muted).lineLimit(1).truncationMode(.middle)
             }
             Spacer(minLength: 12)

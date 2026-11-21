@@ -26,6 +26,8 @@ struct HistoryView: View {
                     }
                     .fixedSize()
                     .disabled(model.stats.held == 0)
+                    // macOS 15 does not take the label from the menu's title.
+                    .accessibilityLabel("Free older runs")
                     .accessibilityIdentifier("purgeOlder")
                 }
                 totals
@@ -113,7 +115,7 @@ struct HistoryView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(e.state == .moved ? Brand.teal : Brand.slate)
                         .frame(width: 70, alignment: .leading)
-                    Text((e.original as NSString).abbreviatingWithTildeInPath)
+                    Text(tildePath(e.original))
                         .font(.callout.monospaced()).foregroundStyle(Brand.text)
                         .lineLimit(1).truncationMode(.middle)
                     if let note = e.note { Text(note).font(.caption).foregroundStyle(Brand.amber) }

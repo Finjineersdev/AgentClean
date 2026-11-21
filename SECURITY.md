@@ -57,7 +57,18 @@ never appear as caches.
 
 The Dev Stack screen reads what tools are installed (Homebrew, version
 managers, Docker through your `docker` CLI) and shows each tool's own removal
-command for you to copy. It never runs those commands.
+command for you to copy. It never runs those commands. A name with anything a
+shell would read as more than a word gets no command, so a planted file name
+cannot become a pasteable payload.
+
+## Known limitations
+
+- **Builds without a Developer ID are not hardened.** Until releases are
+  signed with a Developer ID and notarized, the app ships with an ad-hoc
+  signature and without the hardened runtime (macOS refuses to load the bundled
+  Sparkle framework otherwise). Another program running as you could then
+  inject code into OpenSweep and use any Full Disk Access you granted it. If
+  that matters to you, use the CLI, or do not grant Full Disk Access.
 
 ## Reporting
 

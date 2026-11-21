@@ -40,6 +40,7 @@ app (M3) reads. Snapshots of each shape live in
 | `rule` | string | Rule id (`node`, `rust`, …) |
 | `class` | `"safe"` \| `"caution"` | Safe needs no user action to rebuild |
 | `bytes` | integer or null | Size, when the guard allows the folder |
+| `shared` | bool | Some files are hard links to, or a pnpm or Bun install cloned from, files elsewhere: `bytes` is an upper estimate |
 | `refused` | string or null | Why the guard refuses it, when it does |
 
 In `scan` and `plan`, activity does not refuse items: an active project's
@@ -69,7 +70,8 @@ backup; each is walked on its own volume:
 {"schema_version":1,"type":"summary","projects":12,"ready":{"folders":3,"bytes":0},"caution":{…},"active":{…}}
 ```
 
-`reason` for a skipped folder is one of `unreadable`, `other_volume`,
+`reason` for a skipped folder is one of `unreadable`, `protected` (refused by
+macOS privacy protection; Full Disk Access fixes it), `other_volume`,
 `depth_limit`, `entry_limit`, `excluded`, `installed` (installed software such
 as Homebrew or `/Applications`, never walked or cleaned). The summary is always last: `ready`
 is what `clean` takes with no flags, `caution` what `--include-caution` adds,

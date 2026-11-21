@@ -24,9 +24,12 @@ public struct Item: Codable, Sendable, Hashable {
     public let bytes: UInt64?
     /// Why the guard refuses it, when it does.
     public let refused: String?
+    /// Shares space with files elsewhere (pnpm or Bun store, hard links):
+    /// `bytes` is an upper estimate. Older engines leave it out.
+    public var shared: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
-        case path, rule, kind = "class", bytes, refused
+        case path, rule, kind = "class", bytes, refused, shared
     }
 }
 
@@ -55,6 +58,8 @@ public struct ScanSummary: Codable, Sendable, Hashable {
 
 public enum SkipReason: String, Codable, Sendable {
     case unreadable
+    /// Refused by macOS privacy protection; Full Disk Access fixes it.
+    case protected
     case otherVolume = "other_volume"
     case depthLimit = "depth_limit"
     case entryLimit = "entry_limit"

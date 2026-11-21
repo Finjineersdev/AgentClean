@@ -325,6 +325,7 @@ name = "opensweep-core"
 version = "0.0.1"
 dependencies = [
  "proptest",
+ "rustix",
  "serde",
  "serde_json",
  "tempfile",

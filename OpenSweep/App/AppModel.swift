@@ -72,7 +72,7 @@ final class AppModel {
     func recheckAccess() { fullDiskAccess = FullDiskAccess.granted }
 
     /// Folders the last scan could not read because of macOS privacy settings.
-    var privacyBlocked: Int { skipped.filter { $0.detail.contains("Operation not permitted") }.count }
+    var privacyBlocked: Int { skipped.filter { $0.reason == .protected }.count }
 
     /// Quarantined runs are purged after this many days, freeing their space; 0 keeps them until purged by hand.
     var autoFreeDays: Int {
@@ -116,7 +116,7 @@ final class AppModel {
 
     /// What the scan covers, for people.
     var scanScope: String {
-        wholeDisk ? (otherDrives ? "your whole Mac and other drives" : "your whole Mac") : scanRoots.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", ")
+        wholeDisk ? (otherDrives ? "your whole Mac and other drives" : "your whole Mac") : scanRoots.map { tildePath($0) }.joined(separator: ", ")
     }
 
     init() {
@@ -138,11 +138,15 @@ final class AppModel {
         if engine == nil { error = "The engine is missing from the app bundle. Reinstall OpenSweep." }
     }
 
-    /// The bundled binary, or OPENSWEEP_BIN when developing.
+    /// The bundled binary, or OPENSWEEP_BIN in Debug builds. Release builds
+    /// never take the engine path from the environment: the engine runs with
+    /// the app's Full Disk Access.
     static func locateEngine() -> URL? {
+        #if DEBUG
         if let dev = ProcessInfo.processInfo.environment["OPENSWEEP_BIN"] {
             return URL(fileURLWithPath: dev)
         }
+        #endif
         // Contents/Helpers: Contents/MacOS ignores case and holds OpenSweep.
         let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/opensweep")
         return FileManager.default.isExecutableFile(atPath: helper.path) ? helper : nil
@@ -174,7 +178,7 @@ final class AppModel {
                 for try await event in engine.scan(roots: roots, wholeDisk: whole, otherDrives: drives) {
                     switch event {
                     case .project(let p): projects.append(p)
-                    case .skipped(let path, _, let detail): skipped.append(SkippedFolder(path: path, detail: detail))
+                    case .skipped(let path, let reason, let detail): skipped.append(SkippedFolder(path: path, detail: detail, reason: reason))
                     case .summary(let s): summary = s
                     }
                 }
@@ -195,7 +199,9 @@ final class AppModel {
             let fresh = try await engine.plan(project: URL(fileURLWithPath: root)).project
             if let i = projects.firstIndex(where: { $0.root == root }) { projects[i] = fresh }
         } catch {
-            projects.removeAll { $0.root == root }
+            // A project whose folder is gone leaves the list; any other
+            // failure keeps it and says what went wrong.
+            if FileManager.default.fileExists(atPath: root) { fail(error) } else { projects.removeAll { $0.root == root } }
         }
         if persist { settle() }
     }
@@ -263,9 +269,11 @@ final class AppModel {
     func runScheduleIfDue(now: Date = Date()) async {
         guard !testRun, let interval = autoClean.interval, !scanning else { return }
         if let last = lastAutoClean, now.timeIntervalSince(last) < interval { return }
+        // This scan's own outcome decides, not an older error still on screen.
+        let before = lastScan
         toggleScan()
         await scanTask?.value
-        guard error == nil, summary != nil else { return }
+        guard lastScan != before, summary != nil else { return }
         lastAutoClean = now
         guard let run = await runSchedule(cap: UInt64(max(autoCleanCapGB, 1)) * 1_000_000_000) else { return }
         let moved = run.entries.filter { $0.state == .moved }
@@ -518,6 +526,8 @@ enum FullDiskAccess {
 struct SkippedFolder: Codable, Hashable {
     let path: String
     let detail: String
+    /// Missing in summaries saved by older versions.
+    var reason: SkipReason? = nil
 }
 
 /// Folders ticked in one project, for a clean.

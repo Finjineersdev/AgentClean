@@ -3,7 +3,8 @@
 #
 # One time, by the owner: creates OpenSweep's Sparkle update key and stores it
 # on GitHub (docs/RELEASING.md). The private key stays in your login keychain
-# (that is its backup) and goes to the SPARKLE_PRIVATE_KEY secret through a
+# (that is its backup) and goes to the release environment's
+# SPARKLE_PRIVATE_KEY secret through a
 # temporary file that is erased. Run as yourself, not with sudo: the keychain
 # is per user.
 set -euo pipefail
@@ -29,7 +30,9 @@ PUBLIC=$("$BIN/generate_keys" --account "$ACCOUNT" -p)
 TMP=$(mktemp -d)
 trap 'rm -P "$TMP/key" 2>/dev/null || true; rm -rf "$TMP"' EXIT
 "$BIN/generate_keys" --account "$ACCOUNT" -x "$TMP/key" >/dev/null
-gh secret set SPARKLE_PRIVATE_KEY -R "$REPO" < "$TMP/key"
+# Only the release environment can read it (scripts/protect-releases.sh).
+gh secret set SPARKLE_PRIVATE_KEY --env release -R "$REPO" < "$TMP/key"
+gh secret delete SPARKLE_PRIVATE_KEY -R "$REPO" 2>/dev/null || true
 gh variable set SPARKLE_PUBLIC_KEY -R "$REPO" --body "$PUBLIC"
 
 echo "Done. Public key: $PUBLIC"

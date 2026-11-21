@@ -141,6 +141,130 @@ impl Approved {
     }
 }
 
+/// Why [`Approved::move_into`] did not move.
+#[derive(Debug)]
+pub(crate) enum MoveFailed {
+    /// The entry under the parent's handle is not the approved directory.
+    Changed,
+    Io(std::io::Error),
+}
+
+impl Approved {
+    /// Moves the directory to `dest_dir/name`. Call [`Approved::reverify`]
+    /// first. The parent is opened once; the entry under that handle must
+    /// still be the approved directory (device and inode), and the rename
+    /// goes from the same handle, so a folder on the way swapped for a link
+    /// after `reverify` cannot redirect it. Never replaces anything.
+    #[cfg(unix)]
+    pub(crate) fn move_into(&self, dest_dir: &Path, name: &OsStr) -> Result<(), MoveFailed> {
+        use rustix::fs::{statat, AtFlags, FileType};
+        let (Some(parent), Some(own)) = (self.path.parent(), self.path.file_name()) else {
+            return Err(MoveFailed::Changed);
+        };
+        let from = open_dir(parent).map_err(|_| MoveFailed::Changed)?;
+        let st = statat(&from, own, AtFlags::SYMLINK_NOFOLLOW).map_err(|_| MoveFailed::Changed)?;
+        // Same conversions as std's `MetadataExt`, which made `self.id`.
+        #[allow(clippy::unnecessary_cast, clippy::cast_sign_loss)]
+        let id = (st.st_dev as u64, st.st_ino as u64);
+        if FileType::from_raw_mode(st.st_mode) != FileType::Directory
+            || id != (self.id.dev, self.id.ino)
+        {
+            return Err(MoveFailed::Changed);
+        }
+        let to = open_dir(dest_dir).map_err(MoveFailed::Io)?;
+        rename_excl(&from, own, &to, name).map_err(MoveFailed::Io)
+    }
+
+    #[cfg(not(unix))]
+    pub(crate) fn move_into(&self, dest_dir: &Path, name: &OsStr) -> Result<(), MoveFailed> {
+        let dest = dest_dir.join(name);
+        if fs::symlink_metadata(&dest).is_ok() {
+            return Err(MoveFailed::Io(std::io::ErrorKind::AlreadyExists.into()));
+        }
+        fs::rename(&self.path, dest).map_err(MoveFailed::Io)
+    }
+}
+
+/// Renames `from_dir/from` to `to_dir/to` through open handles, never
+/// replacing anything there (an empty folder included). `to_dir` must be
+/// a real path: if the handle opened is a different folder, because one on
+/// the way is now a link, nothing moves.
+#[cfg(unix)]
+pub(crate) fn rename_into(
+    from_dir: &Path,
+    from: &OsStr,
+    to_dir: &Path,
+    to: &OsStr,
+) -> std::io::Result<()> {
+    let src = open_dir(from_dir)?;
+    let dst = open_dir(to_dir)?;
+    if real_path(&dst)?.as_deref() != Some(to_dir) {
+        return Err(std::io::Error::other(
+            "the folder it came from is now a link or has moved",
+        ));
+    }
+    rename_excl(&src, from, &dst, to)
+}
+
+#[cfg(not(unix))]
+pub(crate) fn rename_into(
+    from_dir: &Path,
+    from: &OsStr,
+    to_dir: &Path,
+    to: &OsStr,
+) -> std::io::Result<()> {
+    let dest = to_dir.join(to);
+    if fs::symlink_metadata(&dest).is_ok() {
+        return Err(std::io::ErrorKind::AlreadyExists.into());
+    }
+    fs::rename(from_dir.join(from), dest)
+}
+
+/// Opens a directory; a link as its last component is refused.
+#[cfg(unix)]
+fn open_dir(p: &Path) -> std::io::Result<rustix::fd::OwnedFd> {
+    use rustix::fs::{Mode, OFlags};
+    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    Ok(rustix::fs::open(p, flags, Mode::empty())?)
+}
+
+/// The path the kernel holds for an open folder.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn real_path(fd: &rustix::fd::OwnedFd) -> std::io::Result<Option<PathBuf>> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = rustix::fs::getpath(fd)?;
+    Ok(Some(PathBuf::from(OsStr::from_bytes(c.as_bytes()))))
+}
+
+#[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+fn real_path(fd: &rustix::fd::OwnedFd) -> std::io::Result<Option<PathBuf>> {
+    use rustix::fd::AsRawFd;
+    fs::read_link(format!("/proc/self/fd/{}", fd.as_raw_fd())).map(Some)
+}
+
+/// `renameat` that fails if the destination exists. A Linux file system
+/// without RENAME_NOREPLACE falls back to a check and a plain rename.
+#[cfg(unix)]
+fn rename_excl(
+    src: &rustix::fd::OwnedFd,
+    from: &OsStr,
+    dst: &rustix::fd::OwnedFd,
+    to: &OsStr,
+) -> std::io::Result<()> {
+    use rustix::fs::{renameat, renameat_with, statat, AtFlags, RenameFlags};
+    use rustix::io::Errno;
+    match renameat_with(src, from, dst, to, RenameFlags::NOREPLACE) {
+        Err(Errno::INVAL | Errno::NOSYS | Errno::NOTSUP) => {
+            // ponytail: check-then-rename on file systems without NOREPLACE.
+            if statat(dst, to, AtFlags::SYMLINK_NOFOLLOW).is_ok() {
+                return Err(std::io::ErrorKind::AlreadyExists.into());
+            }
+            Ok(renameat(src, from, dst, to)?)
+        }
+        other => Ok(other?),
+    }
+}
+
 /// Smallest number of components a project root may have (`/a/b`).
 const MIN_ROOT_DEPTH: usize = 2;
 
@@ -180,10 +304,16 @@ impl Guard {
         if activity.pinned() {
             return Err(Refusal::Pinned);
         }
+        // A kept folder protects everything around it: the folder itself,
+        // anything inside it, and any artifact that contains it. Case is
+        // ignored, as macOS ignores it; refusing more on Linux is safe.
+        let folded = |p: &Path| PathBuf::from(p.to_string_lossy().to_lowercase());
+        let rel = folded(candidate.rel());
         if activity
             .kept()
             .iter()
-            .any(|k| candidate.rel().starts_with(k))
+            .map(|k| folded(k))
+            .any(|k| rel.starts_with(&k) || k.starts_with(&rel))
         {
             return Err(Refusal::KeptByRepository);
         }
@@ -370,8 +500,29 @@ fn too_shallow(root: &Path) -> bool {
 
 /// git in `root`, with every setting that could run a program supplied by
 /// the (untrusted) repository switched off. Callers add the subcommand.
+/// The folders of a PATH value that are absolute. An empty or relative
+/// entry means "the current folder", which inside a scanned repository would
+/// find the repository's own `git` or `npm`.
+pub(crate) fn absolute_dirs(path: Option<&std::ffi::OsStr>) -> Vec<PathBuf> {
+    path.map(|p| {
+        std::env::split_paths(p)
+            .filter(|d| d.is_absolute())
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+/// git, found through absolute PATH folders only.
+fn git_program(path: Option<&std::ffi::OsStr>) -> PathBuf {
+    absolute_dirs(path)
+        .into_iter()
+        .map(|d| d.join("git"))
+        .find(|g| g.is_file())
+        .unwrap_or_else(|| PathBuf::from("/usr/bin/git"))
+}
+
 pub(crate) fn hardened_git(root: &Path) -> Command {
-    let mut git = Command::new("git");
+    let mut git = Command::new(git_program(std::env::var_os("PATH").as_deref()));
     git.args([
         "-c",
         "core.fsmonitor=false",
@@ -445,5 +596,25 @@ mod tests {
         assert!(too_shallow(Path::new("/Users")));
         assert!(!too_shallow(Path::new("/Users/dev")));
         assert!(!too_shallow(Path::new("/Users/dev/proj")));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod path_tests {
+    use super::{absolute_dirs, git_program};
+    use std::ffi::OsStr;
+
+    /// A repository's own `git` is never found through `.` or an empty entry.
+    #[cfg(unix)]
+    #[test]
+    fn relative_path_entries_are_ignored() {
+        let dirs = absolute_dirs(Some(OsStr::new(".::bin:/usr/bin")));
+        assert_eq!(dirs, vec![std::path::PathBuf::from("/usr/bin")]);
+
+        assert_eq!(
+            git_program(Some(OsStr::new(".:"))),
+            std::path::PathBuf::from("/usr/bin/git")
+        );
     }
 }

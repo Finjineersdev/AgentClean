@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Motion, doodles and characters. Every moving piece stops or shortens when
+// Motion and characters. Every moving piece stops or shortens when
 // the person turns on Reduce Motion. The characters are Open Peeps by Pablo
-// Stanley (CC0), see docs/THIRD-PARTY.md; the doodles are drawn here.
+// Stanley (CC0), see docs/THIRD-PARTY.md.
 
 import SwiftUI
 import AppKit
@@ -53,7 +53,7 @@ struct Ambient<Content: View>: View {
 
 // MARK: - Entrances
 
-/// Fades, lifts and un-blurs a view the first time it appears; `delay` staggers lists.
+/// Fades and lifts a view the first time it appears; `delay` staggers lists.
 struct Entrance: ViewModifier {
     let delay: Double
     let edge: Edge
@@ -64,12 +64,10 @@ struct Entrance: ViewModifier {
         let still = shown || reduce
         content
             .opacity(shown ? 1 : 0)
-            .offset(x: still ? 0 : (edge == .leading ? -24 : edge == .trailing ? 24 : 0),
-                    y: still ? 0 : (edge == .bottom ? 18 : edge == .top ? -18 : 0))
-            .scaleEffect(still ? 1 : 0.97)
-            .blur(radius: still ? 0 : 6)
+            .offset(x: still ? 0 : (edge == .leading ? -12 : edge == .trailing ? 12 : 0),
+                    y: still ? 0 : (edge == .bottom ? 10 : edge == .top ? -10 : 0))
             .onAppear {
-                withAnimation(reduce ? .easeOut(duration: 0.2) : .spring(response: 0.55, dampingFraction: 0.82).delay(delay)) { shown = true }
+                withAnimation(reduce ? .easeOut(duration: 0.2) : .smooth(duration: 0.45).delay(delay)) { shown = true }
             }
     }
 }
@@ -77,17 +75,17 @@ struct Entrance: ViewModifier {
 extension View {
     /// Item `index` of a list enters a little after the one before it.
     func entrance(_ index: Int = 0, from edge: Edge = .bottom) -> some View {
-        modifier(Entrance(delay: min(Double(index) * 0.05, 0.5), edge: edge))
+        modifier(Entrance(delay: min(Double(index) * 0.04, 0.32), edge: edge))
     }
 
-    func hoverTilt(_ tint: Color) -> some View { modifier(HoverTilt(tint: tint)) }
+    func hoverLift(_ tint: Color, radius: CGFloat = 18) -> some View { modifier(HoverLift(tint: tint, radius: radius)) }
 }
 
 /// How a whole screen arrives when the sidebar changes it.
 struct PageShift: ViewModifier {
     let on: Bool
     func body(content: Content) -> some View {
-        content.opacity(on ? 0 : 1).offset(x: on ? 40 : 0).blur(radius: on ? 10 : 0)
+        content.opacity(on ? 0 : 1).offset(y: on ? 8 : 0)
     }
 }
 
@@ -100,159 +98,21 @@ extension AnyTransition {
 
 // MARK: - Hover
 
-/// Leans toward the pointer, lifts and lights up in its own colour.
-struct HoverTilt: ViewModifier {
+/// Lifts a card a couple of points and edges it in its own colour.
+struct HoverLift: ViewModifier {
     let tint: Color
-    @State private var point: CGPoint?
-    @State private var size: CGSize = .zero
+    let radius: CGFloat
+    @State private var hover = false
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     func body(content: Content) -> some View {
-        let dx = point.map { ($0.x / max(size.width, 1)) - 0.5 } ?? 0
-        let dy = point.map { ($0.y / max(size.height, 1)) - 0.5 } ?? 0
         content
-            .overlay {
-                if let point {
-                    RadialGradient(colors: [tint.opacity(0.22), .clear],
-                                   center: UnitPoint(x: point.x / max(size.width, 1), y: point.y / max(size.height, 1)),
-                                   startRadius: 0, endRadius: 220)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
-            .background(GeometryReader { g in Color.clear.onAppear { size = g.size }.onChange(of: g.size) { size = g.size } }.accessibilityHidden(true))
-            .rotation3DEffect(.degrees(reduce ? 0 : 7), axis: (x: -dy, y: dx, z: 0), perspective: 0.6)
-            .scaleEffect(point == nil || reduce ? 1 : 1.025)
-            .shadow(color: tint.opacity(point == nil ? 0 : 0.28), radius: 22, y: 10)
-            .zIndex(point == nil ? 0 : 1)
-            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: point)
-            .onContinuousHover { phase in
-                switch phase {
-                case .active(let p): point = p
-                case .ended: point = nil
-                }
-            }
-    }
-}
-
-// MARK: - Backdrop
-
-/// Slow drifting light in the colours of your languages, over a faint dot grid.
-struct AnimatedBackdrop: View {
-    var colors: [Color]
-
-    var body: some View {
-        ZStack {
-            Brand.canvas
-            Ambient { t in
-                Canvas { ctx, size in
-                    for (i, c) in colors.prefix(4).enumerated() {
-                        let p = Double(i) * 1.9
-                        let x = size.width * (0.5 + 0.42 * sin(t * 0.05 + p))
-                        let y = size.height * (0.5 + 0.40 * cos(t * 0.037 + p * 1.3))
-                        let r = max(size.width, size.height) * 0.42
-                        ctx.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r)),
-                                 with: .radialGradient(Gradient(colors: [c.opacity(0.12), c.opacity(0)]),
-                                                       center: CGPoint(x: x, y: y), startRadius: 0, endRadius: r))
-                    }
-                }
-            }
-            Canvas { ctx, size in
-                var dots = Path()
-                let step: CGFloat = 28
-                var y = step / 2
-                while y < size.height {
-                    var x = step / 2
-                    while x < size.width { dots.addEllipse(in: CGRect(x: x - 0.8, y: y - 0.8, width: 1.6, height: 1.6)); x += step }
-                    y += step
-                }
-                ctx.fill(dots, with: .color(Brand.text.opacity(0.05)))
-            }
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Doodles
-
-/// Hand-drawn marks, each in a unit box.
-struct Doodle: Shape {
-    enum Kind { case sparkle, squiggle, loops, arrow, scribbleCircle, zigzag, plus }
-    let kind: Kind
-
-    func path(in r: CGRect) -> Path {
-        var p = Path()
-        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: r.minX + x * r.width, y: r.minY + y * r.height) }
-        func curve(_ steps: Int, _ f: (CGFloat) -> CGPoint) {
-            for i in 0...steps {
-                let q = f(CGFloat(i) / CGFloat(steps))
-                if i == 0 { p.move(to: q) } else { p.addLine(to: q) }
-            }
-        }
-        switch kind {
-        case .sparkle:
-            p.move(to: pt(0.5, 0))
-            p.addQuadCurve(to: pt(1, 0.5), control: pt(0.56, 0.44))
-            p.addQuadCurve(to: pt(0.5, 1), control: pt(0.56, 0.56))
-            p.addQuadCurve(to: pt(0, 0.5), control: pt(0.44, 0.56))
-            p.addQuadCurve(to: pt(0.5, 0), control: pt(0.44, 0.44))
-        case .squiggle:
-            curve(80) { t in pt(t, 0.5 - 0.38 * sin(t * .pi * 5) * (0.6 + 0.4 * t)) }
-        case .loops:
-            curve(160) { t in pt(0.06 + t * 0.82 + 0.08 * cos(t * .pi * 8 + .pi), 0.5 + 0.38 * sin(t * .pi * 8)) }
-        case .arrow:
-            p.move(to: pt(0.02, 0.9))
-            p.addCurve(to: pt(0.92, 0.18), control1: pt(0.2, 0.2), control2: pt(0.6, 0.02))
-            p.move(to: pt(0.72, 0.08))
-            p.addLine(to: pt(0.93, 0.17))
-            p.addLine(to: pt(0.84, 0.38))
-        case .scribbleCircle:
-            curve(120) { t in
-                let a = t * .pi * 2.25 - .pi / 2
-                let k = 1 + 0.05 * sin(t * 11)
-                return pt(0.5 + 0.47 * k * cos(a), 0.5 + 0.44 * k * sin(a))
-            }
-        case .zigzag:
-            curve(6) { t in pt(t, Int((t * 6).rounded()) % 2 == 0 ? 0.8 : 0.2) }
-        case .plus:
-            p.move(to: pt(0.5, 0.05)); p.addLine(to: pt(0.5, 0.95))
-            p.move(to: pt(0.05, 0.5)); p.addLine(to: pt(0.95, 0.5))
-        }
-        return p
-    }
-}
-
-/// A doodle that draws itself in, then drifts and, for sparkles, twinkles.
-struct DoodleView: View {
-    let kind: Doodle.Kind
-    var color: Color = Brand.teal
-    var lineWidth: CGFloat = 2.5
-    var delay: Double = 0
-    @State private var drawn: CGFloat = 0
-    @Environment(\.accessibilityReduceMotion) private var reduce
-
-    var body: some View {
-        Group {
-            if kind == .sparkle {
-                Ambient { t in
-                    let w = sin(t * 2.4 + delay * 3)
-                    Doodle(kind: kind).fill(color)
-                        .scaleEffect(drawn * (0.9 + 0.2 * w))
-                        .rotationEffect(.degrees(5 + 15 * w))
-                }
-            } else {
-                Doodle(kind: kind).trim(from: 0, to: drawn)
-                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
-            }
-        }
-        .accessibilityHidden(true)
-        .allowsHitTesting(false)
-        .onAppear {
-            if reduce { drawn = 1; return }
-            withAnimation(.easeInOut(duration: 0.9).delay(delay)) { drawn = 1 }
-        }
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(tint.opacity(hover ? 0.55 : 0), lineWidth: 1).allowsHitTesting(false))
+            .offset(y: hover && !reduce ? -2 : 0)
+            .shadow(color: .black.opacity(hover ? 0.18 : 0), radius: 16, y: 8)
+            .animation(.smooth(duration: 0.22), value: hover)
+            .onHover { hover = $0 }
     }
 }
 
@@ -276,8 +136,11 @@ struct Blob: Shape {
 
 // MARK: - Characters
 
-/// One of the Open Peeps cast on a lumpy coloured blob, bobbing gently.
+/// One of the Open Peeps cast on a lumpy coloured blob. Still at rest; the
+/// face swaps with a small spring when the mood changes.
 struct Peep: View {
+    /// Settings switch for the character and the cleaning stats (F19).
+    static let showKey = "showCharacter"
     enum Mood: String { case happy, talk, calm, wow, lol }
     let asset: String
     var size: CGFloat = 96
@@ -292,13 +155,14 @@ struct Peep: View {
         asset = "peep-crew-\(crew)"; self.size = size; self.backdrop = backdrop; self.phase = phase
     }
 
+    @AppStorage(Peep.showKey) private var show = true
+
     var body: some View {
-        Ambient { t in
-            let w = sin(t * 3.6 + phase)
-            figure
-                .offset(y: size * 0.04 * w)
-                .rotationEffect(.degrees(3 * w))
-        }
+        if show { shown }
+    }
+
+    private var shown: some View {
+        figure
         .animation(.spring(response: 0.4, dampingFraction: 0.6), value: asset)
         .accessibilityHidden(true)
     }

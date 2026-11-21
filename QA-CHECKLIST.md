@@ -17,6 +17,9 @@ cat $Q/out/report.txt      # every line must start with PASS
 open $Q/out                # window snapshots of every screen
 ```
 
+Run it twice, with `OPENSWEEP_QA_APPEARANCE=light` and `=dark`, to check both
+palettes whatever the system uses.
+
 For the Caches steps, also create `$Q/home/.npm/_cacache/blob`,
 `$Q/home/.gradle/caches/x`, and a stand-in `$Q/bin/npm` that removes
 `$HOME/.npm/_cacache`, and launch with `PATH=$Q/bin:/usr/bin:/bin` so the real
@@ -24,6 +27,10 @@ npm is never run.
 
 The walkthrough expects projects named `shop-web` (dormant Next.js),
 `live-api` (active) and `keep-me` (pinned); see `OpenSweep/App/QAWalkthrough.swift`.
+
+README screenshots (`docs/assets/screens`) come from this walkthrough in
+both appearances, with the projects under `$Q/home/code` so paths show as
+`~/code/...`; resize with `sips -Z 1400`.
 
 ## UI tests
 
@@ -50,3 +57,4 @@ CI runs them on macOS 15 with Xcode 16.
 | 13 | Overview: **Review all ready** | One sheet lists every idle project's Safe folders; Move, then Undo restores all of them in one step |
 | 14 | Quit and reopen | The last scan shows at once; an hour later it rescans in the background (Settings → Rescan when OpenSweep opens) |
 | 12 | VoiceOver (⌘F5) on Projects | Each folder checkbox reads its name, class and size |
+| 15 | Projects, keyboard only | ↑/↓ choose a project; → enters its folders; ↑/↓ and Space tick them; ← goes back |

@@ -24,7 +24,7 @@ let package = Package(
         ),
         .testTarget(
             name: "AgentEngineTests",
-            dependencies: ["AgentEngine"],
+            dependencies: ["AgentEngine", "CleanCore"],
             path: "Tests/AgentEngineTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

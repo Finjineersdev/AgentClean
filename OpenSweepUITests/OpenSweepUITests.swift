@@ -177,7 +177,7 @@ final class OpenSweepUITests: XCTestCase {
         XCTAssertTrue(purge.waitForExistence(timeout: 10))
         shot("08-history")
         purge.click()
-        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 10) || app.buttons["confirmPurge"].waitForExistence(timeout: 1))
+        XCTAssertTrue(waitFor { self.app.buttons["Cancel"].exists || self.app.buttons["confirmPurge"].exists }, "purge asks first")
         shot("09-purge-confirmation")
         app.typeKey(.escape, modifierFlags: [])
 
@@ -195,6 +195,13 @@ final class OpenSweepUITests: XCTestCase {
         XCTAssertTrue(box.waitForExistence(timeout: 15))
         XCTAssertFalse(checked("cache.npm"), "caches are never pre-selected")
         XCTAssertFalse(app.buttons["caches.clear"].isEnabled)
+        // The cache map ticks a cache like its checkbox, and unticks it.
+        let block = app.buttons["cachemap.npm"]
+        XCTAssertTrue(block.exists, "the cache map shows npm")
+        block.click()
+        XCTAssertTrue(checked("cache.npm"), "a block ticks its cache")
+        block.click()
+        XCTAssertFalse(checked("cache.npm"))
         box.click()
         app.buttons["caches.clear"].click()
         let confirm = app.buttons["caches.confirm"]
@@ -217,13 +224,15 @@ final class OpenSweepUITests: XCTestCase {
         for (i, screen) in ["overview", "projects", "caches", "history", "devStack"].enumerated() {
             app.typeKey(String(i + 1), modifierFlags: .command)
             if screen == "projects" { app.buttons["project.shop-web"].click() }
+            // Let entrance animations finish: the audit measures what is on
+            // screen, and a half-faded view reads as low contrast.
             sleep(2)
             // Every issue fails the test except:
             // - a framework container (a Group or AppKit's TouchBar) with no
             //   identifier: no description or a parent/child mismatch on what
             //   SwiftUI builds for the split view;
             // - a contrast finding our own pixel measurement disproves. The
-            //   audit misreads text on the gradient (it flagged 6.4:1 and
+            //   audit misreads text on tinted fills (it flagged 6.4:1 and
             //   8.1:1 text), so the element's screenshot is measured instead.
             // Issues are collected so one run reports all of them.
             try app.performAccessibilityAudit { issue in
@@ -235,6 +244,12 @@ final class OpenSweepUITests: XCTestCase {
                 // SwiftUI pop-up menus open with the show-menu action VoiceOver
                 // uses; the audit looks only for a press action.
                 if issue.auditType == .action, [.popUpButton, .menuButton].contains(e?.elementType) { return true }
+                // On macOS 15 a SwiftUI menu's name is its title, which
+                // VoiceOver reads, and the audit wants a description. Only a
+                // menu that really has a name is let through.
+                if issue.auditType == .sufficientElementDescription, let e,
+                   [.popUpButton, .menuButton].contains(e.elementType),
+                   !e.label.isEmpty || !e.title.isEmpty { return true }
                 // A parent/child mismatch the audit cannot name an element for
                 // is in what SwiftUI builds, not in a view of ours.
                 if issue.auditType == .parentChild, e == nil { return true }
@@ -253,7 +268,8 @@ final class OpenSweepUITests: XCTestCase {
     }
 
     /// WCAG contrast between the text and background of a screenshot: the
-    /// brightest and darkest few percent of pixels (text is the minority).
+    /// brightest and darkest 1% of pixels (text is the minority; small
+    /// caption text in a chip may cover only a few percent).
     static func contrast(_ image: NSImage) -> Double {
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return 0 }
         func lum(_ c: NSColor) -> Double {
@@ -269,7 +285,7 @@ final class OpenSweepUITests: XCTestCase {
         }
         guard l.count > 50 else { return 0 }
         l.sort()
-        let dark = l[l.count / 20], light = l[l.count - 1 - l.count / 50]
+        let dark = l[l.count / 100], light = l[l.count - 1 - l.count / 100]
         return (light + 0.05) / (dark + 0.05)
     }
 
@@ -305,6 +321,31 @@ final class OpenSweepUITests: XCTestCase {
     }
 
     /// U1: Projects shows what can be cleaned by default; All shows the rest.
+    /// G4: arrows move through projects and folders; Space ticks a folder.
+    func testKeyboardMovesThroughProjectsAndFolders() {
+        scan()
+        open("shop-web")
+        let shop = app.buttons["project.shop-web"]
+        XCTAssertTrue(app.checkBoxes["item.node_modules"].waitForExistence(timeout: 10))
+        XCTAssertTrue(shop.isSelected)
+
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(NSPredicate(format: "isSelected == false").evaluate(with: shop), "↓ moves to the next project")
+        app.typeKey(.upArrow, modifierFlags: [])
+        XCTAssertTrue(shop.isSelected, "↑ comes back")
+
+        XCTAssertFalse(checked("item.node_modules"))
+        app.typeKey(.rightArrow, modifierFlags: [])
+        app.typeKey(.space, modifierFlags: [])
+        XCTAssertTrue(checked("item.node_modules"), "Space ticks the first folder")
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.space, modifierFlags: [])
+        XCTAssertFalse(checked("item..next"), "↓ then Space unticks the next one")
+        app.typeKey(.leftArrow, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertFalse(shop.isSelected, "← returns to the project list")
+    }
+
     func testProjectsFilter() throws {
         try file("empty-app/package.json", 2)
         scan()
@@ -340,6 +381,8 @@ final class OpenSweepUITests: XCTestCase {
         let size = window.frame.size
         for screen in ["projects", "caches", "history", "devStack", "overview"] {
             app.outlines.cells.containing(.any, identifier: "nav.\(screen)").firstMatch.click()
+            // This asserts nothing moves, so it must let layout settle; there
+            // is no element to wait for when the right outcome is no change.
             sleep(3)
             if screen == "devStack" { shot("sidebar-dev-stack") }
             XCTAssertEqual(overview.frame.minY, top, accuracy: 2, "\(screen) pushed the sidebar up")

@@ -13,4 +13,10 @@ enum Updater {
     }()
 
     static func checkForUpdates() { controller?.checkForUpdates(nil) }
+
+    /// Whether Sparkle checks on its own; nil when this build has no updater.
+    static var automaticChecks: Bool? {
+        get { controller?.updater.automaticallyChecksForUpdates }
+        set { if let newValue { controller?.updater.automaticallyChecksForUpdates = newValue } }
+    }
 }

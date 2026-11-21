@@ -7,6 +7,20 @@ shows which rebuildable folders are taking space (`node_modules`, `target`,
 `.venv`, build output), explains why each one is safe to remove, and makes
 every clean reversible. Local only: no account, no telemetry.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/overview-dark.png">
+  <img src="docs/assets/screens/overview-light.png" width="880" alt="Overview: space ready to clean now, by language">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/projects-dark.png">
+  <img src="docs/assets/screens/projects-light.png" width="430" alt="Projects: each folder with its class, size and why it is safe">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/history-dark.png">
+  <img src="docs/assets/screens/history-light.png" width="430" alt="History: every clean, restorable until purged">
+</picture>
+
 > **Status: beta (milestone M4).** The Rust engine and CLI find projects,
 > judge whether each is in use, and clean rebuildable folders into a
 > quarantine you can restore from. The Mac app (macOS 14 or later) runs that
