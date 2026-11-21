@@ -50,6 +50,14 @@ owner: R1, R3, R5, P7; C2 stays a toolchain.
 | G5 | No docs site or screenshots (M5) | See commit history |
 | G6 | Light palette and Reduce Motion unchecked after the solid-canvas redesign | Walkthrough takes `OPENSWEEP_QA_APPEARANCE` |
 
+## Third pass (21 Nov 2026, v0.2.0)
+
+R1 closed: CI runs again and is green on `main`, UI tests included. R4 and R5
+in part: the Sparkle key is set, releases need the owner's approval, `v*`
+tags are protected, and `cargo audit` runs in CI. Open: R3 (trademark
+search), R5 (20-tester beta, usability pass), R6 (release-build timing), P7
+(original character). Developer ID stays off by choice.
+
 ## 1. Product gaps (the idea is not delivered without these)
 
 | # | Gap | Evidence | Proposal |

@@ -25,10 +25,18 @@ use serde_json::{json, Value};
 /// Version of every JSON shape this binary prints.
 const SCHEMA_VERSION: u32 = 1;
 
+/// The app's version when built inside it (the Xcode build passes
+/// `MARKETING_VERSION`, which a release takes from its tag); the crate's own
+/// version for a plain `cargo build`.
+const VERSION: &str = match option_env!("OPENSWEEP_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 #[derive(Parser)]
 #[command(
     name = "opensweep",
-    version,
+    version = VERSION,
     about = "Reclaim disk space from developer projects, safely"
 )]
 struct Cli {

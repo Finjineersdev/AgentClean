@@ -1,13 +1,14 @@
 # Releasing OpenSweep
 
 1. Make sure `main` is green (CI and engine workflows).
-2. Tag and push. The tag sets the version; `MARKETING_VERSION` in the project
-   is only the default for local builds.
+2. Tag and push. The tag sets the version of the app and of its engine
+   (`opensweep --version`); `MARKETING_VERSION` in the project is only the
+   default for local builds, so set it to the version you just released.
    ```bash
-   git tag -a v0.4.0 -m "OpenSweep 0.4.0"
-   git push origin v0.4.0
+   git tag -a v0.3.0 -m "OpenSweep 0.3.0"
+   git push origin v0.3.0
    ```
-   A tag with a suffix (`v0.4.0-beta.1`) is published as a pre-release, which
+   A tag with a suffix (`v0.3.0-beta.1`) is published as a pre-release, which
    the update feed and the cask skip.
 3. Approve the run: the release job waits in the `release` environment
    until you approve it under Actions (one click).

@@ -207,7 +207,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -euo pipefail\n# ADR 0005: the app runs the engine binary bundled next to its own executable.\nexport PATH=\"$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/engine\"\n# Not Contents/MacOS: the file system ignores case, and opensweep would\n# replace the app's own OpenSweep executable.\nout=\"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/opensweep\"\nbins=()\nfor arch in $ARCHS; do\n  case \"$arch\" in\n    arm64) triple=aarch64-apple-darwin ;;\n    x86_64) triple=x86_64-apple-darwin ;;\n    *) echo \"error: no Rust target for $arch\"; exit 1 ;;\n  esac\n  cargo build --locked --release -p opensweep-cli --target \"$triple\"\n  bins+=(\"target/$triple/release/opensweep\")\ndone\nmkdir -p \"$(dirname \"$out\")\"\nlipo -create \"${bins[@]}\" -output \"$out\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  ts=--timestamp=none\n  # Notarization needs a secure timestamp; ad-hoc and Debug builds skip it.\n  if [ \"$CONFIGURATION\" = Release ] && [ \"$EXPANDED_CODE_SIGN_IDENTITY\" != - ]; then ts=--timestamp; fi\n  codesign --force --options runtime \"$ts\" --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" \"$out\"\nfi\n";
+			shellScript = "set -euo pipefail\n# ADR 0005: the app runs the engine binary bundled next to its own executable.\nexport PATH=\"$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\ncd \"$SRCROOT/engine\"\n# The engine reports the app's version (opensweep --version).\nexport OPENSWEEP_VERSION=\"$MARKETING_VERSION\"\n# Not Contents/MacOS: the file system ignores case, and opensweep would\n# replace the app's own OpenSweep executable.\nout=\"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/opensweep\"\nbins=()\nfor arch in $ARCHS; do\n  case \"$arch\" in\n    arm64) triple=aarch64-apple-darwin ;;\n    x86_64) triple=x86_64-apple-darwin ;;\n    *) echo \"error: no Rust target for $arch\"; exit 1 ;;\n  esac\n  cargo build --locked --release -p opensweep-cli --target \"$triple\"\n  bins+=(\"target/$triple/release/opensweep\")\ndone\nmkdir -p \"$(dirname \"$out\")\"\nlipo -create \"${bins[@]}\" -output \"$out\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  ts=--timestamp=none\n  # Notarization needs a secure timestamp; ad-hoc and Debug builds skip it.\n  if [ \"$CONFIGURATION\" = Release ] && [ \"$EXPANDED_CODE_SIGN_IDENTITY\" != - ]; then ts=--timestamp; fi\n  codesign --force --options runtime \"$ts\" --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" \"$out\"\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -380,7 +380,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.finjineers.opensweep;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -417,7 +417,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.finjineers.opensweep;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -439,7 +439,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.finjineers.opensweep.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -457,7 +457,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.finjineers.opensweep.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

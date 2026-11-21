@@ -122,7 +122,7 @@ audit test, hardened runtime and notarization in the Release workflow, Sparkle
 updates, and a Homebrew cask. Since 20 Nov 2026 the repository is public and
 ships without Apple Developer ID (owner's choice): ad-hoc signed, normal
 releases, the tap `Finjineersdev/homebrew-tap` updates itself, the owner's
-icon is in. Left for the owner: the Sparkle key (`docs/RELEASING.md`).
+icon is in. The Sparkle key is set (21 Nov 2026).
 - Renamed AgentClean to OpenSweep on 20 Nov 2026: another Mac app already
   sells as "AgentClean". The engine adopts an old `AgentClean` data folder
   once (I22). A first-pass check of "OpenSweep" found no trademark but
@@ -138,13 +138,42 @@ menus' press action, and contrast findings the element's own pixels disprove
 - 20 Nov 2026: the drifting gradient backdrop was replaced by a solid canvas
   (owner's call: "premium, not cheap"); motion is calmer, see `Motion.swift`.
 
+### v0.2.0 (released 21 Nov 2026)
+
+Pull request #1 merged the M5 work and a code and security review; tagged
+`v0.2.0`, published with a signed update feed, and the tap updated.
+
+- App: space flow (Sankey) on Overview, which now fills wide windows; cache
+  map (treemap) on Caches; keyboard navigation in Projects; switches for the
+  character and update checks; README screenshots in light and dark.
+- Engine: `shared` sizes (hard links, pnpm and bun stores, F8); skipped
+  folders refused by macOS privacy protection have the reason `protected`.
+- Security: move and restore go through open folder handles (`rustix`, no
+  `unsafe`), closing the reverify-to-rename race and the restore that could
+  replace an empty folder; a bad commit date no longer crashes a scan; folders
+  a repository keeps are protected inside cleanable folders; relative PATH
+  entries are ignored; the quarantine store must be the user's own and
+  owner-only; a timed-out cache tool is stopped with its process group;
+  `OPENSWEEP_BIN` is Debug-only; Dev Stack never offers a command built from
+  a name with shell characters. Each has a test that fails without it.
+- Releases: the job runs in the `release` environment (owner's approval,
+  `v*` tags only, signing secrets live there); a tag rule lets only an admin
+  create, move or delete `v*` tags (`scripts/protect-releases.sh`).
+  `cargo audit` runs on every engine change and weekly. The engine reports
+  the app's version (`opensweep --version`).
+- Verified: engine checks on macOS and Linux, 21 CleanCore tests, 13 UI tests
+  on macOS 26 locally and macOS 15 in CI, the walkthrough (33/33) in dark and
+  light, the update signature against v0.1.0's key, build provenance.
+
 ## 5. Known gaps and risks
 
 | Gap | Where it gets fixed |
 | --- | --- |
 | Projects on network drives, and on drives without Unix permissions (exFAT, FAT), are skipped | ADR 0004 |
-| GitHub Actions not pinned to commit SHAs | Before first release |
-| Signing, notarization, Sparkle keys and the Homebrew tap need the owner's Apple and GitHub accounts | Owner, `docs/RELEASING.md` |
+| Ad-hoc signed, not notarized (owner's open-source choice): first launch needs right-click → Open, and the hardened runtime is off | Developer ID secrets in the `release` environment, `docs/RELEASING.md` |
+| The character is Open Peeps (CC0 stock), not original (P7) | Owner |
+| No lawyer's trademark search for "OpenSweep" yet | Owner |
+| The project walk is single-threaded (about 43 s for a whole disk in a debug build) | Measure a release build first (R6) |
 | UI tests need macOS automation mode; on a developer Mac run `sudo automationmodetool enable-automationmode-without-authentication` once (CI runners have it) | Owner's Mac |
 
 ## 6. Roadmap
@@ -158,15 +187,20 @@ menus' press action, and contrast findings the element's own pixels disprove
 
 ## 7. Next session
 
-The gap review of 20 Nov 2026 (`docs/GAP-REVIEW.md`) lists what is still
-missing against the idea, with a suggested order; start there.
+v0.2.0 is out and every code gap in `docs/GAP-REVIEW.md` is closed. What is
+left is the beta (M4's exit criteria) and the owner's items.
 
-1. Run the engine checks from `CLAUDE.md`, `cd CleanCore && swift test`, and
-   `scripts/check-swift-never-deletes.sh`; all should pass.
-2. Build the app and run the Debug walkthrough in `QA-CHECKLIST.md`.
-3. If the owner has added the release secrets, tag `v0.4.0-beta.1` and check
-   the release installs on a clean Mac. Otherwise start M5 (scheduled clean,
-   Docker and AI model stores, review-only).
+1. Run the engine checks from `CLAUDE.md`, `cd CleanCore && swift test`,
+   `scripts/check-swift-never-deletes.sh`, then the Debug walkthrough in
+   `QA-CHECKLIST.md`; all should pass.
+2. Beta: at least 20 testers through the Homebrew cask, and a five-developer
+   usability pass (F13). Collect issues; no open severity-one bugs to exit.
+3. Measure a whole-disk scan in a release build (R6); parallelise per root
+   only if it is slow.
+4. Owner: an original character (P7), a trademark search, and Developer ID
+   if the first-launch step puts testers off.
+5. Release with `docs/RELEASING.md`; set `MARKETING_VERSION` to the released
+   version afterwards.
 
 ## 8. Facts worth keeping
 
