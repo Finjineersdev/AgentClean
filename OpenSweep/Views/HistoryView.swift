@@ -26,6 +26,8 @@ struct HistoryView: View {
                     }
                     .fixedSize()
                     .disabled(model.stats.held == 0)
+                    // macOS 15 does not take the label from the menu's title.
+                    .accessibilityLabel("Free older runs")
                     .accessibilityIdentifier("purgeOlder")
                 }
                 totals
