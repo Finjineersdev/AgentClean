@@ -94,6 +94,7 @@ jobs:
           APP=build/dd/Build/Products/Release/OpenSweep.app
           lipo -archs "$APP/Contents/Helpers/opensweep" | grep -q "x86_64 arm64"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "${VERSION#v}"
+          test "$("$APP/Contents/Helpers/opensweep" --version)" = "opensweep ${VERSION#v}"
           codesign --verify --deep --strict --verbose=2 "$APP"
           # It must start: a library macOS refuses to load ends it at once.
           "$APP/Contents/MacOS/OpenSweep" & pid=$!; sleep 5; kill -0 $pid; kill $pid
