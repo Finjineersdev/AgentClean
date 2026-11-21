@@ -244,6 +244,12 @@ final class OpenSweepUITests: XCTestCase {
                 // SwiftUI pop-up menus open with the show-menu action VoiceOver
                 // uses; the audit looks only for a press action.
                 if issue.auditType == .action, [.popUpButton, .menuButton].contains(e?.elementType) { return true }
+                // On macOS 15 a SwiftUI menu's name is its title, which
+                // VoiceOver reads, and the audit wants a description. Only a
+                // menu that really has a name is let through.
+                if issue.auditType == .sufficientElementDescription, let e,
+                   [.popUpButton, .menuButton].contains(e.elementType),
+                   !e.label.isEmpty || !e.title.isEmpty { return true }
                 // A parent/child mismatch the audit cannot name an element for
                 // is in what SwiftUI builds, not in a view of ours.
                 if issue.auditType == .parentChild, e == nil { return true }
